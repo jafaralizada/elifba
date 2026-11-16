@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 90">
+  <!-- The dinosaurs pack's backdrop: a prehistoric valley with soft hills, ferns and a distant volcano, and no dinosaur or egg (a child counts the pictures on the tiles). Elifba own art, MIT. -->
+  <!-- 16:9 and low contrast so tiles stay readable: the colours of ADR 014's guide mixed with white, no outline, light from the top left; the valley floor stays in the bottom fifth (y 66–90). -->
+  <defs>
+    <linearGradient id="vadi_sky1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E4F6F8"/><stop offset="0.78" stop-color="#FBFDF7"/></linearGradient>
+    <radialGradient id="vadi_glow2" cx="0.08" cy="0" r="0.62"><stop offset="0" stop-color="#FFFBE0" stop-opacity="0.88"/><stop offset="1" stop-color="#FFFBE0" stop-opacity="0"/></radialGradient>
+    <linearGradient id="vadi_cloud3" x1="0" y1="0" x2="0" y2="1"><stop offset="0.3" stop-color="#FFFFFF" stop-opacity="0.92"/><stop offset="1" stop-color="#E7E3F5" stop-opacity="0.82"/></linearGradient>
+    <filter id="vadi_blur035" x="-0.5" y="-0.5" width="2" height="2"><feGaussianBlur stdDeviation="0.35"/></filter>
+    <radialGradient id="vadi_volcano4" cx="0.35" cy="0.2" r="0.9"><stop stop-color="#E5DCE8"/><stop offset="0.55" stop-color="#D5CADC"/><stop offset="1" stop-color="#C2B5CD"/></radialGradient>
+    <radialGradient id="vadi_lava5" cx="0.5" cy="0.2" r="0.8"><stop stop-color="#FFE3B8"/><stop offset="0.5" stop-color="#FFC7A6"/><stop offset="1" stop-color="#F3ACA4"/></radialGradient>
+    <linearGradient id="vadi_plume6" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#DDD6E6" stop-opacity="0.75"/><stop offset="1" stop-color="#F6F3FA" stop-opacity="0.2"/></linearGradient>
+    <radialGradient id="vadi_hill7" cx="0.3" cy="0.1" r="1"><stop stop-color="#F1FCE0"/><stop offset="0.5" stop-color="#E3F0D4"/><stop offset="1" stop-color="#D6E6C4"/></radialGradient>
+    <radialGradient id="vadi_hill8" cx="0.3" cy="0.1" r="1"><stop stop-color="#E9F9D2"/><stop offset="0.5" stop-color="#D4E8BE"/><stop offset="1" stop-color="#C4DCA8"/></radialGradient>
+    <radialGradient id="vadi_fern9" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#E2FBBF"/><stop offset="0.5" stop-color="#C5E2A6"/><stop offset="1" stop-color="#B1D28E"/></radialGradient>
+    <linearGradient id="vadi_trunk10" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#DFB8A2"/><stop offset="1" stop-color="#C1B0AE"/></linearGradient>
+  </defs>
+  <rect width="160" height="90" fill="url(#vadi_sky1)"/>
+  <rect width="160" height="90" fill="url(#vadi_glow2)"/>
+  <path d="M20.00,22.00 C17.62,22.00 17.25,17.97 20.37,17.78 C21.28,13.38 28.25,12.47 30.08,16.50 C32.28,14.12 37.97,15.03 38.15,18.52 C41.27,18.52 42.00,22.00 39.25,22.00 Z" fill="url(#vadi_cloud3)" filter="url(#vadi_blur035)"/>
+  <path d="M92.00,16.00 C89.83,16.00 89.50,12.33 92.33,12.17 C93.17,8.17 99.50,7.33 101.17,11.00 C103.17,8.83 108.33,9.67 108.50,12.83 C111.33,12.83 112.00,16.00 109.50,16.00 Z" fill="url(#vadi_cloud3)" filter="url(#vadi_blur035)"/>
+  <path d="M126.5,58.5 C124.2,55.2 125.8,51.0 129.0,51.2 C130.4,48.4 134.8,48.6 136.0,51.4 C138.8,51.6 140.0,55.2 137.8,58.5 Z" fill="url(#vadi_plume6)" filter="url(#vadi_blur035)"/>
+  <path d="M111,76 L125.2,58.8 C125.8,58.1 126.6,57.8 127.5,57.8 L134.5,57.8 C135.4,57.8 136.2,58.1 136.8,58.8 L151,76 Z" fill="url(#vadi_volcano4)"/>
+  <path d="M126.4,57.8 L135.6,57.8 L134.2,63.2 C133.9,64.2 132.8,64.4 132.3,63.5 L131.2,61.6 L129.8,64.6 C129.3,65.5 128.1,65.3 127.9,64.2 Z" fill="url(#vadi_lava5)"/>
+  <path d="M0,73.5 C22,67.5 46,68.2 72,72.4 C98,76.4 122,71.2 160,68.8 L160,90 L0,90 Z" fill="url(#vadi_hill7)"/>
+  <rect x="18.2" y="71.2" width="1.8" height="10.2" rx="0.9" fill="url(#vadi_trunk10)"/>
+  <path d="M19.1,71.6 C14.2,68.2 11.4,69.8 10.2,72.4 C13.2,72.0 16.0,72.2 19.1,73.4 C22.2,72.2 25.0,72.0 28.0,72.4 C26.8,69.8 24.0,68.2 19.1,71.6 Z" fill="url(#vadi_fern9)"/>
+  <path d="M19.1,69.8 C15.4,65.6 13.0,66.4 12.0,68.8 C14.6,68.8 16.8,69.4 19.1,71.2 C21.4,69.4 23.6,68.8 26.2,68.8 C25.2,66.4 22.8,65.6 19.1,69.8 Z" fill="url(#vadi_fern9)"/>
+  <path d="M0,81.8 C28,78.8 58,80.4 90,82.0 C118,83.4 140,80.4 160,79.8 L160,90 L0,90 Z" fill="url(#vadi_hill8)"/>
+  <path d="M142.0,82.6 C138.6,77.8 134.8,77.2 132.8,79.2 C135.8,79.6 138.6,81.0 141.2,83.4 Z" fill="url(#vadi_fern9)"/>
+  <path d="M142.0,82.6 C145.4,77.8 149.2,77.2 151.2,79.2 C148.2,79.6 145.4,81.0 142.8,83.4 Z" fill="url(#vadi_fern9)"/>
+  <path d="M142.0,82.8 C142.0,76.8 140.2,74.8 138.4,75.8 C140.2,77.4 141.2,79.8 142.0,83.2 Z" fill="url(#vadi_fern9)"/>
+</svg>

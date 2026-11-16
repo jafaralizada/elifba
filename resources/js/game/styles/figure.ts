@@ -21,7 +21,15 @@
  * Fluent manner of the pictures above it, without an outline.
  */
 import Phaser from 'phaser';
-import { css, paintPlate, step, texture } from './fluent';
+import {
+    css,
+    ellipse,
+    paintPlate,
+    rgba,
+    roundedRect,
+    step,
+    texture,
+} from './fluent';
 import { itemLabel, shade } from './item';
 import type { Band, ItemDrawing, ItemLayout, ItemLook } from './types';
 
@@ -58,6 +66,8 @@ export type FigureShape = {
     motion: { up: number; down: number };
     /** Where item `index` rests across the free board (find, pop). */
     restY: (index: number) => number;
+    /** Whether the plate's corners carry soft dinosaur-egg spots. */
+    spots?: boolean;
 };
 
 /** The size figures are rasterised at: the largest an item draws them. */
@@ -106,26 +116,55 @@ function plateTexture(
     scene: Phaser.Scene,
     colour: number,
     width: number,
+    spots: boolean = false,
 ): { key: string; pad: number; w: number; h: number } {
     const w = step(width);
     const h = Math.round(w * PLATE);
     const pad = Math.ceil(w * PAD);
-    const key = `figure-plate-${css(colour)}-${w}`;
+    const key = `figure-plate-${spots ? 'spots-' : ''}${css(colour)}-${w}`;
 
     texture(scene, key, w + pad * 2, h + pad * 2, (context) => {
         const rim = Math.max(4, w * RIM);
+        const radius = h * 0.28;
 
         paintPlate(
             context,
             { x: pad, y: pad, width: w, height: h },
             {
                 colour,
-                radius: h * 0.28,
+                radius,
                 inset: { side: rim, top: rim, bottom: rim },
                 face: shade(colour, 0.86),
                 shadow: { blur: w * 0.05, drop: w * 0.025 },
             },
         );
+
+        if (spots) {
+            context.save();
+            roundedRect(
+                context,
+                pad + rim,
+                pad + rim,
+                w - rim * 2,
+                h - rim * 2,
+                Math.max(4, radius - rim),
+            );
+            context.clip();
+            context.fillStyle = rgba(colour, 0.14);
+
+            for (const [sx, sy, rx, ry] of [
+                [0.12, 0.22, 0.036, 0.048],
+                [0.2, 0.15, 0.018, 0.024],
+                [0.88, 0.24, 0.034, 0.045],
+                [0.81, 0.82, 0.024, 0.032],
+                [0.14, 0.8, 0.028, 0.036],
+            ] as const) {
+                ellipse(context, pad + w * sx, pad + h * sy, w * rx, h * ry);
+                context.fill();
+            }
+
+            context.restore();
+        }
     });
 
     return { key, pad, w, h };
@@ -164,7 +203,7 @@ export function drawFigure(
         );
     }
 
-    const paint = plateTexture(scene, colour, width);
+    const paint = plateTexture(scene, colour, width, shape.spots ?? false);
     const scale = width / paint.w;
     const sign = scene.add
         .image(0, plateTop + plate / 2, paint.key)

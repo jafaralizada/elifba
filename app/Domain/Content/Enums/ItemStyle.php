@@ -26,6 +26,9 @@ enum ItemStyle: string
      */
     case Picture = 'picture';
 
+    /** A dinosaur standing behind a spotted plate with the item's text. */
+    case Dino = 'dino';
+
     /**
      * Whether each item stands in front of a picture from the pack's
      * `style.figures` (§2 "Figures"): the pack must list them, and no other
@@ -34,7 +37,7 @@ enum ItemStyle: string
     public function hasFigures(): bool
     {
         return match ($this) {
-            self::Animal, self::Fruit => true,
+            self::Animal, self::Fruit, self::Dino => true,
             self::Balloon, self::Wagon, self::Card, self::Bubble, self::Picture => false,
         };
     }

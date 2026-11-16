@@ -67,16 +67,17 @@ Azerbaijani terms used by teachers and in the interface, the English words used 
 
 ### Theme packs
 
-| Azərbaycanca  | English          | Pack key   | Default style                      |
-| ------------- | ---------------- | ---------- | ---------------------------------- |
-| qatar         | train            | `train`    | `wagon` items and slots            |
-| şar(lar)      | balloons         | `balloons` | `balloon`                          |
-| heyvanlar     | animals          | `animals`  | `animal`, `sparkle` effect         |
-| meyvələr      | fruit            | `fruit`    | `fruit`                            |
-| şəhərlərimiz  | our cities       | `cities`   | `card`                             |
-| milli rəmzlər | national symbols | `symbols`  | `card`, `sparkle` effect only      |
-| rənglər       | colours          | `colors`   | `picture`; R6, picture levels only |
-| rəqəmlər      | numbers          | `numbers`  | `bubble`; R6, number levels only   |
+| Azərbaycanca  | English          | Pack key    | Default style                      |
+| ------------- | ---------------- | ----------- | ---------------------------------- |
+| qatar         | train            | `train`     | `wagon` items and slots            |
+| şar(lar)      | balloons         | `balloons`  | `balloon`                          |
+| heyvanlar     | animals          | `animals`   | `animal`, `sparkle` effect         |
+| dinozavrlar   | dinosaurs        | `dinosaurs` | `dino`, `sparkle` effect           |
+| meyvələr      | fruit            | `fruit`     | `fruit`                            |
+| şəhərlərimiz  | our cities       | `cities`    | `card`                             |
+| milli rəmzlər | national symbols | `symbols`   | `card`, `sparkle` effect only      |
+| rənglər       | colours          | `colors`    | `picture`; R6, picture levels only |
+| rəqəmlər      | numbers          | `numbers`   | `bubble`; R6, number levels only   |
 
 ## Games
 

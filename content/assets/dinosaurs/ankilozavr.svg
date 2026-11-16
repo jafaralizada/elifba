@@ -1,0 +1,24 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- ankilozavr: an armoured Ankylosaurus with back spikes and a heavy tail club. Elifba own art, MIT. -->
+<path d="M10.4 11.4L11.8 8.8L13.2 11.2Z" fill="url(#ankilozavr_spike1)"/>
+<path d="M14.2 10.6L15.8 7.8L17.4 10.6Z" fill="url(#ankilozavr_spike1)"/>
+<path d="M18.2 11.0L19.8 8.4L21.2 11.4Z" fill="url(#ankilozavr_spike1)"/>
+<path d="M21.8 12.6L23.4 10.2L24.4 13.2Z" fill="url(#ankilozavr_spike1)"/>
+<path d="M9.6 22.0H12.8V28.8C12.8 29.5 12.3 30.0 11.6 30.0H10.0C9.4 30.0 9.0 29.5 9.1 28.8L9.6 22.0Z" fill="url(#ankilozavr_leg2)"/>
+<path d="M18.6 22.0H21.8V28.8C21.8 29.5 21.3 30.0 20.6 30.0H19.0C18.4 30.0 18.0 29.5 18.1 28.8L18.6 22.0Z" fill="url(#ankilozavr_leg2)"/>
+<path d="M2.2 19.2C2.0 16.8 4.0 14.8 6.8 14.8C8.4 12.2 12.2 10.6 16.6 10.8C21.0 11.0 24.4 13.4 25.6 16.8L28.6 17.6C29.4 17.8 29.4 19.4 28.4 19.8L24.8 20.6C23.0 23.2 19.4 24.4 15.0 24.4C10.8 24.4 7.8 23.2 6.4 21.4C4.0 21.6 2.4 20.8 2.2 19.2Z" fill="url(#ankilozavr_body3)"/>
+<path d="M7.6 19.4C8.4 13.2 12.0 10.6 16.8 10.8C21.4 11.0 24.8 13.8 25.4 19.4C21.6 20.6 11.8 20.6 7.6 19.4Z" fill="url(#ankilozavr_shell4)"/>
+<ellipse cx="29.0" cy="18.6" rx="2.2" ry="1.8" fill="url(#ankilozavr_shell4)"/>
+<path d="M7.4 22.4H10.6V28.8C10.6 29.5 10.1 30.0 9.4 30.0H7.8C7.2 30.0 6.8 29.5 6.9 28.8L7.4 22.4Z" fill="url(#ankilozavr_body3)"/>
+<path d="M16.4 22.4H19.6V28.8C19.6 29.5 19.1 30.0 18.4 30.0H16.8C16.2 30.0 15.8 29.5 15.9 28.8L16.4 22.4Z" fill="url(#ankilozavr_body3)"/>
+<circle cx="4.8" cy="17.8" r="0.85" fill="#3A234A"/>
+<circle cx="4.6" cy="17.5" r="0.34" fill="#FFFFFF"/>
+<g filter="url(#ankilozavr_blur05)"><ellipse cx="15.8" cy="13.8" rx="3.4" ry="1.2" fill="#FFF2DC" fill-opacity="0.55" transform="rotate(-4 15.8 13.8)"/></g>
+<defs>
+<radialGradient id="ankilozavr_spike1" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#FCFBFE"/><stop offset="0.5" stop-color="#E8E8E9"/><stop offset="1" stop-color="#D0C9EE"/></radialGradient>
+<radialGradient id="ankilozavr_leg2" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#8C5E51"/><stop offset="0.5" stop-color="#703B50"/><stop offset="1" stop-color="#4E2838"/></radialGradient>
+<radialGradient id="ankilozavr_body3" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#E8A66F"/><stop offset="0.5" stop-color="#C48462"/><stop offset="1" stop-color="#8C5E51"/></radialGradient>
+<radialGradient id="ankilozavr_shell4" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#AA7E73"/><stop offset="0.5" stop-color="#8C5E51"/><stop offset="1" stop-color="#703B50"/></radialGradient>
+<filter id="ankilozavr_blur05" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.5"/></filter>
+</defs>
+</svg>

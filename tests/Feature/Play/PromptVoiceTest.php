@@ -104,9 +104,8 @@ it('leaves prompt.audio null where no clip is made yet, and the round plays as b
     expect(array_unique(array_column(prompts(['mechanic' => 'count', 'pack' => 'fruit', 'level' => 'numbers-5']), 'audio')))->toBe([null]);
 });
 
-it('never voices a teacher word, even one a built-in pack also has', function (): void {
+it('voices a teacher word only when its clip has been made', function (): void {
     Voice::made($this->app);
-    // Names could be children's; «alma» is a built-in word of fruit, not of cities.
     $words = ['nigar', 'alma', 'aysel', 'murad'];
 
     foreach ($words as $text) {
@@ -114,16 +113,19 @@ it('never voices a teacher word, even one a built-in pack also has', function ()
     }
 
     $prompts = prompts(['mechanic' => 'find', 'pack' => 'cities', 'level' => 'words-short', 'own_words' => true, 'rounds' => 8]);
+    $alma = array_filter($prompts, static fn (array $prompt): bool => $prompt['show'] === 'alma');
+    $unvoiced = array_filter($prompts, static fn (array $prompt): bool => $prompt['show'] !== 'alma');
 
     expect(array_values(array_unique(array_column($prompts, 'show'))))->toEqualCanonicalizing($words)
-        ->and(array_unique(array_column($prompts, 'audio')))->toBe([null]);
+        ->and(array_unique(array_column($alma, 'audio')))->toBe([clipOf('find.word', 'Alma sözünü tap!')])
+        ->and(array_unique(array_column($unvoiced, 'audio')))->toBe([null]);
 
     // In a game of the pack's own words beside them, the built-in ones are said.
     $mixed = prompts(['mechanic' => 'find', 'pack' => 'cities', 'level' => 'words-short', 'rounds' => 30]);
-    $teacherWords = array_filter($mixed, static fn (array $prompt): bool => in_array($prompt['show'], $words, true));
-    $builtIn = array_filter($mixed, static fn (array $prompt): bool => ! in_array($prompt['show'], $words, true));
+    $unvoicedInMixed = array_filter($mixed, static fn (array $prompt): bool => in_array($prompt['show'], ['nigar', 'aysel', 'murad'], true));
+    $voicedInMixed = array_filter($mixed, static fn (array $prompt): bool => ! in_array($prompt['show'], ['nigar', 'aysel', 'murad'], true));
 
-    expect($teacherWords)->not->toBeEmpty()
-        ->and(array_unique(array_column($teacherWords, 'audio')))->toBe([null])
-        ->and(array_filter(array_column($builtIn, 'audio'), is_null(...)))->toBe([]);
+    expect($unvoicedInMixed)->not->toBeEmpty()
+        ->and(array_unique(array_column($unvoicedInMixed, 'audio')))->toBe([null])
+        ->and(array_filter(array_column($voicedInMixed, 'audio'), is_null(...)))->toBe([]);
 });

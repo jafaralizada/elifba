@@ -1,0 +1,25 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- triseratops: a three-horned Triceratops with a broad neck frill, standing in side view. Elifba own art, MIT. -->
+<path d="M10.4 21.8H14.0V29.0C14.0 29.6 13.5 30.0 12.9 30.0H11.0C10.4 30.0 10.0 29.5 10.1 28.9L10.4 21.8Z" fill="url(#triseratops_leg1)"/>
+<path d="M20.2 21.8H23.8V29.0C23.8 29.6 23.3 30.0 22.7 30.0H20.8C20.2 30.0 19.8 29.5 19.9 28.9L20.2 21.8Z" fill="url(#triseratops_leg1)"/>
+<path d="M11.2 12.2C14.8 11.4 21.6 11.8 25.4 14.4C28.2 16.4 30.2 19.2 30.4 21.6C30.5 22.4 29.6 23.0 28.8 22.6C27.2 21.8 25.8 22.4 24.2 23.4C21.6 24.8 14.2 24.8 11.2 23.2C9.2 22.0 8.6 15.2 11.2 12.2Z" fill="url(#triseratops_body2)"/>
+<path d="M11.2 12.2C14.8 11.4 21.6 11.8 25.4 14.4C28.2 16.4 30.2 19.2 30.4 21.6C30.5 22.4 29.6 23.0 28.8 22.6C27.2 21.8 25.8 22.4 24.2 23.4C21.6 24.8 14.2 24.8 11.2 23.2C9.2 22.0 8.6 15.2 11.2 12.2Z" fill="url(#triseratops_shade3)"/>
+<path d="M7.6 22.6H11.2V29.0C11.2 29.6 10.7 30.0 10.1 30.0H8.2C7.6 30.0 7.2 29.5 7.3 28.9L7.6 22.6Z" fill="url(#triseratops_body2)"/>
+<path d="M17.6 22.6H21.2V29.0C21.2 29.6 20.7 30.0 20.1 30.0H18.2C17.6 30.0 17.2 29.5 17.3 28.9L17.6 22.6Z" fill="url(#triseratops_body2)"/>
+<path d="M8.8 6.6C11.4 4.8 15.2 6.8 15.8 11.2C16.4 15.2 14.2 19.0 11.2 19.4C8.4 19.8 6.8 16.6 6.8 12.6C6.8 9.6 7.4 7.6 8.8 6.6Z" fill="url(#triseratops_frill4)"/>
+<path d="M5.4 10.6C7.8 9.8 11.2 11.2 11.8 14.4C12.4 17.6 10.2 20.2 7.2 20.4C4.8 20.6 2.2 19.6 1.8 17.4C1.4 15.2 3.0 11.4 5.4 10.6Z" fill="url(#triseratops_body2)"/>
+<path d="M6.8 11.8L2.2 7.8C1.6 7.3 2.2 6.4 2.9 6.8L8.2 10.2Z" fill="url(#triseratops_horn5)"/>
+<path d="M8.2 11.2L4.2 6.8C3.7 6.2 4.4 5.4 5.0 5.9L9.6 9.8Z" fill="url(#triseratops_horn5)"/>
+<path d="M2.6 15.2L1.6 12.2C1.4 11.6 2.1 11.2 2.5 11.7L4.2 14.4Z" fill="url(#triseratops_horn5)"/>
+<circle cx="6.2" cy="14.6" r="1.0" fill="#3A234A"/>
+<circle cx="5.9" cy="14.3" r="0.38" fill="#FFFFFF"/>
+<g filter="url(#triseratops_blur05)"><ellipse cx="17.8" cy="14.8" rx="3.4" ry="1.2" fill="#FFE6C2" fill-opacity="0.6" transform="rotate(-6 17.8 14.8)"/></g>
+<defs>
+<radialGradient id="triseratops_leg1" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#FF7E51"/><stop offset="0.5" stop-color="#EE534A"/><stop offset="1" stop-color="#B22945"/></radialGradient>
+<radialGradient id="triseratops_body2" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#FFA35F"/><stop offset="0.5" stop-color="#FF7E51"/><stop offset="1" stop-color="#EE534A"/></radialGradient>
+<radialGradient id="triseratops_shade3" cx="0.85" cy="0.9" r="0.7"><stop stop-color="#B22945" stop-opacity="0.5"/><stop offset="1" stop-color="#B22945" stop-opacity="0"/></radialGradient>
+<radialGradient id="triseratops_frill4" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#FFF246"/><stop offset="0.5" stop-color="#F8CA4D"/><stop offset="1" stop-color="#EE534A"/></radialGradient>
+<radialGradient id="triseratops_horn5" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#FCFBFE"/><stop offset="0.5" stop-color="#E8E8E9"/><stop offset="1" stop-color="#D0C9EE"/></radialGradient>
+<filter id="triseratops_blur05" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.5"/></filter>
+</defs>
+</svg>

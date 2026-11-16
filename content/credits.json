@@ -65,6 +65,7 @@
             "files": [
                 "content/assets/fruit/*",
                 "content/assets/animals/*",
+                "content/assets/dinosaurs/*",
                 "content/assets/balloons/*",
                 "content/assets/train/*"
             ],
@@ -97,11 +98,12 @@
         {
             "files": [
                 "content/assets/animals/cemenlik.svg",
+                "content/assets/dinosaurs/vadi.svg",
                 "content/assets/fruit/bag.svg",
                 "content/assets/colors/goy-uzu.svg",
                 "content/assets/numbers/tepeler.svg"
             ],
-            "title": "Board backdrops in Fluent Emoji's manner: a meadow by a farm (animals), an orchard (fruit), a sky with clouds (colours), soft hills at dawn (numbers)",
+            "title": "Board backdrops in Fluent Emoji's manner: a meadow by a farm (animals), a prehistoric valley (dinosaurs), an orchard (fruit), a sky with clouds (colours), soft hills at dawn (numbers)",
             "author": "Elifba contributors",
             "source": "https://github.com/nijataliyev7/elifba",
             "license": "MIT"

@@ -1,0 +1,17 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- yumurta: a large spotted dinosaur egg. Elifba own art, MIT. -->
+<path d="M16.0 2.4C22.4 2.4 27.2 11.4 27.2 19.6C27.2 26.0 22.4 30.0 16.0 30.0C9.6 30.0 4.8 26.0 4.8 19.6C4.8 11.4 9.6 2.4 16.0 2.4Z" fill="url(#yumurta_shell1)"/>
+<path d="M16.0 2.4C22.4 2.4 27.2 11.4 27.2 19.6C27.2 26.0 22.4 30.0 16.0 30.0C9.6 30.0 4.8 26.0 4.8 19.6C4.8 11.4 9.6 2.4 16.0 2.4Z" fill="url(#yumurta_shade2)"/>
+<ellipse cx="12.2" cy="11.4" rx="2.4" ry="3.0" transform="rotate(-14 12.2 11.4)" fill="url(#yumurta_spot3)"/>
+<ellipse cx="20.6" cy="14.6" rx="2.8" ry="3.4" transform="rotate(16 20.6 14.6)" fill="url(#yumurta_spot3)"/>
+<ellipse cx="11.4" cy="21.8" rx="3.0" ry="2.4" transform="rotate(10 11.4 21.8)" fill="url(#yumurta_spot3)"/>
+<ellipse cx="19.4" cy="24.2" rx="2.0" ry="2.4" transform="rotate(-12 19.4 24.2)" fill="url(#yumurta_spot3)"/>
+<ellipse cx="16.4" cy="7.4" rx="1.5" ry="1.8" fill="url(#yumurta_spot3)"/>
+<g filter="url(#yumurta_blur06)"><ellipse cx="11.8" cy="8.4" rx="2.6" ry="4.2" fill="#FFFFFF" fill-opacity="0.72" transform="rotate(-24 11.8 8.4)"/></g>
+<defs>
+<radialGradient id="yumurta_shell1" cx="0.32" cy="0.24" r="0.82"><stop stop-color="#FCFBFE"/><stop offset="0.52" stop-color="#F2EFE8"/><stop offset="1" stop-color="#D6CBE4"/></radialGradient>
+<radialGradient id="yumurta_shade2" cx="0.85" cy="0.9" r="0.7"><stop stop-color="#988EA1" stop-opacity="0.45"/><stop offset="1" stop-color="#988EA1" stop-opacity="0"/></radialGradient>
+<radialGradient id="yumurta_spot3" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#CFFF73"/><stop offset="0.5" stop-color="#96C860"/><stop offset="1" stop-color="#74A41C"/></radialGradient>
+<filter id="yumurta_blur06" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.6"/></filter>
+</defs>
+</svg>

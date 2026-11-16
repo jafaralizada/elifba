@@ -91,11 +91,11 @@ const SAMPLE_FIGURES = [
     'sample/words/dede.svg', 'sample/words/baci.svg', 'sample/words/kitab.svg', 'sample/words/qelem.svg', 'sample/backdrop.svg',
 ];
 
-it('accepts an animal or fruit look with enough figures, word pictures or others', function (string $item): void {
+it('accepts an animal, fruit or dino look with enough figures, word pictures or others', function (string $item): void {
     $root = ContentFixture::make(['file' => 'packs/sample.json', 'set' => ['style.item' => $item, 'style.figures' => SAMPLE_FIGURES]]);
 
     expect((new ContentValidator($root))->validate())->toBe([]);
-})->with(['animal', 'fruit']);
+})->with(['animal', 'fruit', 'dino']);
 
 it('needs a credits entry for a figure, as for every asset', function (): void {
     $root = ContentFixture::make([
@@ -130,7 +130,7 @@ it('asks for twice as many figures as the fullest round of any level shows', fun
     ])->and(ContentValidator::FIGURES_PER_ITEM * max($most))->toBe(10);
 
     expect(array_map(static fn (ItemStyle $style): bool => $style->hasFigures(), ItemStyle::cases()))
-        ->toBe([false, false, false, false, true, true, false]);
+        ->toBe([false, false, false, false, true, true, false, true]);
 
     foreach ($content->packs() as $pack) {
         $figures = count($pack->style->figures);

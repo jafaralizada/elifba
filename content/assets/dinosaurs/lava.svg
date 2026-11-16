@@ -1,0 +1,15 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- lava: glowing molten volcanic lava pooling and bubbling. Elifba own art, MIT. -->
+<path d="M16.0 3.2C20.2 3.2 22.8 6.4 21.8 10.6C21.2 13.0 23.6 14.8 26.2 15.8C29.0 16.8 30.2 19.6 29.8 22.6C29.2 27.0 23.6 29.8 16.0 29.8C8.4 29.8 2.8 27.0 2.2 22.6C1.8 19.6 3.0 16.8 5.8 15.8C8.4 14.8 10.8 13.0 10.2 10.6C9.2 6.4 11.8 3.2 16.0 3.2Z" fill="url(#lava_outer1)"/>
+<path d="M16.0 6.8C18.6 6.8 20.2 9.0 19.6 11.8C19.0 14.2 21.4 16.0 23.8 17.2C25.8 18.2 26.6 20.2 26.2 22.2C25.6 25.2 21.4 27.0 16.0 27.0C10.6 27.0 6.4 25.2 5.8 22.2C5.4 20.2 6.2 18.2 8.2 17.2C10.6 16.0 13.0 14.2 12.4 11.8C11.8 9.0 13.4 6.8 16.0 6.8Z" fill="url(#lava_inner2)"/>
+<circle cx="11.2" cy="21.4" r="2.2" fill="url(#lava_core3)"/>
+<circle cx="19.8" cy="20.6" r="2.6" fill="url(#lava_core3)"/>
+<circle cx="15.8" cy="14.2" r="1.8" fill="url(#lava_core3)"/>
+<g filter="url(#lava_blur05)"><ellipse cx="15.4" cy="9.6" rx="2.4" ry="1.2" fill="#FFF8B8" fill-opacity="0.8"/></g>
+<defs>
+<radialGradient id="lava_outer1" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#FF7E51"/><stop offset="0.5" stop-color="#F24756"/><stop offset="1" stop-color="#B22945"/></radialGradient>
+<radialGradient id="lava_inner2" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#FFF246"/><stop offset="0.5" stop-color="#FFA35F"/><stop offset="1" stop-color="#EE534A"/></radialGradient>
+<radialGradient id="lava_core3" cx="0.35" cy="0.3" r="0.8"><stop stop-color="#FFFDE0"/><stop offset="0.55" stop-color="#FFF246"/><stop offset="1" stop-color="#F8CA4D"/></radialGradient>
+<filter id="lava_blur05" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.5"/></filter>
+</defs>
+</svg>

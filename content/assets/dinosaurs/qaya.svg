@@ -1,0 +1,15 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- qaya: a tall craggy grey boulder and cliff rock. Elifba own art, MIT. -->
+<path d="M3.2 26.8L6.8 11.4C7.2 9.6 8.4 8.4 10.2 7.8L15.4 3.4C16.8 2.2 18.8 2.6 19.8 4.2L24.2 11.4L28.8 26.4C29.4 28.2 28.2 29.8 26.2 29.8H5.8C3.8 29.8 2.6 28.4 3.2 26.8Z" fill="url(#qaya_stone1)"/>
+<path d="M3.2 26.8L6.8 11.4C7.2 9.6 8.4 8.4 10.2 7.8L15.4 3.4C16.8 2.2 18.8 2.6 19.8 4.2L24.2 11.4L28.8 26.4C29.4 28.2 28.2 29.8 26.2 29.8H5.8C3.8 29.8 2.6 28.4 3.2 26.8Z" fill="url(#qaya_shade2)"/>
+<path d="M16.8 3.2L19.8 4.2L24.2 11.4L28.8 26.4C29.2 27.8 28.4 29.4 26.6 29.8H18.4L15.2 15.6L16.8 3.2Z" fill="url(#qaya_facet3)"/>
+<path d="M18.4 29.8L22.2 18.8C22.8 17.2 24.8 17.0 25.8 18.4L30.0 26.8C30.6 28.2 29.6 29.8 28.0 29.8H18.4Z" fill="url(#qaya_boulder4)"/>
+<g filter="url(#qaya_blur05)"><ellipse cx="12.6" cy="9.4" rx="3.2" ry="1.2" fill="#FFFFFF" fill-opacity="0.65" transform="rotate(-32 12.6 9.4)"/></g>
+<defs>
+<radialGradient id="qaya_stone1" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#DAD9DB"/><stop offset="0.5" stop-color="#C2BDC9"/><stop offset="1" stop-color="#988EA1"/></radialGradient>
+<radialGradient id="qaya_shade2" cx="0.85" cy="0.9" r="0.7"><stop stop-color="#554A63" stop-opacity="0.45"/><stop offset="1" stop-color="#554A63" stop-opacity="0"/></radialGradient>
+<radialGradient id="qaya_facet3" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#C2BDC9"/><stop offset="0.5" stop-color="#988EA1"/><stop offset="1" stop-color="#6A6571"/></radialGradient>
+<radialGradient id="qaya_boulder4" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#DAD9DB"/><stop offset="0.5" stop-color="#C2BDC9"/><stop offset="1" stop-color="#988EA1"/></radialGradient>
+<filter id="qaya_blur05" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.5"/></filter>
+</defs>
+</svg>

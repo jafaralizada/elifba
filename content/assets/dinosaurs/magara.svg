@@ -1,0 +1,15 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- mağara: a rocky prehistoric cave entrance in a hillside. Elifba own art, MIT. -->
+<path d="M2.0 26.8C2.0 14.4 7.8 5.2 16.2 5.2C24.4 5.2 30.0 14.4 30.0 26.8C30.0 28.4 28.8 29.6 27.2 29.6H4.8C3.2 29.6 2.0 28.4 2.0 26.8Z" fill="url(#magara_rock1)"/>
+<path d="M2.0 26.8C2.0 14.4 7.8 5.2 16.2 5.2C24.4 5.2 30.0 14.4 30.0 26.8C30.0 28.4 28.8 29.6 27.2 29.6H4.8C3.2 29.6 2.0 28.4 2.0 26.8Z" fill="url(#magara_shade2)"/>
+<path d="M8.6 29.6C8.6 19.8 11.6 13.8 16.0 13.8C20.4 13.8 23.4 19.8 23.4 29.6H8.6Z" fill="url(#magara_dark3)"/>
+<path d="M13.2 14.2L14.0 17.8L15.0 14.0Z" fill="#988EA1"/>
+<path d="M17.4 14.0L18.2 16.8L19.0 14.4Z" fill="#988EA1"/>
+<g filter="url(#magara_blur05)"><ellipse cx="12.2" cy="9.2" rx="3.8" ry="1.4" fill="#FFFFFF" fill-opacity="0.6" transform="rotate(-18 12.2 9.2)"/></g>
+<defs>
+<radialGradient id="magara_rock1" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#DAD9DB"/><stop offset="0.5" stop-color="#C2BDC9"/><stop offset="1" stop-color="#988EA1"/></radialGradient>
+<radialGradient id="magara_shade2" cx="0.85" cy="0.9" r="0.7"><stop stop-color="#554A63" stop-opacity="0.5"/><stop offset="1" stop-color="#554A63" stop-opacity="0"/></radialGradient>
+<radialGradient id="magara_dark3" cx="0.5" cy="0.2" r="0.9"><stop stop-color="#6A6571"/><stop offset="0.5" stop-color="#554A63"/><stop offset="1" stop-color="#33293D"/></radialGradient>
+<filter id="magara_blur05" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.5"/></filter>
+</defs>
+</svg>

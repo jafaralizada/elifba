@@ -6,7 +6,8 @@
         "bubble",
         "animal",
         "fruit",
-        "picture"
+        "picture",
+        "dino"
     ],
     "slot_styles": ["wagon", "frame"],
     "effects": ["burst", "sparkle"]

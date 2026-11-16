@@ -91,14 +91,14 @@ describe('the setup page', function (): void {
 
                     // With every letter learned, every option starts: 15
                     // mechanic × level pairs of the reading levels in each of
-                    // the 6 packs (A8.3, then pop at the five letter, syllable
+                    // the 7 packs (A8.3, then pop at the five letter, syllable
                     // and word levels), and from R5 the 10 pairs of the picture
-                    // and number levels in the 2 packs that list those units;
+                    // and number levels in the 3 packs that list those units;
                     // from R6 the 4 picture pairs in the colours and the 6
                     // number pairs in the numbers.
-                    expect($options)->toHaveCount(90 + 20 + 4 + 6)
-                        ->and(array_unique(array_column($options, 'pack')))->toHaveCount(8)
-                        ->and(array_count_values(array_column($options, 'mechanic')))->toBe(['pop' => 42, 'find' => 42, 'build_syllable' => 12, 'build_word' => 12, 'build_sentence' => 6, 'count' => 6])
+                    expect($options)->toHaveCount(105 + 30 + 4 + 6)
+                        ->and(array_unique(array_column($options, 'pack')))->toHaveCount(9)
+                        ->and(array_count_values(array_column($options, 'mechanic')))->toBe(['pop' => 51, 'find' => 51, 'build_syllable' => 14, 'build_word' => 14, 'build_sentence' => 7, 'count' => 8])
                         // pop («Oxu və vur») leads, so it is the default chip.
                         ->and(array_values(array_unique(array_column($options, 'mechanic'))))->toBe(['pop', 'find', 'build_syllable', 'build_word', 'build_sentence', 'count']);
 
@@ -172,11 +172,11 @@ describe('the setup page', function (): void {
                     }
 
                     expect($offered)->toBe([
-                        ...array_fill_keys(['pop × pictures-easy', 'find × pictures-easy', 'pop × pictures', 'find × pictures'], ['animals', 'colors', 'fruit']),
+                        ...array_fill_keys(['pop × pictures-easy', 'find × pictures-easy', 'pop × pictures', 'find × pictures'], ['animals', 'colors', 'dinosaurs', 'fruit']),
                         ...array_fill_keys([
                             'pop × numbers-5', 'find × numbers-5', 'count × numbers-5',
                             'pop × numbers-10', 'find × numbers-10', 'count × numbers-10',
-                        ], ['animals', 'fruit', 'numbers']),
+                        ], ['animals', 'dinosaurs', 'fruit', 'numbers']),
                     ])
                         ->and(setupOption($options, 'find', 'cities', 'pictures'))->toBeNull()
                         ->and(setupOption($options, 'count', 'train', 'numbers-5'))->toBeNull()
@@ -295,6 +295,7 @@ describe('starting a game', function (): void {
         'balloons' => ['balloons', 'burst'],
         'train' => ['train', 'burst'],
         'animals' => ['animals', 'sparkle'],
+        'dinosaurs' => ['dinosaurs', 'sparkle'],
         'fruit' => ['fruit', 'burst'],
         'cities' => ['cities', 'sparkle'],
         'symbols' => ['symbols', 'sparkle'],
@@ -332,6 +333,7 @@ describe('starting a game', function (): void {
         'balloons' => ['balloons', 'burst'],
         'train' => ['train', 'burst'],
         'animals' => ['animals', 'sparkle'],
+        'dinosaurs' => ['dinosaurs', 'sparkle'],
         'fruit' => ['fruit', 'burst'],
         'cities' => ['cities', 'sparkle'],
         'symbols' => ['symbols', 'sparkle'],
@@ -360,7 +362,7 @@ describe('starting a game', function (): void {
                 ->and($round->prompt->image !== null)->toBe($mechanic === 'build_word');
         }
     })->with(function (): array {
-        $packs = ['balloons' => 'burst', 'train' => 'burst', 'animals' => 'sparkle', 'fruit' => 'burst', 'cities' => 'sparkle', 'symbols' => 'sparkle'];
+        $packs = ['balloons' => 'burst', 'train' => 'burst', 'animals' => 'sparkle', 'dinosaurs' => 'sparkle', 'fruit' => 'burst', 'cities' => 'sparkle', 'symbols' => 'sparkle'];
         $games = ['build_syllable' => 'syllables-closed', 'build_word' => 'words-long', 'build_sentence' => 'sentences'];
         $cases = [];
 
@@ -422,7 +424,7 @@ describe('starting a game', function (): void {
         expect(GameSession::query()->count())->toBe(0);
     })->with([
         'unknown mechanic' => [['mechanic' => 'dance'], 'mechanic'],
-        'unknown pack' => [['pack' => 'dinosaurs'], 'pack'],
+        'unknown pack' => [['pack' => 'planets'], 'pack'],
         'unknown level' => [['level' => 'poems'], 'level'],
         'too few rounds' => [['rounds' => 4], 'rounds'],
         'too many rounds' => [['rounds' => 31], 'rounds'],

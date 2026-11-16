@@ -1,0 +1,13 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- iz: a three-toed dinosaur footprint pressed into earth. Elifba own art, MIT. -->
+<path d="M16.0 2.4C24.0 2.4 29.6 8.0 29.6 16.0C29.6 24.0 24.0 29.6 16.0 29.6C8.0 29.6 2.4 24.0 2.4 16.0C2.4 8.0 8.0 2.4 16.0 2.4Z" fill="url(#iz_ground1)"/>
+<path d="M16.0 2.4C24.0 2.4 29.6 8.0 29.6 16.0C29.6 24.0 24.0 29.6 16.0 29.6C8.0 29.6 2.4 24.0 2.4 16.0C2.4 8.0 8.0 2.4 16.0 2.4Z" fill="url(#iz_shade2)"/>
+<path d="M16.0 5.6L18.4 12.8L23.8 8.4L21.8 16.4C22.4 20.6 19.8 24.8 16.0 24.8C12.2 24.8 9.6 20.6 10.2 16.4L8.2 8.4L13.6 12.8L16.0 5.6Z" fill="url(#iz_print3)"/>
+<g filter="url(#iz_blur05)"><ellipse cx="10.4" cy="7.2" rx="3.0" ry="1.2" fill="#FFE8DC" fill-opacity="0.55" transform="rotate(-28 10.4 7.2)"/></g>
+<defs>
+<radialGradient id="iz_ground1" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#E8A66F"/><stop offset="0.5" stop-color="#C48462"/><stop offset="1" stop-color="#8C5E51"/></radialGradient>
+<radialGradient id="iz_shade2" cx="0.85" cy="0.9" r="0.7"><stop stop-color="#5F4341" stop-opacity="0.5"/><stop offset="1" stop-color="#5F4341" stop-opacity="0"/></radialGradient>
+<radialGradient id="iz_print3" cx="0.7" cy="0.75" r="0.85"><stop stop-color="#8C5E51"/><stop offset="0.5" stop-color="#5F4341"/><stop offset="1" stop-color="#3A234A"/></radialGradient>
+<filter id="iz_blur05" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.5"/></filter>
+</defs>
+</svg>

@@ -88,7 +88,7 @@ it('starts every build mechanic at every level that has it, in every pack, with 
     }
 
     // syllables-open, syllables-closed, words-short, words-long, sentences.
-    expect($count)->toBe(5 * 6);
+    expect($count)->toBe(5 * 7);
 });
 
 it('plays a pack only when the board draws its look, its effect and, for a build, its slots', function (): void {
@@ -108,8 +108,8 @@ it('plays a pack only when the board draws its look, its effect and, for a build
 it('draws every mechanic in every pack, the train with wagons and the rest with frames', function (): void {
     $packs = app(ContentRepository::class)->packs();
 
-    // The six reading packs and, from R6, the colours and the numbers.
-    expect($packs)->toHaveCount(8);
+    // The seven reading packs and, from R6, the colours and the numbers.
+    expect($packs)->toHaveCount(9);
 
     foreach ($packs as $pack) {
         expect($pack->style->slot)->toBe($pack->key === 'train' ? SlotStyle::Wagon : SlotStyle::Frame, $pack->key);
@@ -120,11 +120,11 @@ it('draws every mechanic in every pack, the train with wagons and the rest with 
     }
 });
 
-it('never bursts the national symbols, the cities or the animals', function (): void {
+it('never bursts the national symbols, the cities, the animals or the dinosaurs', function (): void {
     $content = app(ContentRepository::class);
     $sparkling = array_values(array_filter($content->packs(), static fn ($pack): bool => $pack->style->effect === Effect::Sparkle));
 
-    expect(array_map(static fn ($pack): string => $pack->key, $sparkling))->toBe(['animals', 'cities', 'symbols']);
+    expect(array_map(static fn ($pack): string => $pack->key, $sparkling))->toBe(['animals', 'cities', 'dinosaurs', 'symbols']);
 
     foreach ($sparkling as $pack) {
         foreach ([Mechanic::Find, Mechanic::Pop] as $mechanic) {

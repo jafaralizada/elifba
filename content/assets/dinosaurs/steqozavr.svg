@@ -1,0 +1,26 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- steqozavr: a Stegosaurus with diamond plates along its arched back, standing in side view. Elifba own art, MIT. -->
+<path d="M10.2 11.4L12.0 7.2L14.2 10.6L12.2 13.0Z" fill="url(#steqozavr_plate1)"/>
+<path d="M14.2 9.8L16.8 4.8L19.4 9.2L16.8 12.2Z" fill="url(#steqozavr_plate1)"/>
+<path d="M19.0 10.4L21.8 6.0L24.0 10.6L21.2 13.0Z" fill="url(#steqozavr_plate1)"/>
+<path d="M23.2 12.8L25.8 9.4L27.2 13.4L24.6 15.2Z" fill="url(#steqozavr_plate1)"/>
+<path d="M27.8 16.8L30.2 14.6L29.4 18.0Z" fill="url(#steqozavr_horn2)"/>
+<path d="M28.6 18.8L31.0 17.2L29.8 20.2Z" fill="url(#steqozavr_horn2)"/>
+<path d="M10.6 22.0H13.8V29.0C13.8 29.6 13.3 30.0 12.7 30.0H11.0C10.4 30.0 10.0 29.5 10.1 28.9L10.6 22.0Z" fill="url(#steqozavr_leg3)"/>
+<path d="M19.8 21.6H23.2V29.0C23.2 29.6 22.7 30.0 22.1 30.0H20.2C19.6 30.0 19.2 29.5 19.3 28.9L19.8 21.6Z" fill="url(#steqozavr_leg3)"/>
+<path d="M2.2 17.8C2.0 15.8 3.6 14.2 5.8 14.0C7.8 13.8 9.2 12.4 11.6 11.2C15.2 9.4 20.4 9.6 24.2 12.6C27.2 15.0 29.2 18.4 30.2 21.0C30.5 21.8 29.8 22.6 29.0 22.4C26.6 21.8 24.8 22.8 22.2 23.6C18.4 24.6 12.2 24.6 9.4 23.0C7.6 22.0 6.8 19.8 4.8 19.6C3.2 19.4 2.4 18.8 2.2 17.8Z" fill="url(#steqozavr_body4)"/>
+<path d="M2.2 17.8C2.0 15.8 3.6 14.2 5.8 14.0C7.8 13.8 9.2 12.4 11.6 11.2C15.2 9.4 20.4 9.6 24.2 12.6C27.2 15.0 29.2 18.4 30.2 21.0C30.5 21.8 29.8 22.6 29.0 22.4C26.6 21.8 24.8 22.8 22.2 23.6C18.4 24.6 12.2 24.6 9.4 23.0C7.6 22.0 6.8 19.8 4.8 19.6C3.2 19.4 2.4 18.8 2.2 17.8Z" fill="url(#steqozavr_shade5)"/>
+<path d="M8.4 22.4H11.6V29.0C11.6 29.6 11.1 30.0 10.5 30.0H8.8C8.2 30.0 7.8 29.5 7.9 28.9L8.4 22.4Z" fill="url(#steqozavr_body4)"/>
+<path d="M17.4 22.0H20.8V29.0C20.8 29.6 20.3 30.0 19.7 30.0H17.8C17.2 30.0 16.8 29.5 16.9 28.9L17.4 22.0Z" fill="url(#steqozavr_body4)"/>
+<circle cx="4.8" cy="16.4" r="0.9" fill="#3A234A"/>
+<circle cx="4.6" cy="16.1" r="0.35" fill="#FFFFFF"/>
+<g filter="url(#steqozavr_blur05)"><ellipse cx="16.4" cy="13.8" rx="3.6" ry="1.3" fill="#F4FFCC" fill-opacity="0.6" transform="rotate(-4 16.4 13.8)"/></g>
+<defs>
+<radialGradient id="steqozavr_plate1" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#FFA35F"/><stop offset="0.5" stop-color="#FF7E51"/><stop offset="1" stop-color="#B22945"/></radialGradient>
+<radialGradient id="steqozavr_horn2" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#FCFBFE"/><stop offset="0.5" stop-color="#E8E8E9"/><stop offset="1" stop-color="#D0C9EE"/></radialGradient>
+<radialGradient id="steqozavr_leg3" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#96C860"/><stop offset="0.5" stop-color="#74A41C"/><stop offset="1" stop-color="#4E7814"/></radialGradient>
+<radialGradient id="steqozavr_body4" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#CFFF73"/><stop offset="0.5" stop-color="#96C860"/><stop offset="1" stop-color="#74A41C"/></radialGradient>
+<radialGradient id="steqozavr_shade5" cx="0.85" cy="0.9" r="0.7"><stop stop-color="#74A41C" stop-opacity="0.5"/><stop offset="1" stop-color="#74A41C" stop-opacity="0"/></radialGradient>
+<filter id="steqozavr_blur05" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.5"/></filter>
+</defs>
+</svg>

@@ -55,7 +55,7 @@ The app shows the same list on its `/credits` page.
 
 ### Word pictures Fluent Emoji lacks, drawn in its manner
 
-- Files: `content/assets/fruit/*`, `content/assets/animals/*`, `content/assets/balloons/*`, `content/assets/train/*`
+- Files: `content/assets/fruit/*`, `content/assets/animals/*`, `content/assets/dinosaurs/*`, `content/assets/balloons/*`, `content/assets/train/*`
 - Author: Elifba contributors
 - License: [MIT License](https://opensource.org/license/mit) (`MIT`)
 - Source: <https://github.com/nijataliyev7/elifba>
@@ -81,9 +81,9 @@ The app shows the same list on its `/credits` page.
 - License: [MIT License](https://opensource.org/license/mit) (`MIT`)
 - Source: <https://github.com/nijataliyev7/elifba>
 
-### Board backdrops in Fluent Emoji's manner: a meadow by a farm (animals), an orchard (fruit), a sky with clouds (colours), soft hills at dawn (numbers)
+### Board backdrops in Fluent Emoji's manner: a meadow by a farm (animals), a prehistoric valley (dinosaurs), an orchard (fruit), a sky with clouds (colours), soft hills at dawn (numbers)
 
-- Files: `content/assets/animals/cemenlik.svg`, `content/assets/fruit/bag.svg`, `content/assets/colors/goy-uzu.svg`, `content/assets/numbers/tepeler.svg`
+- Files: `content/assets/animals/cemenlik.svg`, `content/assets/dinosaurs/vadi.svg`, `content/assets/fruit/bag.svg`, `content/assets/colors/goy-uzu.svg`, `content/assets/numbers/tepeler.svg`
 - Author: Elifba contributors
 - License: [MIT License](https://opensource.org/license/mit) (`MIT`)
 - Source: <https://github.com/nijataliyev7/elifba>

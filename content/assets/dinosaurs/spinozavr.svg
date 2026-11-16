@@ -1,0 +1,20 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- spinozavr: a Spinosaurus with a tall rounded back sail, standing in side view. Elifba own art, MIT. -->
+<path d="M11.6 15.2C12.2 8.4 16.0 4.6 20.4 5.2C24.2 5.8 26.8 9.6 26.8 16.2Z" fill="url(#spinozavr_sail1)"/>
+<path d="M14.8 6.4V15.2M18.4 5.2V15.4M22.0 6.2V15.8M24.8 9.0V16.0" stroke="#B22945" stroke-width="0.9" stroke-linecap="round"/>
+<path d="M13.2 22.8H16.6V29.0C16.6 29.6 16.1 30.0 15.5 30.0H12.4C11.8 30.0 11.4 29.5 11.6 28.9L13.2 22.8Z" fill="url(#spinozavr_leg2)"/>
+<path d="M2.2 8.8C1.8 7.2 3.0 5.8 4.8 5.6L11.2 5.2C12.8 5.2 14.0 6.4 14.0 8.0V12.6C18.2 12.4 22.6 13.8 25.6 16.8C27.6 18.8 29.2 17.8 30.0 15.4C30.4 14.4 31.2 15.0 31.0 16.2C30.2 21.2 26.8 24.4 21.8 24.4H14.8C11.2 24.4 8.8 22.0 8.8 18.2V11.2H4.2C3.0 11.2 2.4 10.0 2.2 8.8Z" fill="url(#spinozavr_body3)"/>
+<path d="M2.2 8.8C1.8 7.2 3.0 5.8 4.8 5.6L11.2 5.2C12.8 5.2 14.0 6.4 14.0 8.0V12.6C18.2 12.4 22.6 13.8 25.6 16.8C27.6 18.8 29.2 17.8 30.0 15.4C30.4 14.4 31.2 15.0 31.0 16.2C30.2 21.2 26.8 24.4 21.8 24.4H14.8C11.2 24.4 8.8 22.0 8.8 18.2V11.2H4.2C3.0 11.2 2.4 10.0 2.2 8.8Z" fill="url(#spinozavr_shade4)"/>
+<path d="M16.8 23.0H20.4V29.0C20.4 29.6 19.9 30.0 19.3 30.0H16.0C15.4 30.0 15.0 29.5 15.2 28.9L16.8 23.0Z" fill="url(#spinozavr_body3)"/>
+<path d="M6.4 14.6H9.2V17.4L7.4 18.6C6.8 19.0 6.0 18.4 6.2 17.6L6.4 14.6Z" fill="url(#spinozavr_leg2)"/>
+<circle cx="8.6" cy="7.6" r="0.9" fill="#3A234A"/>
+<circle cx="8.4" cy="7.3" r="0.34" fill="#FFFFFF"/>
+<g filter="url(#spinozavr_blur05)"><ellipse cx="18.6" cy="8.8" rx="2.8" ry="1.1" fill="#FFE6C2" fill-opacity="0.55" transform="rotate(-8 18.6 8.8)"/></g>
+<defs>
+<radialGradient id="spinozavr_sail1" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#FFA35F"/><stop offset="0.5" stop-color="#FF7E51"/><stop offset="1" stop-color="#EE534A"/></radialGradient>
+<radialGradient id="spinozavr_leg2" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#4DA0DA"/><stop offset="0.5" stop-color="#3557C3"/><stop offset="1" stop-color="#273B8E"/></radialGradient>
+<radialGradient id="spinozavr_body3" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#62A5E9"/><stop offset="0.5" stop-color="#4DA0DA"/><stop offset="1" stop-color="#3557C3"/></radialGradient>
+<radialGradient id="spinozavr_shade4" cx="0.85" cy="0.9" r="0.7"><stop stop-color="#3557C3" stop-opacity="0.5"/><stop offset="1" stop-color="#3557C3" stop-opacity="0"/></radialGradient>
+<filter id="spinozavr_blur05" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.5"/></filter>
+</defs>
+</svg>

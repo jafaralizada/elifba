@@ -54,7 +54,7 @@ it('has the section for parents in both languages', function (): void {
         static fn (PackData $pack): bool => $pack->lists(Unit::Picture) || $pack->lists(Unit::Number),
     ));
 
-    expect($picturePacks)->toContain('animals', 'fruit', 'colors', 'numbers')
+    expect($picturePacks)->toContain('animals', 'dinosaurs', 'fruit', 'colors', 'numbers')
         ->not->toContain('balloons', 'train');
 
     $this->get(route('home'))

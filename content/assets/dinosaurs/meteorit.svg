@@ -1,0 +1,18 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- meteorit: a glowing meteorite streaking across the sky with a fiery tail. Elifba own art, MIT. -->
+<path d="M29.4 2.6C29.8 3.0 29.6 3.8 29.0 4.6L20.8 18.6C17.8 23.6 11.4 26.8 6.4 25.6C5.2 25.2 4.2 24.2 3.8 23.0C2.6 18.0 5.8 11.6 10.8 8.6L24.8 0.4C25.6 -0.1 26.4 0.1 26.6 0.8L25.0 5.4L29.4 2.6Z" fill="url(#meteorit_fire1)"/>
+<path d="M25.6 4.4L19.4 15.8C17.2 19.6 12.6 22.0 8.8 21.0C7.8 20.8 7.0 20.0 6.8 19.0C5.8 15.2 8.2 10.6 12.0 8.4L23.4 2.2L21.8 6.4L25.6 4.4Z" fill="url(#meteorit_flame2)"/>
+<circle cx="11.2" cy="20.8" r="8.2" fill="url(#meteorit_rock3)"/>
+<circle cx="11.2" cy="20.8" r="8.2" fill="url(#meteorit_shade4)"/>
+<circle cx="8.6" cy="18.6" r="1.8" fill="#703B50" fill-opacity="0.55"/>
+<circle cx="13.8" cy="22.8" r="2.2" fill="#703B50" fill-opacity="0.55"/>
+<circle cx="9.6" cy="24.2" r="1.2" fill="#703B50" fill-opacity="0.55"/>
+<g filter="url(#meteorit_blur05)"><ellipse cx="8.4" cy="15.8" rx="2.6" ry="1.2" fill="#FFE6C2" fill-opacity="0.65" transform="rotate(-35 8.4 15.8)"/></g>
+<defs>
+<radialGradient id="meteorit_fire1" cx="0.3" cy="0.7" r="0.85"><stop stop-color="#FFA35F"/><stop offset="0.5" stop-color="#FF7E51"/><stop offset="1" stop-color="#F24756"/></radialGradient>
+<radialGradient id="meteorit_flame2" cx="0.3" cy="0.7" r="0.8"><stop stop-color="#FFF246"/><stop offset="0.5" stop-color="#F8CA4D"/><stop offset="1" stop-color="#FF7E51"/></radialGradient>
+<radialGradient id="meteorit_rock3" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#AA7E73"/><stop offset="0.5" stop-color="#8C5E51"/><stop offset="1" stop-color="#703B50"/></radialGradient>
+<radialGradient id="meteorit_shade4" cx="0.85" cy="0.9" r="0.7"><stop stop-color="#33293D" stop-opacity="0.5"/><stop offset="1" stop-color="#33293D" stop-opacity="0"/></radialGradient>
+<filter id="meteorit_blur05" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.5"/></filter>
+</defs>
+</svg>

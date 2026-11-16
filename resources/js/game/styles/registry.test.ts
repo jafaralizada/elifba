@@ -212,6 +212,12 @@ describe('the styles registry', () => {
                     ITEM_STYLES.card.layout(count, band).width * CARD_TEXT,
                 );
                 expect(
+                    ITEM_STYLES.dino.layout(count, band).width * FIGURE_TEXT,
+                    label,
+                ).toBeGreaterThanOrEqual(
+                    ITEM_STYLES.card.layout(count, band).width * CARD_TEXT,
+                );
+                expect(
                     ITEM_STYLES.fruit.layout(count, band).width * FIGURE_TEXT,
                     label,
                 ).toBeGreaterThanOrEqual(

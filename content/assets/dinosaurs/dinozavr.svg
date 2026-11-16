@@ -1,0 +1,24 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- dinozavr: a friendly young green dinosaur standing in side view with back plates. Elifba own art, MIT. -->
+<path d="M13.5 9.2L15.2 6.8L16.8 9.4Z" fill="url(#dinozavr_plate1)"/>
+<path d="M17.2 10.6L19.2 8.2L20.4 11.2Z" fill="url(#dinozavr_plate1)"/>
+<path d="M20.6 13.0L22.8 11.0L23.4 14.2Z" fill="url(#dinozavr_plate1)"/>
+<path d="M23.2 16.4L25.4 14.8L25.6 17.8Z" fill="url(#dinozavr_plate1)"/>
+<path d="M10.2 22.8H13.8V28.8C13.8 29.5 13.2 30.0 12.5 30.0H10.6C9.9 30.0 9.4 29.4 9.6 28.7L10.2 22.8Z" fill="url(#dinozavr_leg2)"/>
+<path d="M18.4 22.8H22.2V28.8C22.2 29.5 21.6 30.0 20.9 30.0H18.8C18.1 30.0 17.6 29.4 17.8 28.7L18.4 22.8Z" fill="url(#dinozavr_leg2)"/>
+<path d="M5.4 5.2C3.2 5.2 1.8 6.8 1.8 9.0C1.8 11.2 3.4 12.6 5.8 12.6H7.8V18.2C7.8 22.4 11.0 25.2 15.6 25.2H22.2C26.4 25.2 29.6 22.2 30.2 18.2C30.4 17.2 29.4 16.6 28.6 17.2C27.2 18.4 25.4 18.8 23.8 18.0C22.4 17.2 21.4 15.2 19.6 13.8C17.8 12.4 15.4 12.0 13.8 11.2C13.4 11.0 13.2 10.4 13.2 9.6V8.4C13.2 6.4 11.6 5.2 9.6 5.2H5.4Z" fill="url(#dinozavr_body3)"/>
+<path d="M5.4 5.2C3.2 5.2 1.8 6.8 1.8 9.0C1.8 11.2 3.4 12.6 5.8 12.6H7.8V18.2C7.8 22.4 11.0 25.2 15.6 25.2H22.2C26.4 25.2 29.6 22.2 30.2 18.2C30.4 17.2 29.4 16.6 28.6 17.2C27.2 18.4 25.4 18.8 23.8 18.0C22.4 17.2 21.4 15.2 19.6 13.8C17.8 12.4 15.4 12.0 13.8 11.2C13.4 11.0 13.2 10.4 13.2 9.6V8.4C13.2 6.4 11.6 5.2 9.6 5.2H5.4Z" fill="url(#dinozavr_shade4)"/>
+<path d="M9.4 15.8C9.4 13.8 11.2 12.8 13.4 13.4C15.8 14.0 17.8 16.4 18.2 19.4C18.6 22.0 17.2 24.4 14.8 24.6C11.6 24.8 9.4 22.2 9.4 18.2V15.8Z" fill="url(#dinozavr_belly5)"/>
+<circle cx="6.2" cy="8.0" r="1.1" fill="#3A234A"/>
+<circle cx="5.9" cy="7.7" r="0.42" fill="#FFFFFF"/>
+<circle cx="3.4" cy="8.4" r="0.45" fill="#74A41C"/>
+<g filter="url(#dinozavr_blur05)"><ellipse cx="8.6" cy="6.8" rx="2.2" ry="0.9" fill="#F4FFCC" fill-opacity="0.65" transform="rotate(-10 8.6 6.8)"/></g>
+<defs>
+<radialGradient id="dinozavr_plate1" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#FFF246"/><stop offset="0.5" stop-color="#F8CA4D"/><stop offset="1" stop-color="#C79738"/></radialGradient>
+<radialGradient id="dinozavr_leg2" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#96C860"/><stop offset="0.5" stop-color="#74A41C"/><stop offset="1" stop-color="#4E7814"/></radialGradient>
+<radialGradient id="dinozavr_body3" cx="0.3" cy="0.22" r="0.85"><stop stop-color="#CFFF73"/><stop offset="0.5" stop-color="#96C860"/><stop offset="1" stop-color="#74A41C"/></radialGradient>
+<radialGradient id="dinozavr_shade4" cx="0.85" cy="0.9" r="0.7"><stop stop-color="#74A41C" stop-opacity="0.55"/><stop offset="1" stop-color="#74A41C" stop-opacity="0"/></radialGradient>
+<radialGradient id="dinozavr_belly5" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#FFF246"/><stop offset="0.55" stop-color="#F8CA4D"/><stop offset="1" stop-color="#C79738"/></radialGradient>
+<filter id="dinozavr_blur05" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.5"/></filter>
+</defs>
+</svg>

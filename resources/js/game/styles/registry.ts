@@ -13,6 +13,7 @@ import { balloon } from './balloon';
 import { bubble } from './bubble';
 import { burst } from './burst';
 import { card } from './card';
+import { dino } from './dino';
 import { fruit } from './fruit';
 import { picture } from './picture';
 import { frame } from './slot-frame';
@@ -29,6 +30,7 @@ export const ITEM_STYLES = {
     animal,
     fruit,
     picture,
+    dino,
 } as const satisfies Record<string, ItemStyle>;
 
 export type ItemStyleKey = keyof typeof ITEM_STYLES;

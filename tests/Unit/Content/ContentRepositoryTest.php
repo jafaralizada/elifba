@@ -42,10 +42,10 @@ it('reads the fruit pack with its look, words and sentences', function (): void 
         ->and(count($fruit->sentences))->toBeGreaterThanOrEqual(10);
 });
 
-it('ships exactly the eight built-in packs, each reading pack with at least 20 words and 10 sentences', function (): void {
+it('ships exactly the nine built-in packs, each reading pack with at least 20 words and 10 sentences', function (): void {
     $packs = app(ContentRepository::class)->packs();
 
-    expect(array_keys($packs))->toBe(['animals', 'balloons', 'cities', 'colors', 'fruit', 'numbers', 'symbols', 'train']);
+    expect(array_keys($packs))->toBe(['animals', 'balloons', 'cities', 'colors', 'dinosaurs', 'fruit', 'numbers', 'symbols', 'train']);
 
     foreach ($packs as $key => $pack) {
         expect($pack->key)->toBe($key);
@@ -140,6 +140,7 @@ it('gives each pack the default look of the glossary', function (string $key, It
     'train' => ['train', ItemStyle::Wagon, SlotStyle::Wagon],
     'balloons' => ['balloons', ItemStyle::Balloon, SlotStyle::Frame],
     'animals' => ['animals', ItemStyle::Animal, SlotStyle::Frame],
+    'dinosaurs' => ['dinosaurs', ItemStyle::Dino, SlotStyle::Frame],
     'fruit' => ['fruit', ItemStyle::Fruit, SlotStyle::Frame],
     'cities' => ['cities', ItemStyle::Card, SlotStyle::Frame],
     'symbols' => ['symbols', ItemStyle::Card, SlotStyle::Frame],
@@ -277,7 +278,7 @@ it('pairs every mechanic with the units of §2', function (): void {
         ->and(Mechanic::BuildSentence->builds())->toBeTrue();
 });
 
-it('lists the units each pack has content for: pictures in the animals, the fruit and the colours, numbers in the animals, the fruit and the numbers', function (): void {
+it('lists the units each pack has content for: pictures in the animals, the dinosaurs, the fruit and the colours, numbers in the animals, the dinosaurs, the fruit and the numbers', function (): void {
     $units = array_map(
         static fn (PackData $pack): array => array_map(static fn (Unit $unit): string => $unit->value, $pack->units),
         app(ContentRepository::class)->packs(),
@@ -289,6 +290,7 @@ it('lists the units each pack has content for: pictures in the animals, the frui
         'balloons' => $reading,
         'cities' => $reading,
         'colors' => ['picture'],
+        'dinosaurs' => [...$reading, 'picture', 'number'],
         'fruit' => [...$reading, 'picture', 'number'],
         'numbers' => ['number'],
         'symbols' => $reading,

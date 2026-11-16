@@ -1,0 +1,15 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- sümük: a large dinosaur bone. Elifba own art, MIT. -->
+<path d="M8.6 3.8C10.8 3.8 12.6 5.6 12.4 7.8L20.2 15.6C22.4 15.4 24.2 17.2 24.2 19.4C26.4 19.4 28.2 21.2 28.2 23.4C28.2 26.0 26.0 28.2 23.4 28.2C21.2 28.2 19.4 26.4 19.4 24.2C17.2 24.2 15.4 22.4 15.6 20.2L7.8 12.4C5.6 12.6 3.8 10.8 3.8 8.6C3.8 6.0 6.0 3.8 8.6 3.8Z" fill="url(#sumuk_bone1)"/>
+<circle cx="11.2" cy="6.6" r="3.4" fill="url(#sumuk_bone1)"/>
+<circle cx="6.6" cy="11.2" r="3.4" fill="url(#sumuk_bone1)"/>
+<circle cx="25.4" cy="20.8" r="3.4" fill="url(#sumuk_bone1)"/>
+<circle cx="20.8" cy="25.4" r="3.4" fill="url(#sumuk_bone1)"/>
+<path d="M8.6 3.8C10.8 3.8 12.6 5.6 12.4 7.8L20.2 15.6C22.4 15.4 24.2 17.2 24.2 19.4C26.4 19.4 28.2 21.2 28.2 23.4C28.2 26.0 26.0 28.2 23.4 28.2C21.2 28.2 19.4 26.4 19.4 24.2C17.2 24.2 15.4 22.4 15.6 20.2L7.8 12.4C5.6 12.6 3.8 10.8 3.8 8.6C3.8 6.0 6.0 3.8 8.6 3.8Z" fill="url(#sumuk_shade2)"/>
+<g filter="url(#sumuk_blur05)"><ellipse cx="14.6" cy="13.8" rx="4.2" ry="1.1" fill="#FFFFFF" fill-opacity="0.75" transform="rotate(45 14.6 13.8)"/></g>
+<defs>
+<radialGradient id="sumuk_bone1" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#FCFBFE"/><stop offset="0.5" stop-color="#E8E8E9"/><stop offset="1" stop-color="#D0C9EE"/></radialGradient>
+<radialGradient id="sumuk_shade2" cx="0.85" cy="0.9" r="0.7"><stop stop-color="#988EA1" stop-opacity="0.45"/><stop offset="1" stop-color="#988EA1" stop-opacity="0"/></radialGradient>
+<filter id="sumuk_blur05" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.5"/></filter>
+</defs>
+</svg>

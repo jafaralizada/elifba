@@ -107,6 +107,7 @@ const sources = import.meta.glob<string>(
         './bubble.ts',
         './figure.ts',
         './animal.ts',
+        './dino.ts',
         './fruit.ts',
         './picture.ts',
         './slot-wagon.ts',
@@ -118,7 +119,7 @@ const sources = import.meta.glob<string>(
 
 describe('the item and slot styles', () => {
     it('reads every style', () => {
-        expect(Object.keys(sources)).toHaveLength(11);
+        expect(Object.keys(sources)).toHaveLength(12);
     });
 
     it.each(Object.entries(sources))('%s draws no outline', (_, source) => {

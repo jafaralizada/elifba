@@ -28,10 +28,10 @@ it('builds ten solvable rounds in every pack and level with all letters learned'
     $builder = Playable::builder($mechanic);
     $levels = array_filter($content->levels(), static fn (LevelData $level): bool => $level->allows($mechanic));
 
-    // The six reading packs; the colours and the numbers (R6) list no
+    // The seven reading packs; the colours and the numbers (R6) list no
     // reading unit, so no build level is offered with them.
     expect($levels)->not->toBeEmpty()
-        ->and(array_filter($content->packs(), static fn (PackData $pack): bool => $pack->lists(Unit::Word)))->toHaveCount(6);
+        ->and(array_filter($content->packs(), static fn (PackData $pack): bool => $pack->lists(Unit::Word)))->toHaveCount(7);
 
     foreach ($levels as $level) {
         foreach (array_filter($content->packs(), static fn (PackData $pack): bool => $pack->lists($level->unit)) as $pack) {

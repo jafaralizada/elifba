@@ -83,8 +83,8 @@ describe('the catalog', function (): void {
 
         $this->get(route('classes.games.create', $this->class))
             ->assertInertia(fn (Assert $page) => $page
-                // 6 reading packs × 9 reading games, 3 picture packs × 2, 3 number packs × 3.
-                ->has('cards', 54 + 6 + 9)
+                // 7 reading packs × 9 reading games, 4 picture packs × 2, 4 number packs × 3.
+                ->has('cards', 63 + 8 + 12)
                 ->where('cards.0', [
                     'pack' => 'animals',
                     'unit' => 'letter',
@@ -131,7 +131,7 @@ describe('the catalog', function (): void {
 
                     // Within a game, the packs' order.
                     expect(collect($cards)->where('mechanic', 'find')->where('unit', 'letter')->pluck('pack')->all())
-                        ->toBe(['animals', 'balloons', 'cities', 'fruit', 'symbols', 'train']);
+                        ->toBe(['animals', 'balloons', 'cities', 'dinosaurs', 'fruit', 'symbols', 'train']);
 
                     return true;
                 }));

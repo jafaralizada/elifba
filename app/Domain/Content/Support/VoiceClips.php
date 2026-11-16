@@ -10,8 +10,10 @@ use App\Domain\Content\Data\VoiceLineData;
 use App\Domain\Content\Data\VoicePhraseData;
 use App\Domain\Content\Enums\Mechanic;
 use App\Domain\Content\Enums\Unit;
+use App\Domain\Content\Models\CustomWord;
 use App\Domain\Language\Support\Alphabet;
 use App\Domain\Language\Support\Az;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * The board's voice (docs/architecture.md §3 "Voice", ADR 015): what each
@@ -284,6 +286,22 @@ final readonly class VoiceClips
                 foreach ($level->keysFrom($pack) as $key) {
                     if ($template->mechanic !== Mechanic::BuildSyllable || mb_strlen(explode(':', $key, 2)[1] ?? '') >= 2) {
                         $targets[] = [$key, $pack];
+                    }
+                }
+            }
+        }
+
+        if (! app()->runningUnitTests() && in_array($template->unit, [Unit::Word, Unit::Syllable], true) && Schema::hasTable('custom_words')) {
+            foreach (CustomWord::query()->orderBy('id')->get() as $row) {
+                $word = $row->toWordData();
+
+                if ($template->unit === Unit::Word) {
+                    $targets[] = [$word->key(), null];
+                } else {
+                    foreach ($word->syllables as $syllable) {
+                        if ($template->mechanic !== Mechanic::BuildSyllable || mb_strlen($syllable) >= 2) {
+                            $targets[] = [Unit::Syllable->value.':'.Az::lower($syllable), null];
+                        }
                     }
                 }
             }
