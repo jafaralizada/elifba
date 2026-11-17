@@ -1,9 +1,12 @@
 <?php
 
 use App\Http\Middleware\EnsureRoleChosen;
+use App\Http\Middleware\EnsureRoomsAreEnabled;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SetLocale;
+use App\Support\RoomsArea;
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -34,11 +37,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectUsersTo(fn (): string => route('start'));
 
         // The areas of docs/architecture.md §1 "Accounts and roles" (ADR 010):
-        // `role` is the package's, with an App\Enums\Role name or two.
+        // `role` is the package's, with an App\Enums\Role name or two;
+        // `rooms.enabled` closes the player area while it is switched off
+        // (§12, ADR 019).
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'role.chosen' => EnsureRoleChosen::class,
+            'rooms.enabled' => EnsureRoomsAreEnabled::class,
         ]);
+
+        // A switched-off rooms area answers as an unknown address does: the
+        // switch runs first, before the cookies, the session, the CSRF check
+        // or the login could say that a room route exists.
+        $middleware->prependToPriorityList(before: EncryptCookies::class, prepend: EnsureRoomsAreEnabled::class);
 
         $middleware->web(append: [
             SetLocale::class,
@@ -57,10 +68,13 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         // An area the account lacks is 403; a typed or bookmarked page leads
-        // home instead of to an error (ADR 010 decision 3).
+        // home instead of to an error (ADR 010 decision 3). A page of the
+        // player area leads to Settings → «Rollar» instead, «Oyunçu»
+        // preselected, and back to the page once the role is taken (ADR 019
+        // decision 6).
         $exceptions->render(function (UnauthorizedException $exception, Request $request) {
             if ($request->isMethod('GET') && ! $request->expectsJson() && $request->user() !== null) {
-                return to_route('start');
+                return RoomsArea::toThePlayerRole($request, 'roles.edit') ?? to_route('start');
             }
 
             return null;

@@ -60,6 +60,14 @@ return [
         'api_url' => 'https://api.elevenlabs.io',
     ],
 
+    // Adults' rooms (§12 "The area and the switch", ADR 019): a separate
+    // area behind a switch, off unless ELIFBA_ROOMS is set. Read it only
+    // through App\Support\RoomsArea. The tables and the `player` role row
+    // exist either way.
+    'rooms' => [
+        'enabled' => filter_var(env('ELIFBA_ROOMS', false), FILTER_VALIDATE_BOOL),
+    ],
+
     // Who runs this instance; shown on /privacy (§7).
     'operator' => [
         'name' => env('ELIFBA_OPERATOR_NAME'),

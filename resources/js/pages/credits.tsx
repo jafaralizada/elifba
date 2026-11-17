@@ -1,4 +1,5 @@
 import { Head, Link, usePage } from '@inertiajs/react';
+import { areaHomeTitle } from '@/components/app/nav-areas';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { Button } from '@/components/ui/button';
@@ -51,11 +52,7 @@ export default function Credits({ credits }: Props) {
                             {/* A signed-in account goes home by role (architecture §1 "Accounts and roles"). */}
                             <Link href={auth.user ? start() : login()}>
                                 {auth.user
-                                    ? t(
-                                          auth.area === 'parent'
-                                              ? 'nav.children'
-                                              : 'nav.classes',
-                                      )
+                                    ? t(areaHomeTitle(auth.area))
                                     : t('nav.log_in')}
                             </Link>
                         </Button>

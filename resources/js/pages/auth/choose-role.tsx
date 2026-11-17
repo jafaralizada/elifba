@@ -13,15 +13,23 @@ import { cn } from '@/lib/utils';
 import { logout } from '@/routes';
 import type { Role } from '@/types';
 
+type Props = {
+    /** The roles this instance offers: «Oyunçu» only with the rooms area on. */
+    roles: Role[];
+    /** Chosen already: «Oyunçu» on the way into a room page (ADR 019). */
+    chosen: Role | null;
+};
+
 /**
  * The role choice right after registration (architecture §1 "Accounts and
- * roles", ADR 010): «Müəllim» or «Valideyn», each with one sentence about
- * what it is for, then that role's agreement (§7 "Agreements"). The other
- * role can be added later in Settings → «Rollar».
+ * roles", ADR 010): «Müəllim», «Valideyn» and, with the rooms area on,
+ * «Oyunçu» (§12), each with one sentence about what it is for, then that
+ * role's agreement (§7 "Agreements"). Another role can be added later in
+ * Settings → «Rollar».
  */
-export default function ChooseRole({ roles }: { roles: Role[] }) {
+export default function ChooseRole({ roles, chosen }: Props) {
     const { t } = useTranslation();
-    const [role, setRole] = useState<Role | null>(null);
+    const [role, setRole] = useState<Role | null>(chosen);
 
     return (
         <>

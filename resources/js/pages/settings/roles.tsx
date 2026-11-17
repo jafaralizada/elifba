@@ -8,23 +8,31 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { useTranslation } from '@/hooks/use-translation';
+import { cn } from '@/lib/utils';
 import { edit } from '@/routes/roles';
 import type { Role } from '@/types';
 
 type Props = {
     /** The roles the account holds. */
     held: Role[];
-    /** The roles it can still take; empty with both. */
+    /** The roles this instance offers that it can still take. */
     available: Role[];
+    /** Chosen already: «Oyunçu» on the way into a room page (ADR 019). */
+    chosen: Role | null;
 };
 
 /**
  * Settings → «Rollar» (architecture §1 "Accounts and roles", ADR 010): the
- * account's roles, and the one it lacks, taken with that role's sentence
- * (§7 "Agreements"). A role is never removed.
+ * account's roles, and the ones it lacks, each taken with that role's
+ * sentence (§7 "Agreements"). A role is never removed. The role a room page
+ * sent the account here for comes first, its sentence in focus.
  */
-export default function Roles({ held, available }: Props) {
+export default function Roles({ held, available, chosen }: Props) {
     const { t } = useTranslation();
+    const offered =
+        chosen === null
+            ? available
+            : [chosen, ...available.filter((role) => role !== chosen)];
 
     return (
         <>
@@ -56,8 +64,12 @@ export default function Roles({ held, available }: Props) {
                         description={t('roles.settings.add.description')}
                     />
 
-                    {available.map((role) => (
-                        <AddRole key={role} role={role} />
+                    {offered.map((role) => (
+                        <AddRole
+                            key={role}
+                            role={role}
+                            chosen={role === chosen}
+                        />
                     ))}
                 </div>
             )}
@@ -65,12 +77,23 @@ export default function Roles({ held, available }: Props) {
     );
 }
 
-function RoleSummary({ role }: { role: Role }) {
+function RoleSummary({
+    role,
+    chosen = false,
+}: {
+    role: Role;
+    chosen?: boolean;
+}) {
     const { t } = useTranslation();
     const Icon = roleIcons[role];
 
     return (
-        <div className="flex items-start gap-3 rounded-xl border bg-card p-4">
+        <div
+            className={cn(
+                'flex items-start gap-3 rounded-xl border bg-card p-4',
+                chosen && 'border-primary ring-1 ring-primary',
+            )}
+        >
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                 <Icon aria-hidden className="size-5" />
             </span>
@@ -84,7 +107,7 @@ function RoleSummary({ role }: { role: Role }) {
     );
 }
 
-function AddRole({ role }: { role: Role }) {
+function AddRole({ role, chosen }: { role: Role; chosen: boolean }) {
     const { t } = useTranslation();
     const id = `agreement-${role}`;
 
@@ -98,7 +121,7 @@ function AddRole({ role }: { role: Role }) {
                 <>
                     <input type="hidden" name="role" value={role} />
 
-                    <RoleSummary role={role} />
+                    <RoleSummary role={role} chosen={chosen} />
 
                     <div className="grid gap-2">
                         <div className="flex items-start gap-3">
@@ -107,6 +130,7 @@ function AddRole({ role }: { role: Role }) {
                                 name="agreement"
                                 value="1"
                                 required
+                                autoFocus={chosen}
                                 className="mt-0.5"
                                 aria-invalid={
                                     errors.agreement ? true : undefined

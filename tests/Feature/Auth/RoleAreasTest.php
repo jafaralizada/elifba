@@ -11,15 +11,18 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\Games;
+use Tests\Support\GuestBoards;
+use Tests\Support\Rooms;
 
 /*
  * Areas by role (docs/architecture.md §1 "Accounts and roles", ADR 010
  * decision 3). Every authenticated route is in exactly one group: teacher,
- * parent or shared (`auth`, `role.chosen`, `verified` and the package's
- * `role` middleware), the account's own pages (no role named; listed
- * below) or the board routes a guest board's bearer may call. A new route
- * fails the first test until it is placed. Rows stay guarded by ownership,
- * which binds before the role is checked.
+ * parent, shared or player (`auth`, `role.chosen`, `verified` and the
+ * package's `role` middleware; the player's with `rooms.enabled` too, §12,
+ * ADR 019), the account's own pages (no role named; listed below) or the
+ * board routes a guest board's bearer may call. A new route fails the first
+ * test until it is placed. Rows stay guarded by ownership, which binds
+ * before the role is checked.
  */
 
 /**
@@ -54,10 +57,6 @@ const ACCOUNT_ROUTES = [
     'user-password.update',
     'other-devices.destroy',
     'appearance.edit',
-    'play-settings.edit',
-    'play-settings.update',
-    'play-settings.sounds.update',
-    'play-settings.voice.update',
     'roles.edit',
     'roles.store',
     // `Route::redirect('settings', …)` has no name.
@@ -70,10 +69,6 @@ const ACCOUNT_ROUTES_AFTER_THE_CHOICE = [
     'user-password.update',
     'other-devices.destroy',
     'appearance.edit',
-    'play-settings.edit',
-    'play-settings.update',
-    'play-settings.sounds.update',
-    'play-settings.voice.update',
     'roles.edit',
     'roles.store',
 ];
@@ -132,11 +127,12 @@ function areaGroupsOf(RoutingRoute $route): array
     $groups = [];
 
     foreach ([
-        'teacher' => Role::middleware(Role::Teacher),
-        'parent' => Role::middleware(Role::Parent),
-        'shared' => Role::middleware(Role::Teacher, Role::Parent),
-    ] as $group => $role) {
-        if (in_array($role, $middleware, true) && array_diff($base, $middleware) === []) {
+        'teacher' => [Role::middleware(Role::Teacher)],
+        'parent' => [Role::middleware(Role::Parent)],
+        'shared' => [Role::middleware(Role::Teacher, Role::Parent)],
+        'player' => [Role::middleware(Role::Player), 'rooms.enabled'],
+    ] as $group => $own) {
+        if (in_array($own[0], $middleware, true) && array_diff([...$base, ...$own], $middleware) === []) {
             $groups[] = $group;
         }
     }
@@ -217,6 +213,22 @@ function parentAreaRoutes(): array
 }
 
 /**
+ * @return array<string, RoutingRoute>
+ */
+function playerAreaRoutes(): array
+{
+    return array_filter(authenticatedRoutes(), static fn (RoutingRoute $route): bool => areaGroupsOf($route) === ['player']);
+}
+
+/**
+ * @return array<string, RoutingRoute>
+ */
+function sharedAreaRoutes(): array
+{
+    return array_filter(authenticatedRoutes(), static fn (RoutingRoute $route): bool => areaGroupsOf($route) === ['shared']);
+}
+
+/**
  * Everything a refused request could change.
  *
  * @return array<string, list<array<string, mixed>>>
@@ -269,18 +281,29 @@ it('puts every authenticated route in one area', function (): void {
     $count = static fn (string $group): int => count(array_filter($routes, static fn (RoutingRoute $route): bool => areaGroupsOf($route) === [$group]));
     expect($count('teacher'))->toBeGreaterThan(20)
         ->and($count('parent'))->toBeGreaterThanOrEqual(1)
-        ->and($count('shared'))->toBeGreaterThan(5);
+        ->and($count('shared'))->toBeGreaterThan(5)
+        ->and($count('player'))->toBeGreaterThanOrEqual(1);
+
+    // The switch closes the player area and nothing else.
+    foreach ($routes as $key => $route) {
+        expect(in_array('rooms.enabled', $route->gatherMiddleware(), true))->toBe(areaGroupsOf($route) === ['player'], $key);
+    }
 });
 
-it('places classes, rankings, teacher words and class games in the teacher area, the board and the remote in the shared one', function (): void {
+it('places classes, rankings, teacher words and class games in the teacher area, the board, the remote and the play settings in the shared one, the rooms in the player one', function (): void {
     $routes = authenticatedRoutes();
 
     foreach (['classes.index', 'classes.show', 'classes.students.store', 'classes.games.create', 'classes.games.store', 'classes.rankings', 'classes.podium', 'words.index', 'words.update', 'words.hidden.store'] as $name) {
         expect(areaGroupsOf($routes[$name]))->toBe(['teacher'], $name);
     }
 
-    foreach (['games.board', 'games.join-code', 'games.remote', 'games.replay', 'pult', 'pult.code', 'pult.claim', 'guest-boards.game.edit', 'guest-boards.game.update'] as $name) {
+    // The play settings are the boards' (ADR 019 decision 8).
+    foreach (['games.board', 'games.join-code', 'games.remote', 'games.replay', 'pult', 'pult.code', 'pult.claim', 'guest-boards.game.edit', 'guest-boards.game.update', 'play-settings.edit', 'play-settings.update', 'play-settings.sounds.update', 'play-settings.voice.update'] as $name) {
         expect(areaGroupsOf($routes[$name]))->toBe(['shared'], $name);
+    }
+
+    foreach (['rooms.index'] as $name) {
+        expect(areaGroupsOf($routes[$name]))->toBe(['player'], $name);
     }
 
     foreach (['children.index', 'children.store', 'children.order', 'children.show', 'children.update', 'children.destroy', 'children.learned-letters.update', 'children.games.create', 'children.games.store'] as $name) {
@@ -473,4 +496,81 @@ it('shares the roles and the area with every page', function (): void {
         ->where('auth.user', null)
         ->where('auth.roles', [])
         ->where('auth.area', null));
+});
+
+it('refuses an account without the player role on every room route', function (string $state, string $rolesPage): void {
+    Rooms::on();
+    $user = User::factory()->{$state}()->create();
+    $before = areaSnapshot();
+    $checked = 0;
+
+    foreach (playerAreaRoutes() as $key => $route) {
+        foreach (array_diff($route->methods(), ['HEAD']) as $method) {
+            $uri = Rooms::uri($route);
+            $page = $this->actingAs($user)->call($method, $uri);
+            $json = $this->actingAs($user)->json($method, $uri);
+            $withoutRole = $state === 'withoutRole';
+
+            // A page visit goes to take the role, «Oyunçu» preselected, and
+            // keeps the page to come back to (ADR 019 decision 6).
+            if ($method === 'GET') {
+                $page->assertRedirect(route($rolesPage, ['role' => 'player']));
+                expect(session('url.intended'))->toBe(url($uri), $key);
+            } else {
+                expect($page->status())->toBe($withoutRole ? 409 : 403, "{$method} {$key}");
+            }
+
+            expect($json->status())->toBe($withoutRole ? 409 : 403, "{$method} {$key} (JSON)");
+            session()->forget('url.intended');
+            $checked++;
+        }
+    }
+
+    expect($checked)->toBeGreaterThanOrEqual(1)
+        ->and(areaSnapshot())->toBe($before);
+})->with([
+    'no role yet' => ['withoutRole', 'role'],
+    'a teacher' => ['configure', 'roles.edit'],
+    'a parent' => ['parent', 'roles.edit'],
+    'a teacher and a parent' => ['teacherAndParent', 'roles.edit'],
+]);
+
+it('keeps the board, the remote and the pult out of the player role', function (): void {
+    Rooms::on();
+    $player = User::factory()->player()->create();
+    // Rows the player is made to own, so that ownership would let it
+    // through and only the role refuses.
+    $class = SchoolClass::factory()->for($player, 'teacher')->create();
+    Student::factory()->for($class)->create(['display_name' => 'Aysel']);
+    $game = Games::start($class, seed: 1);
+    $board = GuestBoards::showing($game)['board'];
+    $values = ['game' => $game->id, 'code' => '123456', 'board' => $board->id];
+    $before = areaSnapshot();
+    $checked = 0;
+
+    foreach (sharedAreaRoutes() as $key => $route) {
+        foreach (array_diff($route->methods(), ['HEAD']) as $method) {
+            $uri = Rooms::uri($route, $values);
+            $page = $this->actingAs($player)->call($method, $uri, ['phone_remote' => false]);
+            $json = $this->actingAs($player)->json($method, $uri, ['phone_remote' => false]);
+
+            // As any area the account lacks: a page visit leads home (ADR 010).
+            expect($page->status())->toBe($method === 'GET' ? 302 : 403, "{$method} {$key}")
+                ->and($json->status())->toBe(403, "{$method} {$key} (JSON)")
+                ->and($json->getContent())->not->toContain('Aysel');
+
+            if ($method === 'GET') {
+                $page->assertRedirect(route('start'));
+            }
+
+            $checked++;
+        }
+    }
+
+    expect($checked)->toBeGreaterThanOrEqual(13)
+        ->and(areaSnapshot())->toBe($before)
+        ->and($player->refresh()->phone_remote)->toBeTrue();
+
+    // …which is the player's own home.
+    $this->get(route('start'))->assertRedirect(route('rooms.index'));
 });

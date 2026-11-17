@@ -4,6 +4,7 @@ namespace Tests;
 
 use Illuminate\Contracts\Routing\ResponseFactory;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\Config;
 use Laravel\Fortify\Features;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\FakeReverb;
@@ -25,6 +26,10 @@ abstract class TestCase extends BaseTestCase
         // spatie/laravel-permission caches what it loaded; its testing guide
         // forgets it before every test (ADR 010).
         $this->app->make(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        // The rooms area is off, as an instance has it, whatever the shell or
+        // `.env` say; a test of the area turns it on (`Tests\Support\Rooms::on()`).
+        Config::set('elifba.rooms.enabled', false);
     }
 
     /**

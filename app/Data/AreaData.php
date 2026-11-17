@@ -9,8 +9,10 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
- * The area an account with both roles moves to (docs/architecture.md §1
- * "Accounts and roles", ADR 010 decision 7): one of the roles it holds.
+ * The area an account with more than one role moves to (docs/architecture.md
+ * §1 "Accounts and roles", ADR 010 decision 7): one of the roles it holds,
+ * as `User::roleList()` lists them — never the player while the rooms area
+ * is switched off (ADR 019 decision 4).
  */
 final readonly class AreaData
 {

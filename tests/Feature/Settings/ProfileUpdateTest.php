@@ -98,7 +98,7 @@ class ProfileUpdateTest extends TestCase
         $this->assertNull($user->fresh());
         expect(DB::table('model_has_roles')->where('model_id', $user->id)->exists())->toBeFalse()
             ->and($other->fresh()?->roleList())->toBe([Role::Teacher])
-            ->and(DB::table('roles')->count())->toBe(2);
+            ->and(DB::table('roles')->count())->toBe(count(Role::cases()));
     }
 
     public function test_an_account_without_a_role_can_still_delete_itself()

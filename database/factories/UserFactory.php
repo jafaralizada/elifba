@@ -11,9 +11,11 @@ use Illuminate\Support\Str;
 /**
  * A created account is a verified teacher with the role and its agreement,
  * as every test before roles assumed (ADR 010 decision 9). `parent()`,
- * `teacherAndParent()` and `withoutRole()` change that. The roles follow the
- * agreements, as `GrantRole` keeps them: an account holds a role exactly
- * when it accepted that role's sentence. `make()` touches no table.
+ * `teacherAndParent()`, `player()`, `teacherAndPlayer()` and `withoutRole()`
+ * change that. The roles follow the agreements, as `GrantRole` keeps them:
+ * an account holds a role exactly when it accepted that role's sentence —
+ * the player role too while the rooms area is switched off, as an account
+ * that took it before keeps it (ADR 019). `make()` touches no table.
  *
  * @extends Factory<User>
  */
@@ -44,6 +46,7 @@ class UserFactory extends Factory
             'terms_accepted_at' => now(),
             'teacher_agreed_at' => now(),
             'parent_agreed_at' => null,
+            'player_agreed_at' => null,
             'area' => Role::Teacher,
         ];
     }
@@ -90,6 +93,32 @@ class UserFactory extends Factory
     }
 
     /**
+     * A player and nothing else (§12 "The area and the switch", ADR 019).
+     */
+    public function player(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'teacher_agreed_at' => null,
+            'parent_agreed_at' => null,
+            'player_agreed_at' => now(),
+            'area' => Role::Player,
+        ]);
+    }
+
+    /**
+     * A teacher who also plays, in the teacher area.
+     */
+    public function teacherAndPlayer(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'teacher_agreed_at' => now(),
+            'parent_agreed_at' => null,
+            'player_agreed_at' => now(),
+            'area' => Role::Teacher,
+        ]);
+    }
+
+    /**
      * Registered, with no role chosen yet.
      */
     public function withoutRole(): static
@@ -97,6 +126,7 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'teacher_agreed_at' => null,
             'parent_agreed_at' => null,
+            'player_agreed_at' => null,
             'area' => null,
         ]);
     }

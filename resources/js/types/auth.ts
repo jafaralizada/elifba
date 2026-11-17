@@ -13,8 +13,9 @@ export type User = {
 /**
  * A role an account holds (`App\Enums\Role`, architecture §1 "Accounts and
  * roles"). It names an area; the page translates it and never shows it as is.
+ * The server sends `player` only while the rooms area is on (§12, ADR 019).
  */
-export type Role = 'teacher' | 'parent';
+export type Role = 'teacher' | 'parent' | 'player';
 
 export type Auth = {
     user: User;

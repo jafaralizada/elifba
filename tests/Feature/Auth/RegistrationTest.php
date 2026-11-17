@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use Laravel\Fortify\Features;
+use Tests\Support\Rooms;
 
 /*
  * Registration requires the privacy-note agreement (docs/architecture.md §7
@@ -51,7 +52,8 @@ it('registers an account that ticked the privacy checkbox, records when, and giv
         ->and($user->roleList())->toBe([])
         ->and($user->area)->toBeNull()
         ->and($user->teacher_agreed_at)->toBeNull()
-        ->and($user->parent_agreed_at)->toBeNull();
+        ->and($user->parent_agreed_at)->toBeNull()
+        ->and($user->player_agreed_at)->toBeNull();
 });
 
 it('asks only for the privacy note, not for a role\'s sentence', function (): void {
@@ -59,16 +61,22 @@ it('asks only for the privacy note, not for a role\'s sentence', function (): vo
         expect(__('auth.register.terms', [], $locale))
             ->not->toBe(__('roles.agreement.teacher', [], $locale))
             ->not->toContain(__('roles.agreement.teacher', [], $locale))
-            ->not->toContain(__('roles.agreement.parent', [], $locale));
+            ->not->toContain(__('roles.agreement.parent', [], $locale))
+            ->not->toContain(__('roles.agreement.player', [], $locale));
     }
 });
 
-it('ignores a role sent with the registration form', function (): void {
-    $this->post(route('register.store'), registration(['role' => 'teacher', 'agreement' => '1']))
+it('ignores a role sent with the registration form', function (string $role): void {
+    Rooms::on();
+
+    $this->post(route('register.store'), registration(['role' => $role, 'agreement' => '1']))
         ->assertRedirect(route('start', absolute: false));
 
-    expect(User::query()->sole()->roleList())->toBe([]);
-});
+    $user = User::query()->sole();
+    expect($user->roleList())->toBe([])
+        ->and($user->getRoleNames()->all())->toBe([])
+        ->and($user->player_agreed_at)->toBeNull();
+})->with(['teacher', 'player']);
 
 it('refuses a registration without the privacy checkbox', function (array $input): void {
     $this->from(route('register'))

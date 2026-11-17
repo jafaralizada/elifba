@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Schema;
  */
 
 it('makes every existing account a teacher with its agreement', function (): void {
+    // Back to before roles: the player role (B2) came later and goes first.
+    $player = require database_path('migrations/2026_11_23_000001_add_player_role.php');
+    $player->down();
     $migration = require database_path('migrations/2026_11_17_000002_add_roles_to_users.php');
     $migration->down();
 
@@ -51,6 +54,7 @@ it('makes every existing account a teacher with its agreement', function (): voi
         ->and(DB::table('model_has_roles')->count())->toBe(2)
         ->and(DB::table('model_has_roles')->distinct()->pluck('model_type')->all())->toBe(['user']);
 
-    // They go on as teachers.
+    // They go on as teachers, the player role added after them too.
+    $player->up();
     $this->actingAs(User::query()->findOrFail($agreed))->get(route('start'))->assertRedirect(route('classes.index'));
 });

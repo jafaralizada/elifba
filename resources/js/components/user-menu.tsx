@@ -45,9 +45,10 @@ type Row = 'area' | 'language' | 'theme';
 /**
  * The account's menu in the shell's header, on every viewport
  * (docs/frontend.md §1, §2): who is signed in, the switch between the
- * teacher and the parent area (only with both roles, architecture §1
- * "Accounts and roles"), the language and the theme, Settings and logging
- * out. The switch, language and theme open in place, under their row, so
+ * areas of the roles it holds (only with more than one, architecture §1
+ * "Accounts and roles"; «Oyunçu», which opens «Otaqlar», only while the
+ * rooms area is on, §12),
+ * the language and the theme, Settings and logging out. The switch, language and theme open in place, under their row, so
  * nothing slides off a phone's screen.
  */
 export function UserMenu() {

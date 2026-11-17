@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Role;
 use App\Http\Controllers\Settings\PlaySettingsController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\RolesController;
@@ -11,7 +12,9 @@ use Illuminate\Support\Facades\Route;
  * The account's own pages (docs/architecture.md §1 "Accounts and roles",
  * ADR 010): no role is named. The profile stays reachable without a role,
  * so an account can always be deleted; the other settings wait for the
- * role choice (`role.chosen`).
+ * role choice (`role.chosen`). The play settings are the boards', so they
+ * sit in the shared group, with the roles that have a board (ADR 019
+ * decision 8).
  */
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', '/settings/profile');
@@ -40,12 +43,15 @@ Route::middleware(['auth', 'role.chosen', 'verified'])->group(function () {
 
     Route::inertia('settings/appearance', 'settings/appearance')->name('appearance.edit');
 
+    // Another role, with its sentence; a role is never removed.
+    Route::get('settings/roles', [RolesController::class, 'edit'])->name('roles.edit');
+    Route::post('settings/roles', [RolesController::class, 'store'])->name('roles.store');
+});
+
+// Settings → «Oyun»: the phone remote, the board's sounds and voice.
+Route::middleware(['auth', 'role.chosen', 'verified', Role::middleware(Role::Teacher, Role::Parent)])->group(function () {
     Route::get('settings/play', [PlaySettingsController::class, 'edit'])->name('play-settings.edit');
     Route::put('settings/play', [PlaySettingsController::class, 'update'])->name('play-settings.update');
     Route::put('settings/play/sounds', [PlaySettingsController::class, 'updateSounds'])->name('play-settings.sounds.update');
     Route::put('settings/play/voice', [PlaySettingsController::class, 'updateVoice'])->name('play-settings.voice.update');
-
-    // The second role, with its sentence; a role is never removed.
-    Route::get('settings/roles', [RolesController::class, 'edit'])->name('roles.edit');
-    Route::post('settings/roles', [RolesController::class, 'store'])->name('roles.store');
 });

@@ -61,20 +61,29 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * The area of the page: the route's own inside the teacher or the parent
-     * group, otherwise the account's (ADR 010 decision 7), which the shared
-     * and account pages follow.
+     * The area of the page: the route's own inside the teacher, the parent
+     * or the player group, otherwise the account's (ADR 010 decision 7),
+     * which the shared and account pages follow. A shared page is a
+     * board's, so it is never in the player area: an account there sees
+     * the first of its teacher and parent areas (ADR 019 decisions 5, 8).
+     * A role this instance does not offer names no area (decision 4).
      */
     private function area(Request $request, User $user): ?Role
     {
         $middleware = $request->route()?->gatherMiddleware() ?? [];
 
-        foreach (Role::cases() as $role) {
+        foreach (Role::available() as $role) {
             if (in_array(Role::middleware($role), $middleware, true)) {
                 return $role;
             }
         }
 
-        return $user->area();
+        $area = $user->area();
+
+        if ($area === Role::Player && in_array(Role::middleware(Role::Teacher, Role::Parent), $middleware, true)) {
+            return array_values(array_filter($user->roleList(), static fn (Role $role): bool => $role !== Role::Player))[0] ?? $area;
+        }
+
+        return $area;
     }
 }

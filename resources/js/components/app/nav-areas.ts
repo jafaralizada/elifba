@@ -1,6 +1,7 @@
 import { usePage } from '@inertiajs/react';
 import {
     BookOpenText,
+    DoorOpen,
     Gamepad2,
     House,
     Palette,
@@ -10,13 +11,14 @@ import {
     UserCog,
     UserRound,
 } from 'lucide-react';
-import type { NavArea } from '@/lib/nav-active';
+import type { NavArea, NavPage } from '@/lib/nav-active';
 import { edit as editAppearance } from '@/routes/appearance';
 import { index as children } from '@/routes/children';
 import { index as classes } from '@/routes/classes';
 import { edit as editPlaySettings } from '@/routes/play-settings';
 import { edit as editProfile } from '@/routes/profile';
 import { edit as editRoles } from '@/routes/roles';
+import { index as rooms } from '@/routes/rooms';
 import { edit as editSecurity } from '@/routes/security';
 import { index as words } from '@/routes/words';
 import type { Role } from '@/types';
@@ -45,46 +47,80 @@ const childrenArea: NavArea = {
     pages: [{ title: 'nav.children', href: children(), icon: House }],
 };
 
+const roomsArea: NavArea = {
+    key: 'rooms',
+    title: 'nav.rooms',
+    icon: DoorOpen,
+    base: '/rooms',
+    pages: [{ title: 'nav.rooms', href: rooms(), icon: DoorOpen }],
+};
+
+const profilePage: NavPage = {
+    title: 'settings.nav.profile',
+    href: editProfile(),
+    icon: UserRound,
+};
+const securityPage: NavPage = {
+    title: 'settings.nav.security',
+    href: editSecurity(),
+    icon: ShieldCheck,
+};
+const appearancePage: NavPage = {
+    title: 'settings.nav.appearance',
+    href: editAppearance(),
+    icon: Palette,
+};
+const playPage: NavPage = {
+    title: 'settings.nav.play',
+    href: editPlaySettings(),
+    icon: Gamepad2,
+};
+const rolesPage: NavPage = {
+    title: 'settings.nav.roles',
+    href: editRoles(),
+    icon: UserCog,
+};
+
 const settingsArea: NavArea = {
     key: 'settings',
     title: 'nav.settings',
     icon: Settings,
     base: '/settings',
-    pages: [
-        { title: 'settings.nav.profile', href: editProfile(), icon: UserRound },
-        {
-            title: 'settings.nav.security',
-            href: editSecurity(),
-            icon: ShieldCheck,
-        },
-        {
-            title: 'settings.nav.appearance',
-            href: editAppearance(),
-            icon: Palette,
-        },
-        {
-            title: 'settings.nav.play',
-            href: editPlaySettings(),
-            icon: Gamepad2,
-        },
-        { title: 'settings.nav.roles', href: editRoles(), icon: UserCog },
-    ],
+    pages: [profilePage, securityPage, appearancePage, playPage, rolesPage],
+};
+
+/**
+ * The player's Settings: the same pages but «Oyun», which is the boards'
+ * and opens only for a teacher or a parent (ADR 019 decision 8).
+ */
+const playerSettingsArea: NavArea = {
+    ...settingsArea,
+    pages: [profilePage, securityPage, appearancePage, rolesPage],
 };
 
 /**
  * The shell's one nav definition (docs/frontend.md §1), one navigation per
- * area (architecture §1 "Accounts and roles"): the sidebar, the bottom bar
- * and the pill strip read the one of the page's area. Titles are
- * translation keys.
+ * area (architecture §1 "Accounts and roles", §12 for the player): the
+ * sidebar, the bottom bar and the pill strip read the one of the page's
+ * area. Titles are translation keys.
  */
 export const navAreas: Record<Role, NavArea[]> = {
     teacher: [classesArea, wordsArea, settingsArea],
     parent: [childrenArea, settingsArea],
+    player: [roomsArea, playerSettingsArea],
 };
 
 /** The navigation of an area; none before the role choice. */
 export function navAreasFor(area: Role | null): NavArea[] {
     return area === null ? [] : navAreas[area];
+}
+
+/**
+ * The name of an area's home, as a link to `/start` reads on a page outside
+ * the shell; «Siniflər» before the role choice.
+ */
+export function areaHomeTitle(area: Role | null): string {
+    return area === null ? classesArea.title : navAreas[area][0].title;
 }
 
 /** The navigation of the current page's area (the shared `auth.area`). */

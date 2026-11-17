@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { navAreas, navAreasFor } from '@/components/app/nav-areas';
+import {
+    areaHomeTitle,
+    navAreas,
+    navAreasFor,
+} from '@/components/app/nav-areas';
 import { activeArea, activePage, isWithin, pathOf } from '@/lib/nav-active';
 import type { NavArea } from '@/lib/nav-active';
 
 const teacher = navAreas.teacher;
 const parent = navAreas.parent;
+const player = navAreas.player;
 
 const areaKey = (url: string, areas = teacher): string | undefined =>
     activeArea(areas, url)?.key;
@@ -49,7 +54,7 @@ describe('the teacher shell areas', () => {
     });
 
     it('opens every area on its first page, inside the area', () => {
-        for (const areas of [teacher, parent]) {
+        for (const areas of [teacher, parent, player]) {
             for (const area of areas) {
                 const first = pathOf(area.pages[0].href);
 
@@ -158,11 +163,75 @@ describe('the navigation of each area', () => {
     });
 });
 
+describe('the player shell areas', () => {
+    it('has the rooms and Settings, in the nav order', () => {
+        expect(player.map((area) => area.key)).toEqual(['rooms', 'settings']);
+        expect(player.map((area) => area.pages.length)).toEqual([1, 4]);
+    });
+
+    it('finds the rooms and every room page under them', () => {
+        for (const url of ['/rooms', '/rooms/01JROOM', '/rooms?past=1']) {
+            expect(areaKey(url, player)).toBe('rooms');
+            expect(pageTitle(url, player)).toBe('nav.rooms');
+        }
+    });
+
+    it("offers the settings but the boards' «Oyun»", () => {
+        expect(pageTitle('/settings/profile', player)).toBe(
+            'settings.nav.profile',
+        );
+        expect(pageTitle('/settings/security', player)).toBe(
+            'settings.nav.security',
+        );
+        expect(pageTitle('/settings/appearance', player)).toBe(
+            'settings.nav.appearance',
+        );
+        expect(pageTitle('/settings/roles', player)).toBe('settings.nav.roles');
+        expect(pageTitle('/settings/play', player)).toBeUndefined();
+        expect(player[1].key).toBe(teacher[2].key);
+        expect(player[1].base).toBe(teacher[2].base);
+    });
+
+    it('leaves the class, child, word and board pages outside', () => {
+        for (const url of [
+            '/classes',
+            '/children',
+            '/words',
+            '/games/01JGAME/board',
+            '/pult',
+        ]) {
+            expect(areaKey(url, player)).toBeUndefined();
+        }
+    });
+
+    it('puts no room page in the teacher or the parent area', () => {
+        for (const areas of [teacher, parent]) {
+            expect(areaKey('/rooms', areas)).toBeUndefined();
+
+            for (const area of areas) {
+                for (const page of area.pages) {
+                    expect(pathOf(page.href)).not.toMatch(/rooms|otaq/);
+                }
+            }
+        }
+    });
+});
+
 describe('navAreasFor', () => {
     it('gives each area its navigation and none before the role choice', () => {
         expect(navAreasFor('teacher')).toBe(teacher);
         expect(navAreasFor('parent')).toBe(parent);
+        expect(navAreasFor('player')).toBe(player);
         expect(navAreasFor(null)).toEqual([]);
+    });
+});
+
+describe('areaHomeTitle', () => {
+    it('names the home `/start` leads to', () => {
+        expect(areaHomeTitle('teacher')).toBe('nav.classes');
+        expect(areaHomeTitle('parent')).toBe('nav.children');
+        expect(areaHomeTitle('player')).toBe('nav.rooms');
+        expect(areaHomeTitle(null)).toBe('nav.classes');
     });
 });
 

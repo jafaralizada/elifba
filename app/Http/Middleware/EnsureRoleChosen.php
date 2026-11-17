@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Support\RoomsArea;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -11,8 +12,10 @@ use Symfony\Component\HttpFoundation\Response;
  * `role.chosen` (docs/architecture.md §1 "Accounts and roles", ADR 010
  * decision 4): an account that has not chosen a role yet reaches nothing
  * but the role choice, its profile and logging out. A page visit goes to
- * `/role`; a JSON or non-GET request gets 409 `role_required`. Anyone who
- * is not an account (a guest board's bearer) passes: its routes decide.
+ * `/role` — from a page of the player area with «Oyunçu» preselected and
+ * the page kept to come back to (ADR 019 decision 6); a JSON or non-GET
+ * request gets 409 `role_required`. Anyone who is not an account (a guest
+ * board's bearer) passes: its routes decide.
  */
 final class EnsureRoleChosen
 {
@@ -28,7 +31,7 @@ final class EnsureRoleChosen
         }
 
         if ($request->isMethod('GET') && ! $request->expectsJson()) {
-            return to_route('role');
+            return RoomsArea::toThePlayerRole($request, 'role') ?? to_route('role');
         }
 
         return response()->json(['error' => 'role_required'], Response::HTTP_CONFLICT);
