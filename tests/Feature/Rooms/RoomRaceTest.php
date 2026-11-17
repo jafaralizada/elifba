@@ -16,6 +16,7 @@ use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\Rooms;
 
 /*
@@ -588,6 +589,23 @@ it('starts no second game while one is running', function (): void {
     $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), $setup)->assertForbidden();
     expect(fn () => app(StartRoomGame::class)->handle($this->room, new RoomGameSetupData(RoomMechanic::RecallOrder, 1, 5)))
         ->toThrow(AuthorizationException::class);
+});
+
+it('offers the setup of a game to the host of an open room alone, as the server accepts it', function (): void {
+    // Each mechanic the room can play with its difficulties, and the rounds' bounds; never the content's own list.
+    $offered = ['mechanics' => [['mechanic' => 'recall_order', 'difficulties' => [1, 2, 3, 4]]], 'rounds' => ['min' => 5, 'max' => 20]];
+    $this->actingAs($this->host)->get(route('rooms.show', $this->room))
+        ->assertInertia(fn (Assert $page) => $page->where('setup', $offered));
+    $this->actingAs($this->aygun)->get(route('rooms.show', $this->room))
+        ->assertInertia(fn (Assert $page) => $page->where('setup', null));
+
+    foreach ($offered['mechanics'][0]['difficulties'] as $difficulty) {
+        expect(RoomGameSetupData::validate(['mechanic' => 'recall_order', 'difficulty' => $difficulty, 'rounds' => 5])->difficulty)->toBe($difficulty);
+    }
+
+    $this->actingAs($this->host)->post(route('rooms.close', $this->room));
+    $this->get(route('rooms.show', $this->room))
+        ->assertInertia(fn (Assert $page) => $page->where('setup', null));
 });
 
 it('ends the game when the room closes', function (): void {

@@ -9,15 +9,10 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 import { authenticate } from '@/actions/Illuminate/Broadcasting/BroadcastController';
+import { xsrfToken } from './http';
 import type { RoomChannel, SocketState } from './live';
 
 export type RoomEcho = Echo<'reverb'>;
-
-function xsrfToken(): string | null {
-    const match = /(?:^|;\s*)XSRF-TOKEN=([^;]*)/.exec(document.cookie);
-
-    return match ? decodeURIComponent(match[1]) : null;
-}
 
 export function connectRoomEcho(): RoomEcho {
     const env = import.meta.env;

@@ -157,4 +157,35 @@ describe('watchRoom', () => {
         tick();
         expect(refresh).toHaveBeenCalledTimes(2);
     });
+
+    it('tells a page that polls by itself whether it hears the channel, and never polls', () => {
+        const fake = fakeChannel();
+        const { timers, running } = fakeTimers();
+        const refresh = vi.fn();
+        const heard: boolean[] = [];
+        const watch = watchRoom({
+            revision: 0,
+            channel: fake.channel,
+            refresh,
+            timers,
+            onListening: (listening) => heard.push(listening),
+        });
+
+        expect(heard).toEqual([false]);
+        fake.subscribed();
+        expect(heard).toEqual([false, true]);
+        expect(refresh).toHaveBeenCalledOnce();
+
+        fake.socket('disconnected');
+        fake.socket('connecting');
+        fake.failed();
+        expect(heard).toEqual([false, true, false]);
+        fake.subscribed();
+        expect(heard).toEqual([false, true, false, true]);
+        expect(running.size).toBe(0);
+
+        watch.stop();
+        fake.socket('disconnected');
+        expect(heard).toEqual([false, true, false, true]);
+    });
 });

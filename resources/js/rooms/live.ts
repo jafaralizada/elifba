@@ -9,7 +9,11 @@
  * A signal sent before the channel is subscribed is lost, so the page asks
  * for the state every 3 s until the subscription succeeds, once more when
  * it does (the first and every one after a reconnect), and every 3 s again
- * whenever the socket drops or the subscription fails.
+ * whenever the socket drops or the subscription fails. A page that plays
+ * a game asks by its own rules instead (`followRoom()` in `clock.ts`: at
+ * the timetable's moments, and every 3 s only in the lobby and after it
+ * has answered): it passes `onListening` and is told when the channel is
+ * heard and when it is not, and this module does not poll.
  *
  * The channel comes from outside (`roomChannel()` in `socket.ts` adapts
  * Echo; tests use a fake), so this module never loads Echo.
@@ -51,25 +55,41 @@ export type RoomWatch = {
 /**
  * Calls `refresh` when the channel signals a revision above the page's,
  * once on every subscription, and every `POLL_MS` while the channel is not
- * subscribed (or there is no channel at all). A malformed signal is
- * dropped.
+ * subscribed (or there is no channel at all) — unless `onListening` is
+ * given: then it is told, on every change, whether the channel is heard,
+ * and the page polls by its own rules. A malformed signal is dropped.
  */
 export function watchRoom(options: {
     revision: number;
     channel: RoomChannel | null;
     refresh: () => void;
     timers?: Timers;
+    onListening?: (listening: boolean) => void;
 }): RoomWatch {
     const timers = options.timers ?? realTimers;
+    const onListening = options.onListening;
     let revision = options.revision;
     let poll: unknown = null;
+    let listening: boolean | null = null;
     let stopped = false;
 
-    const startPolling = () => {
-        if (poll === null && !stopped) {
+    const hear = (heard: boolean) => {
+        if (stopped || heard === listening) {
+            return;
+        }
+
+        listening = heard;
+
+        if (onListening !== undefined) {
+            onListening(heard);
+        } else if (!heard && poll === null) {
             poll = timers.every(options.refresh, POLL_MS);
+        } else if (heard && poll !== null) {
+            timers.cancel(poll);
+            poll = null;
         }
     };
+    const startPolling = () => hear(false);
     const stopPolling = () => {
         if (poll !== null) {
             timers.cancel(poll);
@@ -94,7 +114,7 @@ export function watchRoom(options: {
                 return;
             }
 
-            stopPolling();
+            hear(true);
             // Whatever changed while the channel was not listening.
             options.refresh();
         });

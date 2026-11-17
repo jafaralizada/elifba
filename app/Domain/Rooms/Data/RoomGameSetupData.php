@@ -62,6 +62,35 @@ final readonly class RoomGameSetupData
     }
 
     /**
+     * What the host's setup offers, as `rules()` accepts it: each mechanic
+     * `RoomPlayable` lists with the difficulties of its levels, and the
+     * bounds of the rounds. The room page names them; it never lists them
+     * itself.
+     *
+     * @return array{mechanics: list<array{mechanic: string, difficulties: list<int>}>, rounds: array{min: int, max: int}}
+     */
+    public static function options(): array
+    {
+        $mechanics = [];
+
+        foreach (self::playableLevels() as $level) {
+            $mechanics[$level->mechanic->value][] = $level->difficulty;
+        }
+
+        $options = [];
+
+        foreach ($mechanics as $mechanic => $difficulties) {
+            sort($difficulties);
+            $options[] = ['mechanic' => $mechanic, 'difficulties' => $difficulties];
+        }
+
+        return [
+            'mechanics' => $options,
+            'rounds' => ['min' => Config::integer('elifba.rooms.rounds.min'), 'max' => Config::integer('elifba.rooms.rounds.max')],
+        ];
+    }
+
+    /**
      * @return list<RoomLevelData>
      */
     private static function playableLevels(): array
