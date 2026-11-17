@@ -18,15 +18,21 @@ namespace App\Domain\Content\Enums;
 enum RoomMechanic: string
 {
     /**
-     * «Ardıcıllığı yadda saxla»: a row of digits or letters is shown, then
-     * hidden; tap them in the order shown (`sequence`).
+     * «Ardıcıllığı yadda saxla»: a row of digits, letters or shapes is
+     * shown, then hidden; tap them in the order shown (`sequence`).
      */
     case RecallOrder = 'recall_order';
+
+    /**
+     * «Xanaları yadda saxla»: cells of a grid light up, then go dark; tap
+     * the cells that were lit (`set`).
+     */
+    case RecallCells = 'recall_cells';
 
     public function family(): RoomFamily
     {
         return match ($this) {
-            self::RecallOrder => RoomFamily::Memory,
+            self::RecallOrder, self::RecallCells => RoomFamily::Memory,
         };
     }
 
@@ -40,15 +46,18 @@ enum RoomMechanic: string
 
     /**
      * The kinds of item a level of this mechanic may name in `kinds`, as
-     * far as their material exists: words wait for B6's word list
-     * (`content/rooms/words.json`), shapes for B4's (`shapes.json`).
+     * far as their material exists: shapes from B4 (`content/rooms/
+     * shapes.json`); words wait for B6's word list (`content/rooms/
+     * words.json`). A `recall_cells` level names none: its items are the
+     * cells of its grid.
      *
      * @return list<RoomItemKind>
      */
     public function kinds(): array
     {
         return match ($this) {
-            self::RecallOrder => [RoomItemKind::Digit, RoomItemKind::Letter],
+            self::RecallOrder => [RoomItemKind::Digit, RoomItemKind::Letter, RoomItemKind::Shape],
+            self::RecallCells => [],
         };
     }
 }

@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- ulduz: a five-pointed star, a shape of a memory round. Elifba own art, MIT. -->
+<path d="M15.55 3.11 Q16 2 16.45 3.11 L19.43 10.55 Q19.88 11.66 21.08 11.74 L29.07 12.28 Q30.27 12.36 29.34 13.13 L23.2 18.27 Q22.28 19.04 22.57 20.2 L24.52 27.97 Q24.82 29.14 23.8 28.5 L17.02 24.24 Q16 23.6 14.98 24.24 L8.2 28.5 Q7.18 29.14 7.48 27.97 L9.43 20.2 Q9.72 19.04 8.8 18.27 L2.66 13.13 Q1.73 12.36 2.93 12.28 L10.92 11.74 Q12.12 11.66 12.57 10.55 Z" fill="url(#ulduz_fill1)"/>
+<path d="M15.55 3.11 Q16 2 16.45 3.11 L19.43 10.55 Q19.88 11.66 21.08 11.74 L29.07 12.28 Q30.27 12.36 29.34 13.13 L23.2 18.27 Q22.28 19.04 22.57 20.2 L24.52 27.97 Q24.82 29.14 23.8 28.5 L17.02 24.24 Q16 23.6 14.98 24.24 L8.2 28.5 Q7.18 29.14 7.48 27.97 L9.43 20.2 Q9.72 19.04 8.8 18.27 L2.66 13.13 Q1.73 12.36 2.93 12.28 L10.92 11.74 Q12.12 11.66 12.57 10.55 Z" fill="url(#ulduz_fill2)"/>
+<g filter="url(#ulduz_blur06)"><ellipse cx="13" cy="12.5" rx="2.2" ry="1.4" fill="#FFFFFF" fill-opacity="0.55" transform="rotate(-40 13 12.5)"/></g>
+<defs>
+<radialGradient id="ulduz_fill1" cx="0.35" cy="0.3" r="0.75"><stop stop-color="#F9DC66"/><stop offset="0.55" stop-color="#F5C400"/><stop offset="1" stop-color="#B89300"/></radialGradient>
+<radialGradient id="ulduz_fill2" cx="0.85" cy="0.88" r="0.7"><stop stop-color="#B89300" stop-opacity="0.6"/><stop offset="0.85" stop-color="#B89300" stop-opacity="0"/></radialGradient>
+<filter id="ulduz_blur06" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.6"/></filter>
+</defs>
+</svg>

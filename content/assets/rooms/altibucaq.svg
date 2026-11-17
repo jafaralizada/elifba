@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- altibucaq: a hexagon, a shape of a memory round. Elifba own art, MIT. -->
+<path d="M14.09 2.6 Q16 1.5 17.91 2.6 L26.65 7.65 Q28.56 8.75 28.56 10.95 L28.56 21.05 Q28.56 23.25 26.65 24.35 L17.91 29.4 Q16 30.5 14.09 29.4 L5.35 24.35 Q3.44 23.25 3.44 21.05 L3.44 10.95 Q3.44 8.75 5.35 7.65 Z" fill="url(#altibucaq_fill1)"/>
+<path d="M14.09 2.6 Q16 1.5 17.91 2.6 L26.65 7.65 Q28.56 8.75 28.56 10.95 L28.56 21.05 Q28.56 23.25 26.65 24.35 L17.91 29.4 Q16 30.5 14.09 29.4 L5.35 24.35 Q3.44 23.25 3.44 21.05 L3.44 10.95 Q3.44 8.75 5.35 7.65 Z" fill="url(#altibucaq_fill2)"/>
+<g filter="url(#altibucaq_blur06)"><ellipse cx="10.5" cy="9.5" rx="3" ry="1.8" fill="#FFFFFF" fill-opacity="0.55" transform="rotate(-30 10.5 9.5)"/></g>
+<defs>
+<radialGradient id="altibucaq_fill1" cx="0.35" cy="0.3" r="0.75"><stop stop-color="#78C5C0"/><stop offset="0.55" stop-color="#1E9E96"/><stop offset="1" stop-color="#167670"/></radialGradient>
+<radialGradient id="altibucaq_fill2" cx="0.85" cy="0.88" r="0.7"><stop stop-color="#167670" stop-opacity="0.6"/><stop offset="0.85" stop-color="#167670" stop-opacity="0"/></radialGradient>
+<filter id="altibucaq_blur06" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.6"/></filter>
+</defs>
+</svg>

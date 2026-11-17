@@ -1,6 +1,10 @@
 <?php
 
+use App\Domain\Content\Data\RangeData;
+use App\Domain\Content\Data\RoomLevelData;
+use App\Domain\Content\Enums\RoomItemKind;
 use App\Domain\Content\Enums\RoomMechanic;
+use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Rooms\Actions\StartRoomGame;
 use App\Domain\Rooms\Data\RoomGameSetupData;
 use App\Domain\Rooms\Data\RoomStateData;
@@ -11,7 +15,9 @@ use App\Domain\Rooms\Models\RoomGame;
 use App\Domain\Rooms\Models\RoomPlayer;
 use App\Domain\Rooms\Models\RoomRound;
 use App\Domain\Rooms\Support\RoomClock;
+use App\Domain\Rooms\Support\RoomPlayable;
 use App\Domain\Rooms\Support\RoomPointsRule;
+use App\Domain\Rooms\Support\RoomSeed;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -593,14 +599,19 @@ it('starts no second game while one is running', function (): void {
 
 it('offers the setup of a game to the host of an open room alone, as the server accepts it', function (): void {
     // Each mechanic the room can play with its difficulties, and the rounds' bounds; never the content's own list.
-    $offered = ['mechanics' => [['mechanic' => 'recall_order', 'difficulties' => [1, 2, 3, 4]]], 'rounds' => ['min' => 5, 'max' => 20]];
+    $offered = ['mechanics' => [
+        ['mechanic' => 'recall_order', 'difficulties' => [1, 2, 3, 4]],
+        ['mechanic' => 'recall_cells', 'difficulties' => [1, 2, 3, 4]],
+    ], 'rounds' => ['min' => 5, 'max' => 20]];
     $this->actingAs($this->host)->get(route('rooms.show', $this->room))
         ->assertInertia(fn (Assert $page) => $page->where('setup', $offered));
     $this->actingAs($this->aygun)->get(route('rooms.show', $this->room))
         ->assertInertia(fn (Assert $page) => $page->where('setup', null));
 
-    foreach ($offered['mechanics'][0]['difficulties'] as $difficulty) {
-        expect(RoomGameSetupData::validate(['mechanic' => 'recall_order', 'difficulty' => $difficulty, 'rounds' => 5])->difficulty)->toBe($difficulty);
+    foreach ($offered['mechanics'] as $offer) {
+        foreach ($offer['difficulties'] as $difficulty) {
+            expect(RoomGameSetupData::validate(['mechanic' => $offer['mechanic'], 'difficulty' => $difficulty, 'rounds' => 5])->difficulty)->toBe($difficulty);
+        }
     }
 
     $this->actingAs($this->host)->post(route('rooms.close', $this->room));
@@ -659,4 +670,140 @@ it('limits answers to 30 a minute per account', function (): void {
     }
 
     raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertTooManyRequests();
+});
+
+// B4: «Xanaları yadda saxla» (§12 "Room games"). The study names the lit
+// cells; nothing else before the reveal does — not the countdown, not the
+// question, which is the whole dark grid with ids of its own, the same
+// whichever cells were lit.
+it('plays a game of cells to its ranking and names no lit cell before the reveal', function (): void {
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), ['mechanic' => 'recall_cells', 'difficulty' => 2, 'rounds' => 5])->assertNoContent();
+    $game = $this->room->refresh()->latestGame()?->load('rounds');
+    $level = app(ContentRepository::class)->roomLevel(RoomMechanic::RecallCells, 2);
+    $grid = $level->grid?->toArray();
+    $everyCell = [];
+
+    for ($row = 0; $row < ($grid['rows'] ?? 0); $row++) {
+        for ($col = 0; $col < ($grid['cols'] ?? 0); $col++) {
+            $everyCell[] = ['cell', null, null, [$col, $row]];
+        }
+    }
+
+    expect($game)->not->toBeNull()
+        ->and($game?->mechanic)->toBe(RoomMechanic::RecallCells)
+        ->and($game?->rounds)->toHaveCount(5);
+
+    // The countdown: nothing of any round.
+    ['state' => $state, 'wire' => $wire] = raceRead($this->aygun, $this->room);
+
+    expect($state['game'])->toMatchArray(['mechanic' => 'recall_cells', 'difficulty' => 2, 'phase' => 'live'])
+        ->and($state['round']['phase'])->toBe('countdown');
+
+    foreach ($game->rounds ?? [] as $round) {
+        foreach ([...raceIds($round)['study'], ...raceIds($round)['ask']] as $id) {
+            expect($wire)->not->toContain($id);
+        }
+    }
+
+    $points = 0;
+
+    foreach (range(0, 4) as $index) {
+        $round = Rooms::round($game, $index);
+        $lit = array_map(static fn ($item): ?array => $item->cell, $round->studyData()->items ?? []);
+
+        // The study: the lit cells on the grid, and nothing of the question.
+        $this->travelTo(Rooms::at($game, RoomPhase::Study, $index));
+        ['state' => $state, 'wire' => $wire] = raceRead($this->aygun, $this->room);
+
+        expect($state['round']['study'])->toMatchArray(['layout' => 'grid', 'grid' => $grid])
+            ->and(array_column($state['round']['study']['items'], 'cell'))->toBe($lit)
+            ->and(count($lit))->toBeGreaterThanOrEqual($level->lit->min ?? 0)->toBeLessThanOrEqual($level->lit->max ?? 0)
+            ->and($state['round']['ask'])->toBeNull();
+        raceWithholds($wire, $round);
+
+        foreach (raceIds($round)['ask'] as $id) {
+            expect($wire)->not->toContain($id);
+        }
+
+        // The question: the dark grid in reading order, asking for as many as were lit; no id of the study.
+        $this->travelTo(Rooms::at($game, RoomPhase::Answer, $index));
+
+        foreach ([$this->host, $this->aygun] as $account) {
+            ['state' => $state, 'wire' => $wire] = raceRead($account, $this->room);
+            $ask = $state['round']['ask'];
+
+            expect($state['round']['study'])->toBeNull()
+                ->and(array_map(static fn (array $item): array => [$item['kind'], $item['text'], $item['asset'], $item['cell']], $ask['items']))->toBe($everyCell)
+                ->and([$ask['shape'], $ask['pick'], $ask['layout'], $ask['grid']])->toBe(['set', count($lit), 'grid', $grid]);
+            raceWithholds($wire, $round);
+
+            foreach (raceIds($round)['study'] as $id) {
+                expect($wire)->not->toContain($id);
+            }
+        }
+
+        // Aygün taps the lit cells in another order and is right; Rəşad swaps one for a dark cell.
+        raceAnswer($this->aygun, $this->room, $round, array_reverse(Rooms::right($round)))->assertExactJson(['status' => 'accepted', 'revision' => $this->room->refresh()->revision]);
+        raceAnswer($this->host, $this->room, $round, Rooms::wrong($round))->assertOk();
+        $aygun = RoomAnswer::query()->where('room_round_id', $round->id)->where('room_player_id', $this->aygunRow->id)->sole();
+        $points += $aygun->points;
+
+        // Both answered: the round is revealed, the lit cells named by the question's ids.
+        ['state' => $state] = raceRead($this->aygun, $this->room);
+
+        expect($state['round']['phase'])->toBe('reveal')
+            ->and($state['round']['reveal']['solution'])->toBe(Rooms::right($round))
+            ->and($state['round']['reveal']['mine'])->toMatchArray(['correct' => true, 'points' => $aygun->points])
+            ->and($state['round']['reveal']['results'])->toBe([
+                ['player_id' => $this->hostRow->id, 'correct' => false, 'points' => 0],
+                ['player_id' => $this->aygunRow->id, 'correct' => true, 'points' => $aygun->points],
+            ]);
+    }
+
+    // Over: Aygün first with every round's points, Rəşad after the places without one.
+    $this->travelTo(Rooms::at($game, RoomPhase::Over));
+    ['state' => $state] = raceRead($this->host, $this->room);
+
+    expect($state['game']['phase'])->toBe('over')
+        ->and($points)->toBeGreaterThanOrEqual(50)
+        ->and($state['ranking'])->toBe([
+            ['player_id' => $this->aygunRow->id, 'points' => $points, 'place' => 1],
+            ['player_id' => $this->hostRow->id, 'points' => 0, 'place' => null],
+        ]);
+});
+
+// B4: shapes in «Ardıcıllığı yadda saxla» (§12 "Room games"): pictures with
+// no text, judged by what they show.
+it('plays a row of shapes and judges it by their pictures', function (): void {
+    $level = new RoomLevelData(RoomMechanic::RecallOrder, 2, 4_500, 15_000, [RoomItemKind::Shape], new RangeData(5, 6));
+    [$built] = RoomPlayable::builder(RoomMechanic::RecallOrder)->build($level, 1, RoomSeed::random(7));
+    $game = RoomGame::factory()->for($this->room)->create(['difficulty' => 2]);
+    $round = RoomRound::factory()->for($game, 'game')->built($built)->create(['position' => 0]);
+    $game->load('rounds');
+
+    $this->travelTo(Rooms::at($game, RoomPhase::Study));
+    ['state' => $state] = raceRead($this->aygun, $this->room);
+    $study = $state['round']['study']['items'];
+
+    expect(array_unique(array_column($study, 'kind')))->toBe(['shape'])
+        ->and(array_filter(array_column($study, 'text')))->toBe([])
+        ->and($study[0]['asset'])->toMatch('#/content/rooms/[a-z]+\.svg\?v=\d+$#');
+
+    $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    ['state' => $state, 'wire' => $wire] = raceRead($this->aygun, $this->room);
+    $asked = array_column($state['round']['ask']['items'], 'asset');
+
+    // The question is the same pictures, never in the order shown.
+    expect($asked)->not->toBe(array_column($study, 'asset'))
+        ->and(array_values(array_diff($asked, array_column($study, 'asset'))))->toBe([]);
+    raceWithholds($wire, $round);
+
+    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertOk();
+    raceAnswer($this->host, $this->room, $round, Rooms::wrong($round))->assertOk();
+    ['state' => $state] = raceRead($this->aygun, $this->room);
+
+    expect($state['round']['reveal']['results'])->toBe([
+        ['player_id' => $this->hostRow->id, 'correct' => false, 'points' => 0],
+        ['player_id' => $this->aygunRow->id, 'correct' => true, 'points' => $state['round']['reveal']['mine']['points']],
+    ]);
 });

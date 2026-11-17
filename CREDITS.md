@@ -81,6 +81,13 @@ The app shows the same list on its `/credits` page.
 - License: [MIT License](https://opensource.org/license/mit) (`MIT`)
 - Source: <https://github.com/nijataliyev7/elifba>
 
+### Shapes for the adults' memory rounds: twelve plain shapes in Fluent Emoji's manner, each with a form of its own
+
+- Files: `content/assets/rooms/*`
+- Author: Elifba contributors
+- License: [MIT License](https://opensource.org/license/mit) (`MIT`)
+- Source: <https://github.com/nijataliyev7/elifba>
+
 ### Board backdrops in Fluent Emoji's manner: a meadow by a farm (animals), a prehistoric valley (dinosaurs), an orchard (fruit), a sky with clouds (colours), soft hills at dawn (numbers), moon hills (space), a roadside (vehicles), mountain valleys (nature), a classroom (school)
 
 - Files: `content/assets/animals/cemenlik.svg`, `content/assets/dinosaurs/vadi.svg`, `content/assets/fruit/bag.svg`, `content/assets/colors/goy-uzu.svg`, `content/assets/numbers/tepeler.svg`, `content/assets/space/sema.svg`, `content/assets/vehicles/yol.svg`, `content/assets/nature/daglar.svg`, `content/assets/school/sinif-otaq.svg`

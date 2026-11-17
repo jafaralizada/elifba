@@ -63,6 +63,10 @@ describe('room fixtures', () => {
             'state.over',
             'answer',
             'receipt',
+            'state.study.cells',
+            'state.answer.cells',
+            'state.reveal.cells',
+            'state.study.shapes',
         ]) {
             expect(fixture(name), name).toBeDefined();
         }

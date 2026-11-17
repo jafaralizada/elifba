@@ -328,7 +328,7 @@ it('places classes, rankings, teacher words and class games in the teacher area,
     // Every room route, and nothing else, is the player's: `/rooms…` and `/otaq…`.
     $rooms = array_filter($routes, static fn (RoutingRoute $route): bool => preg_match('#^(rooms|otaq)(/|$)#', $route->uri()) === 1);
     expect(array_keys($rooms))->toBe(array_keys(playerAreaRoutes()))
-        ->and(array_keys($rooms))->toContain('rooms.index', 'rooms.store', 'rooms.entrance', 'rooms.join', 'rooms.join.store', 'rooms.show', 'rooms.state', 'rooms.leave', 'rooms.update', 'rooms.members.destroy', 'rooms.close', 'rooms.destroy', 'rooms.name.destroy', 'rooms.games.store', 'rooms.game.destroy', 'rooms.answers.store');
+        ->and(array_keys($rooms))->toContain('rooms.index', 'rooms.store', 'rooms.entrance', 'rooms.join', 'rooms.join.store', 'rooms.show', 'rooms.state', 'rooms.leave', 'rooms.update', 'rooms.members.destroy', 'rooms.close', 'rooms.destroy', 'rooms.name.destroy', 'rooms.games.store', 'rooms.game.destroy', 'rooms.answers.store', 'rooms.screen');
 
     foreach (['children.index', 'children.store', 'children.order', 'children.show', 'children.update', 'children.destroy', 'children.learned-letters.update', 'children.games.create', 'children.games.store'] as $name) {
         expect(areaGroupsOf($routes[$name]))->toBe(['parent'], $name);

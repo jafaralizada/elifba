@@ -1,0 +1,37 @@
+<?php
+
+namespace App\Http\Controllers\Rooms;
+
+use App\Domain\Rooms\Models\Room;
+use App\Domain\Rooms\Support\RoomJoinLink;
+use App\Domain\Rooms\Support\RoomPlaces;
+use App\Domain\Rooms\Support\RoomState;
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Container\Attributes\CurrentUser;
+use Inertia\Inertia;
+use Inertia\Response;
+
+/**
+ * The big screen (docs/architecture.md §12 "The big screen", ADR 021):
+ * `GET /rooms/{room}/screen`, page `rooms/screen`, for the host of an open
+ * room in their own session on a laptop or a television's browser. It
+ * gets what the room page gets to follow the room — the state
+ * (`RoomState`, which it then reads from `GET /rooms/{room}/state` as a
+ * host may) and the place labels — and `join`, the addresses of the QR and
+ * the code field (`RoomJoinLink`), built on the server. It writes nothing,
+ * and it is not the guest board: `/lovhe`, the `board` guard and its
+ * bearer never show a room. Plain until B4's interface session designs it.
+ */
+final class RoomScreenController extends Controller
+{
+    public function __invoke(Room $room, #[CurrentUser] User $account): Response
+    {
+        return Inertia::render('rooms/screen', [
+            'room' => ['id' => $room->id, 'status' => $room->status()->value],
+            'state' => RoomState::for($room, $account)->toArray(),
+            'place_labels' => RoomPlaces::labels($room, app()->getLocale()),
+            'join' => RoomJoinLink::of($room),
+        ]);
+    }
+}

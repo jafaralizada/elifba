@@ -14,8 +14,8 @@
             "difficulty": 2,
             "study_ms": 3000,
             "answer_ms": 10000,
-            "kinds": ["letter"],
-            "length": { "min": 4, "max": 5 }
+            "kinds": ["letter", "shape"],
+            "length": { "min": 4, "max": 4 }
         },
         {
             "mechanic": "recall_order",
@@ -32,6 +32,38 @@
             "answer_ms": 60000,
             "kinds": ["letter"],
             "length": { "min": 12, "max": 12 }
+        },
+        {
+            "mechanic": "recall_cells",
+            "difficulty": 1,
+            "study_ms": 1000,
+            "answer_ms": 5000,
+            "grid": { "cols": 2, "rows": 2 },
+            "lit": { "min": 1, "max": 3 }
+        },
+        {
+            "mechanic": "recall_cells",
+            "difficulty": 2,
+            "study_ms": 2000,
+            "answer_ms": 10000,
+            "grid": { "cols": 3, "rows": 3 },
+            "lit": { "min": 2, "max": 4 }
+        },
+        {
+            "mechanic": "recall_cells",
+            "difficulty": 3,
+            "study_ms": 3000,
+            "answer_ms": 20000,
+            "grid": { "cols": 6, "rows": 6 },
+            "lit": { "min": 35, "max": 35 }
+        },
+        {
+            "mechanic": "recall_cells",
+            "difficulty": 4,
+            "study_ms": 4000,
+            "answer_ms": 30000,
+            "grid": { "cols": 4, "rows": 5 },
+            "lit": { "min": 5, "max": 6 }
         }
     ]
 }

@@ -3,6 +3,7 @@
 use App\Domain\Content\Data\LevelData;
 use App\Domain\Content\Data\PackData;
 use App\Domain\Content\Data\RoomLevelData;
+use App\Domain\Content\Data\RoomShapeData;
 use App\Domain\Content\Data\WordData;
 use App\Domain\Content\Enums\Effect;
 use App\Domain\Content\Enums\ItemStyle;
@@ -252,37 +253,89 @@ it('credits the Inter font files', function (): void {
 it('reads the room levels', function (): void {
     $content = app(ContentRepository::class);
     $levels = $content->roomLevels();
+    $orders = array_values(array_filter($levels, static fn (RoomLevelData $level): bool => $level->mechanic === RoomMechanic::RecallOrder));
+    $cells = array_values(array_filter($levels, static fn (RoomLevelData $level): bool => $level->mechanic === RoomMechanic::RecallCells));
 
-    // B3: «Ardıcıllığı yadda saxla» at the four difficulties, digits first, then digits and letters.
-    expect($content->roomVersion())->toBeGreaterThanOrEqual(1)
+    // B3: «Ardıcıllığı yadda saxla» at the four difficulties, digits first,
+    // then digits, letters and (B4) shapes; B4: «Xanaları yadda saxla».
+    expect($content->roomVersion())->toBeGreaterThanOrEqual(2)
         ->and(array_map(static fn (RoomLevelData $level): array => [$level->mechanic, $level->difficulty], $levels))->toBe([
             [RoomMechanic::RecallOrder, 1],
             [RoomMechanic::RecallOrder, 2],
             [RoomMechanic::RecallOrder, 3],
             [RoomMechanic::RecallOrder, 4],
+            [RoomMechanic::RecallCells, 1],
+            [RoomMechanic::RecallCells, 2],
+            [RoomMechanic::RecallCells, 3],
+            [RoomMechanic::RecallCells, 4],
         ])
-        ->and($levels[0]->kinds)->toBe([RoomItemKind::Digit])
-        ->and($levels[3]->kinds)->toBe([RoomItemKind::Digit, RoomItemKind::Letter])
+        ->and($orders[0]->kinds)->toBe([RoomItemKind::Digit])
+        ->and($orders[3]->kinds)->toBe([RoomItemKind::Digit, RoomItemKind::Letter, RoomItemKind::Shape])
         ->and(RoomMechanic::RecallOrder->family())->toBe(RoomFamily::Memory)
-        ->and(RoomMechanic::RecallOrder->studies())->toBeTrue();
+        ->and(RoomMechanic::RecallOrder->studies())->toBeTrue()
+        ->and(RoomMechanic::RecallCells->family())->toBe(RoomFamily::Memory)
+        ->and(RoomMechanic::RecallCells->studies())->toBeTrue()
+        ->and(RoomMechanic::RecallCells->kinds())->toBe([]);
 
     // Harder is longer, studied longer and answered in more time.
-    foreach (array_slice($levels, 1, null, true) as $index => $level) {
-        $easier = $levels[$index - 1];
+    foreach (array_slice($orders, 1, null, true) as $index => $level) {
+        $easier = $orders[$index - 1];
 
         expect($level->length?->min)->toBeGreaterThan($easier->length->max ?? 0)
             ->and($level->studyMs)->toBeGreaterThan($easier->studyMs)
             ->and($level->answerMs)->toBeGreaterThan($easier->answerMs);
     }
 
-    expect($content->roomLevel(RoomMechanic::RecallOrder, 2))->toBe($levels[1])
+    // Harder is a larger grid with more cells lit, never all of them.
+    foreach ($cells as $index => $level) {
+        expect($level->grid)->not->toBeNull()
+            ->and($level->lit)->not->toBeNull()
+            ->and($level->lit->max ?? 0)->toBeLessThan($level->grid?->cells() ?? 0)
+            ->and($level->kinds)->toBe([])
+            ->and($level->length)->toBeNull();
+
+        if ($index > 0) {
+            $easier = $cells[$index - 1];
+
+            expect($level->grid?->cells())->toBeGreaterThan($easier->grid?->cells() ?? 0)
+                ->and($level->lit?->min)->toBeGreaterThan($easier->lit->max ?? 0)
+                ->and($level->studyMs)->toBeGreaterThan($easier->studyMs)
+                ->and($level->answerMs)->toBeGreaterThan($easier->answerMs);
+        }
+    }
+
+    expect($content->roomLevel(RoomMechanic::RecallOrder, 2))->toBe($orders[1])
+        ->and($content->roomLevel(RoomMechanic::RecallCells, 3))->toBe($cells[2])
         ->and(fn () => $content->roomLevel(RoomMechanic::RecallOrder, 5))->toThrow(InvalidArgumentException::class);
 
     // A fixture root reads its own.
     $fixture = new ContentRepository(ContentFixture::make());
 
-    expect(array_map(static fn (RoomLevelData $level): ?int => $level->length?->max, $fixture->roomLevels()))->toBe([3, 5, 8, 12])
-        ->and($fixture->roomLevel(RoomMechanic::RecallOrder, 4)->studyMs)->toBe(60_000);
+    expect(array_map(static fn (RoomLevelData $level): ?int => $level->length?->max, $fixture->roomLevels()))->toBe([3, 4, 8, 12, null, null, null, null])
+        ->and($fixture->roomLevel(RoomMechanic::RecallOrder, 4)->studyMs)->toBe(60_000)
+        ->and($fixture->roomLevel(RoomMechanic::RecallCells, 4)->grid?->toArray())->toBe(['cols' => 4, 'rows' => 5])
+        ->and($fixture->roomLevel(RoomMechanic::RecallCells, 3)->lit?->max)->toBe(35);
+});
+
+it('reads the room shapes', function (): void {
+    $shapes = app(ContentRepository::class)->roomShapes();
+    $keys = array_map(static fn (RoomShapeData $shape): string => $shape->key, $shapes);
+
+    // B4: twelve shapes of our own, more than the longest row of any level.
+    expect($shapes)->toHaveCount(12)
+        ->and(array_unique($keys))->toBe($keys)
+        ->and($shapes[0]->image)->toBe('rooms/daire.svg')
+        ->and($shapes[0]->url())->toEndWith('/content/rooms/daire.svg?v='.$shapes[0]->version);
+
+    foreach ($shapes as $shape) {
+        expect($shape->image)->toBe("rooms/{$shape->key}.svg")
+            ->and(base_path("content/assets/{$shape->image}"))->toBeFile();
+    }
+
+    // A fixture root reads its own.
+    $fixture = new ContentRepository(ContentFixture::make());
+
+    expect(array_map(static fn (RoomShapeData $shape): string => $shape->key, $fixture->roomShapes()))->toBe(['circle', 'square', 'triangle', 'star']);
 });
 
 it('says which pack, level or prompt does not exist', function (Closure $read): void {

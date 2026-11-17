@@ -4,6 +4,7 @@ namespace App\Domain\Rooms\Support\Mechanics;
 
 use App\Domain\Content\Data\RangeData;
 use App\Domain\Content\Data\RoomLevelData;
+use App\Domain\Content\Data\RoomShapeData;
 use App\Domain\Content\Enums\RoomItemKind;
 use App\Domain\Language\Support\Alphabet;
 use App\Domain\Language\Support\Az;
@@ -23,10 +24,11 @@ use Random\Randomizer;
  * then hidden; the question is the same items shuffled, to be tapped in
  * the order shown (`sequence`).
  *
- * - One kind per round, drawn from the level's `kinds`: digits 0–9, or
- *   letters of the alphabet (`Alphabet`) cased by `Az::upper`. Words (B6)
- *   and shapes (B4) are not built yet; the validator refuses a level that
- *   names them.
+ * - One kind per round, drawn from the level's `kinds`: digits 0–9,
+ *   letters of the alphabet (`Alphabet`) cased by `Az::upper`, or the
+ *   shapes of `content/rooms/shapes.json` (B4), shown as their pictures
+ *   (`asset`, the file's URL) with no text. Words (B6) are not built yet;
+ *   the validator refuses a level that names them.
  * - The row's length is drawn from the level's `length` (3–12: two items
  *   could only be asked reversed, which would tell the answer), and no
  *   item comes twice in it (`RoomItemKind::distinct()` bounds the length):
@@ -38,11 +40,19 @@ use Random\Randomizer;
  *   turned by one place, which can never read like it, since its items
  *   are all different.
  * - The solution is the question's ids in the row's order, and the row's
- *   reading as the one accepted reading: two tiles that say the same are
+ *   reading as the one accepted reading (`RoomItemData::says()`: the text,
+ *   or a shape's picture): two tiles that say the same are
  *   interchangeable.
  */
 final readonly class RecallOrderBuilder implements RoomRoundBuilder
 {
+    /**
+     * @param  list<RoomShapeData>  $shapes  what a row of shapes is drawn from
+     */
+    public function __construct(
+        private array $shapes,
+    ) {}
+
     public function build(RoomLevelData $level, int $count, Randomizer $random): array
     {
         $length = $level->length;
@@ -63,23 +73,25 @@ final readonly class RecallOrderBuilder implements RoomRoundBuilder
     private function round(RoomLevelData $level, RangeData $length, Randomizer $random): BuiltRoomRoundData
     {
         $kind = $level->kinds[$random->getInt(0, count($level->kinds) - 1)];
-        $row = self::row(self::pool($kind), $random->getInt($length->min, $length->max), $random);
+        $row = self::row($this->pool($kind), $random->getInt($length->min, $length->max), $random);
         $ids = new RoomItemIds($random);
+        $item = static fn (array $shown): RoomItemData => new RoomItemData($ids->next(), $kind, $shown['text'], $shown['asset']);
 
-        $study = array_map(static fn (string $text): RoomItemData => new RoomItemData($ids->next(), $kind, $text), $row);
-        $asked = array_map(static fn (string $text): RoomItemData => new RoomItemData($ids->next(), $kind, $text), $row);
+        $study = array_map($item, $row);
+        $asked = array_map($item, $row);
+        $reading = self::reading($asked);
 
         // `$asked` is still in the row's order: that order is the solution.
         $solution = new RoomSolutionData(
             RoomAnswerShape::Sequence,
             array_map(static fn (RoomItemData $item): string => $item->id, $asked),
-            [$row],
+            [$reading],
         );
 
         /** @var list<RoomItemData> $shuffled */
         $shuffled = $random->shuffleArray($asked);
 
-        if (self::reading($shuffled) === $row) {
+        if (self::reading($shuffled) === $reading) {
             $shuffled = [...array_slice($shuffled, 1), $shuffled[0]];
         }
 
@@ -93,15 +105,19 @@ final readonly class RecallOrderBuilder implements RoomRoundBuilder
     }
 
     /**
-     * What a row of this kind is drawn from, as shown.
+     * What a row of this kind is drawn from, as shown: a text, or a
+     * shape's picture.
      *
-     * @return list<string>
+     * @return list<array{text: string|null, asset: string|null}>
      */
-    private static function pool(RoomItemKind $kind): array
+    private function pool(RoomItemKind $kind): array
     {
+        $text = static fn (string $text): array => ['text' => $text, 'asset' => null];
+
         return match ($kind) {
-            RoomItemKind::Digit => array_map(strval(...), range(0, 9)),
-            RoomItemKind::Letter => array_map(Az::upper(...), Alphabet::letters()),
+            RoomItemKind::Digit => array_map($text, array_map(strval(...), range(0, 9))),
+            RoomItemKind::Letter => array_map($text, array_map(Az::upper(...), Alphabet::letters())),
+            RoomItemKind::Shape => array_map(static fn (RoomShapeData $shape): array => ['text' => null, 'asset' => $shape->url()], $this->shapes),
             default => throw new InvalidArgumentException("recall_order does not show {$kind->value} yet."),
         };
     }
@@ -109,16 +125,16 @@ final readonly class RecallOrderBuilder implements RoomRoundBuilder
     /**
      * A row of `$length` different items of the pool.
      *
-     * @param  list<string>  $pool
-     * @return list<string>
+     * @param  list<array{text: string|null, asset: string|null}>  $pool
+     * @return list<array{text: string|null, asset: string|null}>
      */
     private static function row(array $pool, int $length, Randomizer $random): array
     {
         if ($length > count($pool)) {
-            throw new InvalidArgumentException("A row of {$length} would repeat an item of {$pool[0]}…");
+            throw new InvalidArgumentException("A row of {$length} would repeat an item of ".count($pool).'.');
         }
 
-        /** @var list<string> $shuffled */
+        /** @var list<array{text: string|null, asset: string|null}> $shuffled */
         $shuffled = $random->shuffleArray($pool);
 
         return array_slice($shuffled, 0, $length);

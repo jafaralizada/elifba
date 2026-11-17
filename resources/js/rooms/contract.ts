@@ -59,8 +59,8 @@ export const RoomPlayer = z.strictObject({
     host: z.boolean(),
 });
 
-/** The mechanics a room plays; grows with B4–B6. */
-export const RoomMechanic = z.enum(['recall_order']);
+/** The mechanics a room plays; grows with B5–B6. */
+export const RoomMechanic = z.enum(['recall_order', 'recall_cells']);
 
 export const RoomItem = z.strictObject({
     id: itemId,

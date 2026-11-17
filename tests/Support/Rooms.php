@@ -8,6 +8,7 @@ use App\Domain\Rooms\Actions\OpenRoom;
 use App\Domain\Rooms\Actions\StartRoomGame;
 use App\Domain\Rooms\Data\OpenRoomData;
 use App\Domain\Rooms\Data\RoomGameSetupData;
+use App\Domain\Rooms\Enums\RoomAnswerShape;
 use App\Domain\Rooms\Enums\RoomPhase;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomGame;
@@ -58,14 +59,14 @@ final class Rooms
     }
 
     /**
-     * A game of `recall_order` started in `$room` (a new room when null)
-     * through `StartRoomGame`, with its rounds loaded; round 0 opens after
-     * the countdown.
+     * A game of `recall_order` (or `$mechanic`) started in `$room` (a new
+     * room when null) through `StartRoomGame`, with its rounds loaded;
+     * round 0 opens after the countdown.
      */
-    public static function playing(?Room $room = null, int $rounds = 5, int $difficulty = 1): RoomGame
+    public static function playing(?Room $room = null, int $rounds = 5, int $difficulty = 1, RoomMechanic $mechanic = RoomMechanic::RecallOrder): RoomGame
     {
         return app(StartRoomGame::class)
-            ->handle($room ?? self::open(), new RoomGameSetupData(RoomMechanic::RecallOrder, $difficulty, $rounds))
+            ->handle($room ?? self::open(), new RoomGameSetupData($mechanic, $difficulty, $rounds))
             ->load('rounds');
     }
 
@@ -105,14 +106,22 @@ final class Rooms
     }
 
     /**
-     * A wrong answer of the right shape: the solution turned by one place,
-     * which never reads like the row, since no item stands beside its equal.
+     * A wrong answer of the right shape: for a sequence, the solution turned
+     * by one place, which never reads like the row, since no item stands
+     * beside its equal; for a set, one of its items swapped for an item of
+     * the question that is not in it.
      *
      * @return list<string>
      */
     public static function wrong(RoomRound $round): array
     {
         $ids = self::right($round);
+
+        if ($round->solutionData()->shape === RoomAnswerShape::Set) {
+            $other = array_values(array_diff($round->askData()->ids(), $ids));
+
+            return [...array_slice($ids, 1), $other[0]];
+        }
 
         return [...array_slice($ids, 1), $ids[0]];
     }

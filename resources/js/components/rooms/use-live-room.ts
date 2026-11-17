@@ -1,0 +1,161 @@
+import { router } from '@inertiajs/react';
+import { useEffect, useRef, useState } from 'react';
+import { state as stateRoute } from '@/routes/rooms';
+import { followRoom, serverClock } from '@/rooms/clock';
+import type { RoomFollow, ServerClock } from '@/rooms/clock';
+import type { RoomState } from '@/rooms/contract';
+import { fetchState } from '@/rooms/http';
+import type { RoomWatch } from '@/rooms/live';
+import { watchRoom } from '@/rooms/live';
+import { connectRoomEcho, roomChannel } from '@/rooms/socket';
+
+/** Whether `next` may replace `shown`: a fetch that was overtaken never covers a newer state. */
+function newer(next: RoomState, shown: RoomState | null): boolean {
+    return (
+        shown === null ||
+        next.revision > shown.revision ||
+        (next.revision === shown.revision && next.server_ms >= shown.server_ms)
+    );
+}
+
+/**
+ * A room's state as a page follows it (architecture §12 "The race", "The
+ * big screen"): the room page and the screen start from the state of their
+ * props and read it again when `room.changed` brings a higher revision, at
+ * each moment of the timetable (`followRoom()`: the server's clock is
+ * estimated from the states fetched), and by polling where there is no
+ * socket. A page sends no client event, and a fetched state older than the
+ * one shown is dropped. A room that refused the viewer reloads the page,
+ * which says why; one that closed calls `onClosed` (by default the same
+ * reload: the room page becomes its results).
+ */
+export function useLiveRoom({
+    room,
+    initial,
+    onClosed = () => router.reload(),
+}: {
+    room: { id: string; status: 'open' | 'closed' };
+    initial: RoomState | null;
+    onClosed?: () => void;
+}): {
+    state: RoomState | null;
+    clock: ServerClock;
+    refresh: () => void;
+} {
+    const [state, setState] = useState(initial);
+    const [clock] = useState(() => serverClock());
+    const live = room.status === 'open' && initial !== null;
+    // One socket for the page's life, not one per reload of its props.
+    const watchRef = useRef<RoomWatch | null>(null);
+    const followRef = useRef<RoomFollow | null>(null);
+    const refreshRef = useRef<() => void>(() => {});
+    const firstRevision = useRef(initial?.revision ?? 0);
+    // Two fetches may answer out of order: an older state never covers a newer one.
+    const shown = useRef<RoomState | null>(initial);
+    const closed = useRef(onClosed);
+
+    useEffect(() => {
+        closed.current = onClosed;
+    }, [onClosed]);
+
+    useEffect(() => {
+        if (initial === null) {
+            setState(null);
+
+            return;
+        }
+
+        // The props carry no send time: read by the moment they are here.
+        clock.observe(initial.server_ms, null, performance.now());
+
+        if (newer(initial, shown.current) || shown.current === initial) {
+            shown.current = initial;
+            setState(initial);
+            watchRef.current?.seen(initial.revision);
+            followRef.current?.show(initial);
+        }
+    }, [initial, clock]);
+
+    useEffect(() => {
+        if (!live) {
+            return;
+        }
+
+        let stopped = false;
+        let echo: ReturnType<typeof connectRoomEcho> | null = null;
+
+        try {
+            echo = connectRoomEcho();
+        } catch {
+            echo = null;
+        }
+
+        const refresh = () => {
+            void fetchState(stateRoute.url(room.id)).then((result) => {
+                if (stopped) {
+                    return;
+                }
+
+                if (result.kind === 'failed') {
+                    follow.failed();
+
+                    return;
+                }
+
+                if (result.kind === 'refused') {
+                    // Removed, gone or closed: the page says which.
+                    router.reload();
+
+                    return;
+                }
+
+                const next = result.state;
+                clock.observe(next.server_ms, result.sentAt, result.receivedAt);
+
+                if (!newer(next, shown.current)) {
+                    return;
+                }
+
+                shown.current = next;
+                watch.seen(next.revision);
+
+                if (next.room.status !== room.status) {
+                    closed.current();
+                } else {
+                    setState(next);
+                    follow.show(next);
+                }
+            });
+        };
+
+        const follow = followRoom({ clock, refresh });
+        const watch = watchRoom({
+            revision: firstRevision.current,
+            channel: echo === null ? null : roomChannel(echo, room.id),
+            refresh,
+            onListening: follow.listening,
+        });
+
+        watchRef.current = watch;
+        followRef.current = follow;
+        refreshRef.current = refresh;
+
+        if (shown.current !== null) {
+            follow.show(shown.current);
+        }
+
+        // The props bound the server's clock from one side only: a fetch bounds it from both.
+        refresh();
+
+        return () => {
+            stopped = true;
+            watchRef.current = null;
+            followRef.current = null;
+            refreshRef.current = () => {};
+            follow.stop();
+            watch.stop();
+        };
+    }, [live, room.id, room.status, clock]);
+
+    return { state, clock, refresh: () => refreshRef.current() };
+}

@@ -54,6 +54,8 @@ it('round-trips every fixture', function (string $name): void {
 it('has every phase\'s fixture, the answer and the receipt', function (): void {
     expect(array_keys(roomPayloads()))->toEqualCanonicalizing([
         'state.lobby', 'state.countdown', 'state.study', 'state.answer', 'state.reveal', 'state.over', 'answer', 'receipt',
+        // B4: a grid of cells to study, answer and reveal, and a row of shapes.
+        'state.study.cells', 'state.answer.cells', 'state.reveal.cells', 'state.study.shapes',
     ]);
 });
 
@@ -68,6 +70,22 @@ it('has no solution in any state before the reveal', function (): void {
         expect($wire)->not->toMatch('/"(solution|accept|correct|mine|results|picked|elapsed_ms|seed)"/', $name)
             ->and($wire)->not->toContain(json_encode($reveal['round']['reveal']['solution']), $name);
     }
+
+    // A grid: neither the study's ids nor the solution's order are in the question before the reveal.
+    $cells = roomFixture('state.reveal.cells');
+
+    foreach (['state.study.cells', 'state.answer.cells', 'state.study.shapes'] as $name) {
+        $wire = (string) json_encode(roomFixture($name));
+
+        expect($wire)->not->toMatch('/"(solution|accept|correct|mine|results|picked|elapsed_ms|seed)"/', $name)
+            ->and($wire)->not->toContain(json_encode($cells['round']['reveal']['solution']), $name);
+    }
+
+    $studied = array_column(roomFixture('state.study.cells')['round']['study']['items'], 'id');
+    $asked = roomFixture('state.answer.cells')['round']['ask']['items'];
+
+    expect(array_intersect($studied, array_column($asked, 'id')))->toBe([])
+        ->and(array_column($asked, 'cell'))->toBe([[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1], [0, 2], [1, 2], [2, 2]]);
 
     // The DTOs refuse a key of a later or an earlier phase, as the zod schemas do.
     $refused = static function (array $state, array $round, string $why): void {

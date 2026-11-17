@@ -23,7 +23,9 @@ enum RoomItemKind: string
     /**
      * How many different items of this kind a `recall_order` row is drawn
      * from — 10 digits, the alphabet's letters — so how long a row can be
-     * with no item twice; null for a kind whose material is not there yet.
+     * with no item twice; null for a kind whose material is content that
+     * whoever reads it counts (shapes: `content/rooms/shapes.json`, which
+     * the validator counts in the root it checks) or is not there yet.
      */
     public function distinct(): ?int
     {

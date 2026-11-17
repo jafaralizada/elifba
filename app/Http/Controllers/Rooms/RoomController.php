@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Rooms;
 
-use App\Domain\Language\Support\Ordinal;
 use App\Domain\Rooms\Actions\DeleteRoom;
 use App\Domain\Rooms\Actions\LockRoom;
 use App\Domain\Rooms\Actions\OpenRoom;
@@ -10,14 +9,17 @@ use App\Domain\Rooms\Data\LockRoomData;
 use App\Domain\Rooms\Data\OpenRoomData;
 use App\Domain\Rooms\Data\RoomGameSetupData;
 use App\Domain\Rooms\Models\Room;
+use App\Domain\Rooms\Support\RoomClock;
+use App\Domain\Rooms\Support\RoomJoinLink;
 use App\Domain\Rooms\Support\RoomList;
+use App\Domain\Rooms\Support\RoomPlaces;
+use App\Domain\Rooms\Support\RoomResults;
 use App\Domain\Rooms\Support\RoomState;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -33,11 +35,15 @@ use Inertia\Response;
  * one `GET /rooms/{room}/state` answers, phase by phase, with nothing more
  * of a round. Places are labelled here (`place_labels`: the label of place
  * n at n − 1, `Ordinal::label()`), as many as the room has players or may
- * have, since a page never suffixes a number itself. The host of an open
- * room also gets `setup`, what a new game may be
- * (`RoomGameSetupData::options()`). No other account's id or address
- * reaches a room page — the shared `auth.user` is the viewer's own — and
- * no name goes into a URL or a flash.
+ * have, since a page never suffixes a number itself (`RoomPlaces`). The
+ * host of an open room also gets `setup`, what a new game may be
+ * (`RoomGameSetupData::options()`); whoever gets the state of an open room
+ * gets `join`, the addresses its QR and its code field are at
+ * (`RoomJoinLink`); and everyone who was in a closed room gets `games`,
+ * each game with its ranking (`RoomResults`), named from the state's
+ * players. `rooms/index` lists the account's rooms (`RoomList`). No other
+ * account's id or address reaches a room page — the shared `auth.user` is
+ * the viewer's own — and no name goes into a URL or a flash.
  */
 final class RoomController extends Controller
 {
@@ -57,14 +63,15 @@ final class RoomController extends Controller
     {
         $gate = Gate::forUser($account);
         $open = $room->isOpen();
-        $places = max(Config::integer('elifba.rooms.max_players'), $room->players()->whereNull('removed_at')->count());
-        $locale = app()->getLocale();
+        $watches = $gate->allows('watch', $room);
 
         return Inertia::render('rooms/show', [
             'room' => ['id' => $room->id, 'status' => $room->status()->value],
-            'state' => $gate->allows('watch', $room) || ! $open ? RoomState::for($room, $account)->toArray() : null,
-            'place_labels' => array_map(static fn (int $place): string => Ordinal::label($place, $locale), range(1, $places)),
+            'state' => $watches || ! $open ? RoomState::for($room, $account)->toArray() : null,
+            'place_labels' => RoomPlaces::labels($room, app()->getLocale()),
             'setup' => $open && $gate->allows('host', $room) ? RoomGameSetupData::options() : null,
+            'join' => $open && $watches ? RoomJoinLink::of($room) : null,
+            'games' => $open ? null : RoomResults::games($room, RoomClock::nowMs()),
             'can' => [
                 'host' => $gate->allows('host', $room),
                 'leave' => $gate->allows('play', $room),

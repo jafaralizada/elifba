@@ -1,0 +1,9 @@
+{
+    "version": 1,
+    "shapes": [
+        { "key": "circle", "image": "rooms/circle.svg" },
+        { "key": "square", "image": "rooms/square.svg" },
+        { "key": "triangle", "image": "rooms/triangle.svg" },
+        { "key": "star", "image": "rooms/star.svg" }
+    ]
+}

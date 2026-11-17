@@ -1,0 +1,17 @@
+{
+    "version": 1,
+    "shapes": [
+        { "key": "daire", "image": "rooms/daire.svg" },
+        { "key": "kvadrat", "image": "rooms/kvadrat.svg" },
+        { "key": "ucbucaq", "image": "rooms/ucbucaq.svg" },
+        { "key": "ulduz", "image": "rooms/ulduz.svg" },
+        { "key": "urek", "image": "rooms/urek.svg" },
+        { "key": "romb", "image": "rooms/romb.svg" },
+        { "key": "altibucaq", "image": "rooms/altibucaq.svg" },
+        { "key": "aypara", "image": "rooms/aypara.svg" },
+        { "key": "damci", "image": "rooms/damci.svg" },
+        { "key": "ox", "image": "rooms/ox.svg" },
+        { "key": "bulud", "image": "rooms/bulud.svg" },
+        { "key": "ildirim", "image": "rooms/ildirim.svg" }
+    ]
+}

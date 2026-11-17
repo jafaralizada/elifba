@@ -32,7 +32,7 @@ use SplFileInfo;
  * Checks a content root (docs/architecture.md §3, §8): `alphabet.json`,
  * `avatars.json`, `sounds.json`, `levels.json`, `prompts.json`, `names.json`,
  * `voice.json` with `voice-clips.json`, `credits.json`, `packs/*.json`,
- * `rooms/levels.json` (§12 "Room content"),
+ * `rooms/levels.json` and `rooms/shapes.json` (§12 "Room content"),
  * `tests/syllables.json` and every file under `assets/`, `voice-names/`
  * and `resources/fonts/` (credits; SVG files are also checked for anything
  * that could run or load). `validate()` lists every problem, one line each;
@@ -165,6 +165,20 @@ final class ContentValidator
 
     public const int MAX_ROOM_ROW = 12;
 
+    /**
+     * A `recall_cells` grid: 2–6 cells across and down, so at most 6 × 6
+     * (§12 "Room games"); a grid of one row or column would be a row.
+     */
+    public const int MIN_ROOM_GRID = 2;
+
+    public const int MAX_ROOM_GRID = 6;
+
+    /**
+     * Where the shapes of memory rounds are, under `assets/` (§12 "Room
+     * content").
+     */
+    public const string ROOM_SHAPES_FOLDER = 'rooms/';
+
     private const string KEY = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/';
 
     /**
@@ -248,7 +262,7 @@ final class ContentValidator
         $this->sounds();
         $levels = $this->levels();
         $this->prompts($levels);
-        $this->roomLevels();
+        $this->roomLevels($this->roomShapes());
         $this->names();
         $this->voice();
         $credits = $this->credits();
@@ -723,12 +737,18 @@ final class ContentValidator
      * build:
      *
      * - `recall_order`: `kinds`, distinct kinds of `RoomMechanic::kinds()`
-     *   (digits and letters until the shapes and the word list exist);
-     *   `length`, 3–12 items, `min` ≤ `max`, and no longer than each kind
-     *   has different items (`RoomItemKind::distinct()`: 10 digits), since
-     *   no item comes twice in a row.
+     *   (digits, letters and shapes until the word list exists); `length`,
+     *   3–12 items, `min` ≤ `max`, and no longer than each kind has
+     *   different items (`RoomItemKind::distinct()`: 10 digits; the shapes
+     *   of `shapes.json`, counted when that file is sound), since no item
+     *   comes twice in a row.
+     * - `recall_cells`: `grid`, `cols` and `rows` 2–6; `lit`, from 1 and
+     *   `min` ≤ `max`, fewer than the grid's cells, so a dark cell is always
+     *   left to tell from a lit one.
+     *
+     * @param  int|null  $shapes  how many shapes `shapes.json` holds; null when it has a problem
      */
-    private function roomLevels(): void
+    private function roomLevels(?int $shapes): void
     {
         $file = ContentRepository::ROOM_LEVELS;
         $data = $this->object($this->read($file), $file, '', ['version', 'levels']);
@@ -791,9 +811,11 @@ final class ContentValidator
                 $this->problem($file, "{$where}.study_ms must be 0: only a memory game is studied");
             }
 
-            if ($mechanic === RoomMechanic::RecallOrder) {
-                $this->recallOrderLevel($mechanic, $level, $file, $where);
-            }
+            match ($mechanic) {
+                RoomMechanic::RecallOrder => $this->recallOrderLevel($mechanic, $level, $file, $where, $shapes),
+                RoomMechanic::RecallCells => $this->recallCellsLevel($level, $file, $where),
+                null => null,
+            };
         }
 
         foreach ($difficulties as $mechanic => $given) {
@@ -814,13 +836,15 @@ final class ContentValidator
     {
         return match ($mechanic) {
             RoomMechanic::RecallOrder => ['kinds', 'length'],
+            RoomMechanic::RecallCells => ['grid', 'lit'],
         };
     }
 
     /**
      * @param  array<string, mixed>  $level
+     * @param  int|null  $shapes  how many shapes there are; null when `shapes.json` has a problem
      */
-    private function recallOrderLevel(RoomMechanic $mechanic, array $level, string $file, string $where): void
+    private function recallOrderLevel(RoomMechanic $mechanic, array $level, string $file, string $where, ?int $shapes): void
     {
         $kinds = $this->enums(RoomItemKind::class, $level['kinds'], $file, "{$where}.kinds") ?? [];
         $shown = array_map(static fn (RoomItemKind $kind): string => $kind->value, $mechanic->kinds());
@@ -835,12 +859,182 @@ final class ContentValidator
         $max = is_array($level['length']) ? ($level['length']['max'] ?? null) : null;
 
         foreach ($kinds as $kind) {
-            $distinct = $kind->distinct();
+            $distinct = $kind === RoomItemKind::Shape ? $shapes : $kind->distinct();
 
             if (is_int($max) && $distinct !== null && $max > $distinct) {
                 $this->problem($file, "{$where}.length: a row of {$kind->value}s holds at most {$distinct}, none twice");
             }
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $level
+     */
+    private function recallCellsLevel(array $level, string $file, string $where): void
+    {
+        $grid = $this->object($level['grid'], $file, "{$where}.grid", ['cols', 'rows']);
+        $cells = null;
+
+        if ($grid !== null) {
+            $sides = array_filter([$grid['cols'], $grid['rows']], static fn (mixed $side): bool => is_int($side) && $side >= self::MIN_ROOM_GRID && $side <= self::MAX_ROOM_GRID);
+
+            if (count($sides) !== 2) {
+                $this->problem($file, "{$where}.grid needs cols and rows as whole numbers from ".self::MIN_ROOM_GRID.' to '.self::MAX_ROOM_GRID);
+            } else {
+                /** @var int $cols */
+                $cols = $grid['cols'];
+                /** @var int $rows */
+                $rows = $grid['rows'];
+                $cells = $cols * $rows;
+            }
+        }
+
+        $this->range($level['lit'], 1, null, $file, "{$where}.lit");
+        $max = is_array($level['lit']) ? ($level['lit']['max'] ?? null) : null;
+
+        if ($cells !== null && is_int($max) && $max >= $cells) {
+            $this->problem($file, "{$where}.lit: a grid of {$cells} cells lights at most ".($cells - 1).', so a dark cell is left');
+        }
+    }
+
+    // ── rooms/shapes.json ───────────────────────────────────────────────
+
+    /**
+     * The shapes of memory rounds (§12 "Room content", B4): `version` and a
+     * non-empty list of `shapes`, each a `key` (lowercase, unique) and an
+     * `image`, an SVG under `assets/rooms/` that exists and no other shape
+     * uses. A shape is told apart from the others by its form, not by its
+     * colour alone: two files that are the same drawing but for their
+     * colours (and the ids their names prefix) are refused. A shape holds
+     * no digit, letter or text, so no `<text>` element; and every SVG under
+     * `assets/rooms/` is a shape of the list. The files also pass the SVG
+     * check every asset passes and need a credits entry like every asset.
+     *
+     * @return int|null how many shapes there are, or null when the file has a problem
+     */
+    private function roomShapes(): ?int
+    {
+        $file = ContentRepository::ROOM_SHAPES;
+        $before = count($this->problems);
+        $data = $this->object($this->read($file), $file, '', ['version', 'shapes']);
+
+        if ($data === null) {
+            return null;
+        }
+
+        if (! is_int($data['version']) || $data['version'] < 1) {
+            $this->problem($file, 'version must be a whole number from 1');
+        }
+
+        $shapes = $this->list($data['shapes'], $file, 'shapes');
+
+        if ($shapes === null) {
+            return null;
+        }
+
+        if ($shapes === []) {
+            $this->problem($file, '`shapes` must not be empty');
+        }
+
+        $keys = [];
+        /** @var array<string, string> $used picture path → the entry that has it */
+        $used = [];
+        /** @var array<string, string> $forms a drawing without its colours → the entry that has it */
+        $forms = [];
+
+        foreach ($shapes as $index => $shape) {
+            $where = "shapes[{$index}]";
+            $shape = $this->object($shape, $file, $where, ['key', 'image']);
+
+            if ($shape === null) {
+                continue;
+            }
+
+            $key = $shape['key'];
+
+            if (! is_string($key) || preg_match(self::KEY, $key) !== 1) {
+                $this->problem($file, "{$where}.key must be lowercase letters and digits joined by single hyphens");
+            } elseif (in_array($key, $keys, true)) {
+                $this->problem($file, "{$where}.key \"{$key}\" is already a shape's");
+            } else {
+                $keys[] = $key;
+            }
+
+            $image = $shape['image'];
+
+            if (is_string($image) && ! str_starts_with($image, self::ROOM_SHAPES_FOLDER)) {
+                $this->problem($file, "{$where}.image \"{$image}\" must be under {$this->contentFolder()}/assets/".self::ROOM_SHAPES_FOLDER);
+
+                continue;
+            }
+
+            $image = $this->asset($image, ['svg'], $file, "{$where}.image");
+
+            if ($image === null || pathinfo($image, PATHINFO_EXTENSION) !== 'svg' || ! self::exists("{$this->root}/assets/{$image}")) {
+                continue;
+            }
+
+            if (isset($used[$image])) {
+                $this->problem($file, "{$where}.image \"{$image}\" is already the picture of {$used[$image]}");
+
+                continue;
+            }
+
+            $used[$image] = $where;
+            $svg = (string) file_get_contents("{$this->root}/assets/{$image}");
+
+            if (preg_match('/<(?:text|tspan|textPath)\b/i', $svg) === 1) {
+                $this->problem($file, "{$where}.image \"{$image}\" holds text; a shape has no digit, letter or text");
+            }
+
+            $form = self::form($svg, pathinfo($image, PATHINFO_FILENAME));
+
+            if (isset($forms[$form])) {
+                $this->problem($file, "{$where}.image \"{$image}\" is the drawing of {$forms[$form]} in other colours; shapes differ by form");
+            } else {
+                $forms[$form] = $where;
+            }
+        }
+
+        foreach ($this->roomShapeFiles() as $path) {
+            if (! isset($used[$path])) {
+                $this->problem($file, "assets/{$path} is no shape of the list");
+            }
+        }
+
+        return count($this->problems) === $before ? count($shapes) : null;
+    }
+
+    /**
+     * A drawing without its colours and without its own name where its ids
+     * are prefixed with it (`ulduz_fill1`): what is left is its form.
+     */
+    private static function form(string $svg, string $name): string
+    {
+        $svg = str_replace("{$name}_", '', $svg);
+        $svg = (string) preg_replace('/<!--.*?-->/s', '', $svg);
+        $svg = (string) preg_replace('/#[0-9A-Fa-f]{3,8}\b|rgba?\([^)]*\)/', '', $svg);
+
+        return (string) preg_replace('/\s+/', ' ', trim($svg));
+    }
+
+    /**
+     * Every SVG under `assets/rooms/`, relative to `assets/`.
+     *
+     * @return list<string>
+     */
+    private function roomShapeFiles(): array
+    {
+        $folder = "{$this->root}/assets/".rtrim(self::ROOM_SHAPES_FOLDER, '/');
+        $files = [];
+
+        foreach (glob("{$folder}/*.svg") ?: [] as $path) {
+            $files[] = self::ROOM_SHAPES_FOLDER.basename($path);
+        }
+
+        sort($files, SORT_STRING);
+
+        return $files;
     }
 
     // ── names.json ──────────────────────────────────────────────────────

@@ -58,6 +58,9 @@ final class RoomRanking
     }
 
     /**
+     * The room's games are read with their rounds unless they are loaded
+     * (`RoomList` loads them for many rooms at once).
+     *
      * @param  Collection<int, RoomPlayer>|null  $players  the room's rows not removed, in order; read when null
      * @return list<RoomRankedPlayerData>
      */
@@ -65,7 +68,9 @@ final class RoomRanking
     {
         $rounds = [];
 
-        foreach ($room->games()->with('rounds:id,room_game_id,position,study_ms,answer_ms,closed_ms')->get() as $game) {
+        $games = $room->relationLoaded('games') ? $room->games : $room->games()->with('rounds:id,room_game_id,position,study_ms,answer_ms,closed_ms')->get();
+
+        foreach ($games as $game) {
             $rounds = [...$rounds, ...self::closedRounds($game, $nowMs)];
         }
 

@@ -157,7 +157,8 @@ it('lists the account\'s own rooms on «Otaqlar», open and past', function (): 
         ->assertInertia(fn (Assert $page) => $page
             ->where('open', [])
             ->where('past', [
-                ['id' => $joined->id, 'date' => '24 noyabr 2026', 'host' => false, 'players' => 2],
-                ['id' => $mine->id, 'date' => '24 noyabr 2026', 'host' => true, 'players' => 1],
+                // No game played yet: no games, no points and no place (B4).
+                ['id' => $joined->id, 'date' => '24 noyabr 2026', 'host' => false, 'players' => 2, 'games' => [], 'mine' => ['points' => 0, 'place' => null]],
+                ['id' => $mine->id, 'date' => '24 noyabr 2026', 'host' => true, 'players' => 1, 'games' => [], 'mine' => ['points' => 0, 'place' => null]],
             ]));
 });

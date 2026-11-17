@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- romb: a diamond, a shape of a memory round. Elifba own art, MIT. -->
+<path d="M14.36 3.26 Q16 1.5 17.64 3.26 L27.86 14.24 Q29.5 16 27.86 17.76 L17.64 28.74 Q16 30.5 14.36 28.74 L4.14 17.76 Q2.5 16 4.14 14.24 Z" fill="url(#romb_fill1)"/>
+<path d="M14.36 3.26 Q16 1.5 17.64 3.26 L27.86 14.24 Q29.5 16 27.86 17.76 L17.64 28.74 Q16 30.5 14.36 28.74 L4.14 17.76 Q2.5 16 4.14 14.24 Z" fill="url(#romb_fill2)"/>
+<g filter="url(#romb_blur06)"><ellipse cx="11.5" cy="11" rx="2.6" ry="1.5" fill="#FFFFFF" fill-opacity="0.55" transform="rotate(-45 11.5 11)"/></g>
+<defs>
+<radialGradient id="romb_fill1" cx="0.35" cy="0.3" r="0.75"><stop stop-color="#B8A4CC"/><stop offset="0.55" stop-color="#8967AA"/><stop offset="1" stop-color="#674D80"/></radialGradient>
+<radialGradient id="romb_fill2" cx="0.85" cy="0.88" r="0.7"><stop stop-color="#674D80" stop-opacity="0.6"/><stop offset="0.85" stop-color="#674D80" stop-opacity="0"/></radialGradient>
+<filter id="romb_blur06" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.6"/></filter>
+</defs>
+</svg>

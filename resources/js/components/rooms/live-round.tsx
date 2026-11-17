@@ -1,10 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ComponentType } from 'react';
-import {
-    RecallOrderAsk,
-    RecallOrderSolution,
-    RecallOrderStudy,
-} from '@/components/rooms/mechanics/recall-order';
+import { MECHANIC_VIEWS } from '@/components/rooms/mechanics/views';
 import { Standing } from '@/components/rooms/standing';
 import { secondsUntil, useServerNow } from '@/components/rooms/use-server-now';
 import { Button } from '@/components/ui/button';
@@ -12,40 +7,8 @@ import { useTranslation } from '@/hooks/use-translation';
 import { store as answersRoute } from '@/routes/rooms/answers';
 import { eventId, sendAnswer } from '@/rooms/answer';
 import type { ServerClock } from '@/rooms/clock';
-import type {
-    RoomAnswer,
-    RoomAsk,
-    RoomMechanic,
-    RoomMine,
-    RoomRound,
-    RoomState,
-    RoomStudy,
-} from '@/rooms/contract';
+import type { RoomAnswer, RoomRound, RoomState } from '@/rooms/contract';
 import { roomRequest } from '@/rooms/http';
-
-/** A mechanic's view: its study, its question and its reveal (§12 "Room games"). */
-type MechanicView = {
-    Study: ComponentType<{ study: RoomStudy }>;
-    Ask: ComponentType<{
-        ask: RoomAsk;
-        picked: string[];
-        disabled: boolean;
-        onPick: (id: string) => void;
-    }>;
-    Solution: ComponentType<{
-        ask: RoomAsk;
-        solution: string[];
-        mine: RoomMine | null;
-    }>;
-};
-
-const VIEWS: Record<RoomMechanic, MechanicView> = {
-    recall_order: {
-        Study: RecallOrderStudy,
-        Ask: RecallOrderAsk,
-        Solution: RecallOrderSolution,
-    },
-};
 
 const NOTES = {
     sending: 'rooms.game.sending',
@@ -93,7 +56,7 @@ export function LiveRound({
 }) {
     const { t, locale } = useTranslation();
     const now = useServerNow(clock, true);
-    const view = VIEWS[state.game?.mechanic ?? 'recall_order'];
+    const view = MECHANIC_VIEWS[state.game?.mechanic ?? 'recall_order'];
     const [draft, setDraft] = useState<{ round: string; ids: string[] }>({
         round: '',
         ids: [],

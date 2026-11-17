@@ -1,5 +1,5 @@
 {
-    "version": 1,
+    "version": 2,
     "levels": [
         {
             "mechanic": "recall_order",
@@ -14,7 +14,7 @@
             "difficulty": 2,
             "study_ms": 4500,
             "answer_ms": 15000,
-            "kinds": ["digit", "letter"],
+            "kinds": ["digit", "letter", "shape"],
             "length": { "min": 5, "max": 6 }
         },
         {
@@ -22,7 +22,7 @@
             "difficulty": 3,
             "study_ms": 6000,
             "answer_ms": 20000,
-            "kinds": ["digit", "letter"],
+            "kinds": ["digit", "letter", "shape"],
             "length": { "min": 7, "max": 8 }
         },
         {
@@ -30,8 +30,40 @@
             "difficulty": 4,
             "study_ms": 7000,
             "answer_ms": 25000,
-            "kinds": ["digit", "letter"],
+            "kinds": ["digit", "letter", "shape"],
             "length": { "min": 9, "max": 10 }
+        },
+        {
+            "mechanic": "recall_cells",
+            "difficulty": 1,
+            "study_ms": 2000,
+            "answer_ms": 10000,
+            "grid": { "cols": 3, "rows": 3 },
+            "lit": { "min": 3, "max": 4 }
+        },
+        {
+            "mechanic": "recall_cells",
+            "difficulty": 2,
+            "study_ms": 2500,
+            "answer_ms": 15000,
+            "grid": { "cols": 4, "rows": 4 },
+            "lit": { "min": 5, "max": 6 }
+        },
+        {
+            "mechanic": "recall_cells",
+            "difficulty": 3,
+            "study_ms": 3000,
+            "answer_ms": 20000,
+            "grid": { "cols": 5, "rows": 5 },
+            "lit": { "min": 7, "max": 8 }
+        },
+        {
+            "mechanic": "recall_cells",
+            "difficulty": 4,
+            "study_ms": 3500,
+            "answer_ms": 25000,
+            "grid": { "cols": 6, "rows": 6 },
+            "lit": { "min": 9, "max": 11 }
         }
     ]
 }

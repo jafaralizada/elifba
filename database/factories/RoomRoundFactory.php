@@ -7,7 +7,7 @@ use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Rooms\Data\BuiltRoomRoundData;
 use App\Domain\Rooms\Models\RoomGame;
 use App\Domain\Rooms\Models\RoomRound;
-use App\Domain\Rooms\Support\Mechanics\RecallOrderBuilder;
+use App\Domain\Rooms\Support\RoomPlayable;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Random\Engine\Mt19937;
 use Random\Randomizer;
@@ -32,7 +32,7 @@ class RoomRoundFactory extends Factory
     public function definition(): array
     {
         $level = app(ContentRepository::class)->roomLevel(RoomMechanic::RecallOrder, 1);
-        [$round] = (new RecallOrderBuilder)->build($level, 1, new Randomizer(new Mt19937(fake()->numberBetween(1, RoomGame::MAX_SEED))));
+        [$round] = RoomPlayable::builder(RoomMechanic::RecallOrder)->build($level, 1, new Randomizer(new Mt19937(fake()->numberBetween(1, RoomGame::MAX_SEED))));
 
         return [
             'room_game_id' => RoomGame::factory(),

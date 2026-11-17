@@ -43,6 +43,12 @@ final class RoomPolicy
         return $this->host($user, $room) || $this->play($user, $room);
     }
 
+    /** `host` of an open room: the big screen (B4). */
+    public function screen(User $user, Room $room): bool
+    {
+        return $this->host($user, $room) && $room->isOpen();
+    }
+
     /** `host` of an open room with no game running: starting a game (B3). */
     public function start(User $user, Room $room): bool
     {

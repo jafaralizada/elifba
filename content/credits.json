@@ -100,6 +100,13 @@
             "license": "MIT"
         },
         {
+            "files": ["content/assets/rooms/*"],
+            "title": "Shapes for the adults' memory rounds: twelve plain shapes in Fluent Emoji's manner, each with a form of its own",
+            "author": "Elifba contributors",
+            "source": "https://github.com/nijataliyev7/elifba",
+            "license": "MIT"
+        },
+        {
             "files": [
                 "content/assets/animals/cemenlik.svg",
                 "content/assets/dinosaurs/vadi.svg",

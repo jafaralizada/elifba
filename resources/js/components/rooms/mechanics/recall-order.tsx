@@ -1,17 +1,30 @@
+import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
 import type { RoomAsk, RoomItem, RoomMine, RoomStudy } from '@/rooms/contract';
 
 /*
  * «Ardıcıllığı yadda saxla» on the room page (docs/architecture.md §12
- * "Room games", B3): the row to study, the question to tap in order, and
- * the order that was right. Every item is drawn as the server sent it —
- * its text is content, cased on the server — and nothing here knows the
- * order before the reveal: the question comes shuffled, and only
- * `reveal.solution` says which way it goes. Plain on purpose; B4 designs it.
+ * "Room games", B3, B4): the row to study, the question to tap in order,
+ * and the order that was right. Every item is drawn as the server sent it —
+ * a text is content, cased on the server; a shape is its picture, from the
+ * app's own `/content` — and nothing here knows the order before the
+ * reveal: the question comes shuffled, and only `reveal.solution` says
+ * which way it goes. Plain on purpose; B4's interface session designs it.
  */
 
-function tile(item: RoomItem): string {
+function tile(item: RoomItem): ReactNode {
+    if (item.asset !== null) {
+        return (
+            <img
+                src={item.asset}
+                alt=""
+                draggable={false}
+                className="size-4/5 object-contain"
+            />
+        );
+    }
+
     return item.text ?? '';
 }
 

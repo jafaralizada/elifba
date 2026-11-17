@@ -1,0 +1,408 @@
+<?php
+
+use App\Domain\Content\Enums\RoomMechanic;
+use App\Domain\Language\Support\Ordinal;
+use App\Domain\Rooms\Enums\RoomPhase;
+use App\Domain\Rooms\Models\Room;
+use App\Domain\Rooms\Models\RoomAnswer;
+use App\Domain\Rooms\Models\RoomGame;
+use App\Domain\Rooms\Models\RoomPlayer;
+use App\Domain\Rooms\Models\RoomRound;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\TestResponse;
+use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\Rooms;
+
+/*
+ * The room pages' data (docs/architecture.md §12 "Rooms and joining",
+ * "Scoring and what is kept", "The big screen", "Adults' privacy"):
+ * «Otaqlar» lists an account's own rooms, open and past, a past one with
+ * its games and the account's own place; a closed room is its results, game
+ * by game, named from the accounts as they are now; a name taken out is
+ * null and its points stay; a deleted room is gone for everyone; the
+ * screen is the host's. Everything ranked is derived on each read. No page
+ * gets another account's id or address, or a solution before its reveal.
+ */
+
+beforeEach(function (): void {
+    Rooms::on();
+    $this->travelTo('2026-11-24 19:00:00');
+    $this->resad = User::factory()->player()->create(['name' => 'Rəşad Quliyev', 'email' => 'resad@example.com']);
+    $this->aygun = User::factory()->player()->create(['name' => 'Aygün Məmmədova', 'email' => 'aygun@example.com']);
+    $this->tural = User::factory()->player()->create(['name' => 'Tural Əliyev', 'email' => 'tural@example.com']);
+});
+
+/**
+ * Plays a whole game in the room through the answer endpoint, as the
+ * players' phones would: in each round each account of `$right` taps the
+ * solution and each of `$wrong` a wrong answer, then the game runs to its
+ * end. Returns the game, over.
+ *
+ * @param  list<User>  $right
+ * @param  list<User>  $wrong
+ */
+function pagesPlay(Room $room, RoomMechanic $mechanic, int $difficulty, array $right, array $wrong = []): RoomGame
+{
+    $game = Rooms::playing($room, 5, $difficulty, $mechanic);
+
+    foreach (range(0, 4) as $index) {
+        $round = Rooms::round($game, $index);
+        test()->travelTo(Rooms::at($game, RoomPhase::Answer, $index));
+
+        foreach ($right as $account) {
+            test()->actingAs($account)->postJson(route('rooms.answers.store', $room), Rooms::answer($round, Rooms::right($round)))->assertOk();
+        }
+
+        foreach ($wrong as $account) {
+            test()->actingAs($account)->postJson(route('rooms.answers.store', $room), Rooms::answer($round, Rooms::wrong($round)))->assertOk();
+        }
+    }
+
+    test()->travelTo(Rooms::at($game, RoomPhase::Over));
+
+    return $game->refresh();
+}
+
+/** The points a row has in a game, from the stored answers. */
+function pagesPoints(RoomGame $game, RoomPlayer $row): int
+{
+    return (int) RoomAnswer::query()
+        ->whereIn('room_round_id', RoomRound::query()->where('room_game_id', $game->id)->select('id'))
+        ->where('room_player_id', $row->id)
+        ->sum('points');
+}
+
+/** The row of `$account` in `$room`. */
+function pagesRow(Room $room, User $account): RoomPlayer
+{
+    return RoomPlayer::query()->where('room_id', $room->id)->where('user_id', $account->id)->sole();
+}
+
+/**
+ * The page as JSON, without the translations every page carries.
+ *
+ * @return array<string, mixed>
+ */
+function pagesProps(TestResponse $response): array
+{
+    $props = $response->assertOk()->viewData('page')['props'];
+    unset($props['translations']);
+
+    return $props;
+}
+
+it('lists an account\'s open and past rooms and nobody else\'s', function (): void {
+    // A past room: Rəşad and Aygün played «Xanaları yadda saxla», Aygün right every time, Rəşad never.
+    $past = Rooms::open($this->resad);
+    Rooms::join($past, $this->aygun);
+    $game = pagesPlay($past, RoomMechanic::RecallCells, 2, right: [$this->aygun], wrong: [$this->resad]);
+    $this->actingAs($this->resad)->post(route('rooms.close', $past))->assertRedirect();
+
+    // An open room of Rəşad's with Aygün in it, and one of Tural's that is nobody else's business.
+    $this->travelTo('2026-11-25 10:00:00');
+    $open = Rooms::open($this->resad);
+    Rooms::join($open, $this->aygun);
+    $turals = Rooms::open($this->tural);
+    $nigar = User::factory()->player()->create(['name' => 'Nigar Həsənova']);
+    Rooms::join($turals, $nigar);
+
+    $aygunPoints = pagesPoints($game, pagesRow($past, $this->aygun));
+
+    expect($aygunPoints)->toBeGreaterThanOrEqual(50);
+
+    $this->actingAs($this->resad)->get(route('rooms.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('rooms/index')
+            ->where('open', [['id' => $open->id, 'code' => $open->code, 'host' => true, 'players' => 2]])
+            ->where('past', [[
+                'id' => $past->id,
+                'date' => '24 noyabr 2026',
+                'host' => true,
+                'players' => 2,
+                'games' => [['mechanic' => 'recall_cells', 'difficulty' => 2]],
+                // No points: no place.
+                'mine' => ['points' => 0, 'place' => null],
+            ]]));
+
+    $this->actingAs($this->aygun)->get(route('rooms.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('open', [['id' => $open->id, 'code' => $open->code, 'host' => false, 'players' => 2]])
+            ->where('past', [[
+                'id' => $past->id,
+                'date' => '24 noyabr 2026',
+                'host' => false,
+                'players' => 2,
+                'games' => [['mechanic' => 'recall_cells', 'difficulty' => 2]],
+                'mine' => ['points' => $aygunPoints, 'place' => Ordinal::label(1, 'az')],
+            ]]));
+
+    // In English the place is labelled in English, by the server.
+    $this->aygun->forceFill(['locale' => 'en'])->save();
+    $this->actingAs($this->aygun)->get(route('rooms.index'))
+        ->assertInertia(fn (Assert $page) => $page->where('past.0.mine.place', '1st')->where('past.0.date', '24 November 2026'));
+
+    // Tural sees his own room only; Nigar the same one; nobody else's.
+    $this->actingAs($this->tural)->get(route('rooms.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('open', [['id' => $turals->id, 'code' => $turals->code, 'host' => true, 'players' => 2]])
+            ->where('past', []));
+    $this->actingAs($nigar)->get(route('rooms.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('open', [['id' => $turals->id, 'code' => $turals->code, 'host' => false, 'players' => 2]])
+            ->where('past', []));
+
+    // A player who left an open room finds it under the past ones, with what the room has played so far.
+    $this->actingAs($this->aygun)->post(route('rooms.leave', $open))->assertRedirect();
+    $this->get(route('rooms.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('open', [])
+            ->where('past.0', ['id' => $open->id, 'date' => '25 November 2026', 'host' => false, 'players' => 2, 'games' => [], 'mine' => ['points' => 0, 'place' => null]]));
+
+    // A player the host removed sees the room no more.
+    $this->actingAs($this->tural)->delete(route('rooms.members.destroy', [$turals, pagesRow($turals, $nigar)]))->assertRedirect();
+    $this->actingAs($nigar)->get(route('rooms.index'))
+        ->assertInertia(fn (Assert $page) => $page->where('open', [])->where('past', []));
+});
+
+it('gives a closed room its games and rankings by name', function (): void {
+    $room = Rooms::open($this->resad);
+    Rooms::join($room, $this->aygun);
+    Rooms::join($room, $this->tural);
+    [$resad, $aygun, $tural] = [pagesRow($room, $this->resad), pagesRow($room, $this->aygun), pagesRow($room, $this->tural)];
+
+    // Game 1: Aygün and Tural right at once, Rəşad wrong. Game 2: Rəşad right, the others wrong.
+    $first = pagesPlay($room, RoomMechanic::RecallOrder, 1, right: [$this->aygun, $this->tural], wrong: [$this->resad]);
+    $second = pagesPlay($room, RoomMechanic::RecallCells, 3, right: [$this->resad], wrong: [$this->aygun, $this->tural]);
+
+    expect(pagesPoints($first, $aygun))->toBe(100)
+        ->and(pagesPoints($first, $tural))->toBe(100)
+        ->and(pagesPoints($second, $resad))->toBe(100);
+
+    // While the room is open, its page has no results of games.
+    $this->actingAs($this->aygun)->get(route('rooms.show', $room))
+        ->assertInertia(fn (Assert $page) => $page->where('games', null));
+    $this->actingAs($this->resad)->post(route('rooms.close', $room))->assertRedirect();
+
+    // The open room's page has no games; the closed one's has each with its ranking.
+    foreach ([$this->resad, $this->aygun, $this->tural] as $account) {
+        $props = pagesProps($this->actingAs($account)->get(route('rooms.show', $room)));
+        $names = array_column($props['state']['players'], 'name', 'id');
+        $ranked = static fn (array $game): array => array_map(
+            static fn (array $row): array => [$names[$row['player_id']], $row['points'], $row['place']],
+            $game['ranking'],
+        );
+
+        expect($props['room'])->toBe(['id' => $room->id, 'status' => 'closed'])
+            ->and($props['join'])->toBeNull()
+            ->and($props['setup'])->toBeNull()
+            ->and(array_map(static fn (array $game): array => [$game['id'], $game['mechanic'], $game['difficulty'], $game['rounds']], $props['games']))->toBe([
+                [$first->id, 'recall_order', 1, 5],
+                [$second->id, 'recall_cells', 3, 5],
+            ])
+            // A shared place, names in Azerbaijani order inside it; no points, no place.
+            ->and($ranked($props['games'][0]))->toBe([
+                ['Aygün Məmmədova', 100, 1],
+                ['Tural Əliyev', 100, 1],
+                ['Rəşad Quliyev', 0, null],
+            ])
+            ->and($ranked($props['games'][1]))->toBe([
+                ['Rəşad Quliyev', 100, 1],
+                ['Aygün Məmmədova', 0, null],
+                ['Tural Əliyev', 0, null],
+            ])
+            // The room's standing over both games: three players on 100, one place.
+            ->and($props['state']['ranking'])->toBe([
+                ['player_id' => $aygun->id, 'points' => 100, 'place' => 1],
+                ['player_id' => $resad->id, 'points' => 100, 'place' => 1],
+                ['player_id' => $tural->id, 'points' => 100, 'place' => 1],
+            ])
+            ->and($props['place_labels'][0])->toBe(Ordinal::label(1, 'az'));
+    }
+
+    // Names are the accounts' as they are now.
+    $this->aygun->forceFill(['name' => 'Aygün Həsənova'])->save();
+    $this->actingAs($this->resad)->get(route('rooms.show', $room))
+        ->assertInertia(fn (Assert $page) => $page->where('state.players.1.name', 'Aygün Həsənova'));
+});
+
+it('sends no account id, address or solution to any room page', function (): void {
+    $room = Rooms::open($this->resad);
+    Rooms::join($room, $this->aygun);
+    $game = Rooms::playing($room, 5, 2, RoomMechanic::RecallCells);
+    $accounts = [$this->resad, $this->aygun];
+
+    /**
+     * Every page a room account may open now, as the JSON it receives.
+     *
+     * @return array<string, string>
+     */
+    $pages = function (User $account) use ($room): array {
+        $this->actingAs($account);
+        $open = $room->refresh()->isOpen();
+        $pages = [
+            'rooms/index' => $this->get(route('rooms.index')),
+            'rooms/show' => $this->get(route('rooms.show', $room)),
+            'rooms/join' => $this->get(route('rooms.entrance')),
+            ...($open && $room->isHostedBy($account) ? ['rooms/screen' => $this->get(route('rooms.screen', $room))] : []),
+        ];
+
+        $wire = array_map(static function (TestResponse $response): string {
+            $props = $response->assertOk()->viewData('page')['props'];
+            // The viewer's own account is in the shared `auth.user`, as on every page.
+            unset($props['translations'], $props['auth']);
+
+            return (string) json_encode($props, JSON_UNESCAPED_UNICODE);
+        }, $pages);
+
+        if ($open) {
+            $wire['state'] = (string) $this->getJson(route('rooms.state', $room))->assertOk()->getContent();
+        }
+
+        return $wire;
+    };
+
+    $check = function (string $moment, ?RoomRound $round) use ($pages, $accounts): void {
+        foreach ($accounts as $viewer) {
+            foreach ($pages($viewer) as $name => $wire) {
+                foreach ([$this->resad, $this->aygun, $this->tural] as $someone) {
+                    expect($wire)->not->toContain($someone->email, "{$moment} {$name}")
+                        ->and($wire)->not->toMatch('/"(user_id|account_id|email|ip|ip_address|seed)"/', "{$moment} {$name}")
+                        ->and($wire)->not->toContain('"id":'.$someone->id.',', "{$moment} {$name}")
+                        ->and($wire)->not->toContain('"id":'.$someone->id.'}', "{$moment} {$name}");
+                }
+
+                if ($round !== null) {
+                    expect($wire)->not->toMatch('/"(solution|accept|correct|mine|results|picked|elapsed_ms)"/', "{$moment} {$name}")
+                        ->and($wire)->not->toContain(json_encode(Rooms::right($round)), "{$moment} {$name}");
+                }
+            }
+        }
+    };
+
+    // The lobby, the countdown, a study and a question: nothing of anyone, no solution.
+    $check('countdown', Rooms::round($game, 0));
+
+    foreach ([RoomPhase::Study, RoomPhase::Answer] as $phase) {
+        $this->travelTo(Rooms::at($game, $phase, 1));
+        $check($phase->value, Rooms::round($game, 1));
+    }
+
+    // Answered, revealed, over, closed: still no account id or address.
+    $round = Rooms::round($game, 1);
+    $this->actingAs($this->aygun)->postJson(route('rooms.answers.store', $room), Rooms::answer($round, Rooms::right($round)))->assertOk();
+    $this->travelTo(Rooms::at($game, RoomPhase::Reveal, 1));
+    $check('reveal', null);
+    $this->travelTo(Rooms::at($game, RoomPhase::Over));
+    $check('over', null);
+    $this->actingAs($this->resad)->post(route('rooms.close', $room));
+    $check('closed', null);
+
+    // The open room's join link is on the server's own address, never the request's.
+    $other = Rooms::open($this->tural);
+    config(['app.url' => 'http://192.168.1.20:8000']);
+    $this->actingAs($this->tural)->get(route('rooms.show', $other))
+        ->assertInertia(fn (Assert $page) => $page->where('join', [
+            'url' => 'http://192.168.1.20:8000/otaq/'.$other->code,
+            'entry_url' => 'http://192.168.1.20:8000/otaq',
+        ]));
+});
+
+it('takes a player\'s name out of a closed room and keeps the points', function (): void {
+    $room = Rooms::open($this->resad);
+    Rooms::join($room, $this->aygun);
+    $aygun = pagesRow($room, $this->aygun);
+    $game = pagesPlay($room, RoomMechanic::RecallCells, 1, right: [$this->aygun], wrong: [$this->resad]);
+    $points = pagesPoints($game, $aygun);
+
+    // Not while the room is open.
+    $this->actingAs($this->aygun)->delete(route('rooms.name.destroy', $room))->assertForbidden();
+    $this->actingAs($this->resad)->post(route('rooms.close', $room));
+
+    $this->actingAs($this->aygun)->delete(route('rooms.name.destroy', $room))->assertRedirect(route('rooms.index'));
+
+    expect($aygun->refresh()->user_id)->toBeNull();
+
+    // Gone from her list and her reach.
+    $this->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('past', []));
+    $this->get(route('rooms.show', $room))->assertNotFound();
+
+    // The host still sees her points and her place, without a name.
+    $props = pagesProps($this->actingAs($this->resad)->get(route('rooms.show', $room)));
+
+    expect($props['state']['players'][1])->toBe(['id' => $aygun->id, 'name' => null, 'present' => false, 'host' => false])
+        ->and($props['games'][0]['ranking'][0])->toBe(['player_id' => $aygun->id, 'points' => $points, 'place' => 1])
+        ->and($props['state']['ranking'][0])->toBe(['player_id' => $aygun->id, 'points' => $points, 'place' => 1])
+        ->and(json_encode($props, JSON_UNESCAPED_UNICODE))->not->toContain('Aygün');
+
+    // And on «Otaqlar» the host, who scored nothing, has no place.
+    $this->get(route('rooms.index'))
+        ->assertInertia(fn (Assert $page) => $page->where('past.0.mine', ['points' => 0, 'place' => null]));
+});
+
+it('deletes a closed room for everyone', function (): void {
+    $room = Rooms::open($this->resad);
+    Rooms::join($room, $this->aygun);
+    pagesPlay($room, RoomMechanic::RecallCells, 1, right: [$this->aygun, $this->resad]);
+
+    // Not while it is open, and never by a player.
+    $this->actingAs($this->resad)->delete(route('rooms.destroy', $room))->assertForbidden();
+    $this->actingAs($this->resad)->post(route('rooms.close', $room));
+    $this->actingAs($this->aygun)->delete(route('rooms.destroy', $room))->assertForbidden();
+
+    $this->actingAs($this->resad)->delete(route('rooms.destroy', $room))->assertRedirect(route('rooms.index'));
+
+    // Every row under it is gone.
+    foreach (['rooms' => 'id', 'room_players' => 'room_id', 'room_games' => 'room_id'] as $table => $column) {
+        expect(DB::table($table)->where($column, $room->id)->count())->toBe(0, $table);
+    }
+
+    expect(DB::table('room_rounds')->count())->toBe(0)
+        ->and(DB::table('room_answers')->count())->toBe(0);
+
+    foreach ([$this->resad, $this->aygun] as $account) {
+        $this->actingAs($account)->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('past', [])->where('open', []));
+        $this->get(route('rooms.show', $room))->assertNotFound();
+    }
+});
+
+it('gives the screen only to the host', function (): void {
+    $room = Rooms::open($this->resad);
+    Rooms::join($room, $this->aygun);
+
+    // The host: the state the room page has, the place labels and the join link from the server.
+    $props = pagesProps($this->actingAs($this->resad)->get(route('rooms.screen', $room)));
+
+    expect(array_keys($props))->toContain('room', 'state', 'place_labels', 'join')
+        ->and($props['room'])->toBe(['id' => $room->id, 'status' => 'open'])
+        ->and($props['state'])->toBe($this->getJson(route('rooms.state', $room))->json())
+        ->and($props['join']['url'])->toBe(rtrim((string) config('app.url'), '/').'/otaq/'.$room->code);
+    $this->get(route('rooms.screen', $room))->assertInertia(fn (Assert $page) => $page->component('rooms/screen'));
+
+    // In a game it follows the same state, and writes nothing.
+    $game = Rooms::playing($room);
+    $this->travelTo(Rooms::at($game, RoomPhase::Study, 0));
+    $before = [DB::table('rooms')->get()->all(), DB::table('room_players')->get()->all(), DB::table('room_answers')->count(), RoomRound::query()->whereNotNull('closed_ms')->count()];
+    $props = pagesProps($this->actingAs($this->resad)->get(route('rooms.screen', $room)));
+
+    expect($props['state']['round']['phase'])->toBe('study')
+        ->and($props['state'])->toBe($this->getJson(route('rooms.state', $room))->json())
+        ->and([DB::table('rooms')->get()->all(), DB::table('room_players')->get()->all(), DB::table('room_answers')->count(), RoomRound::query()->whereNotNull('closed_ms')->count()])->toEqual($before);
+
+    // A player of the room, a host who does not play too: only the host.
+    $this->actingAs($this->aygun)->get(route('rooms.screen', $room))->assertForbidden();
+    $this->actingAs($this->tural)->get(route('rooms.screen', $room))->assertNotFound();
+    $watcher = User::factory()->player()->create();
+    $watched = Rooms::open($watcher, plays: false);
+    $this->actingAs($watcher)->get(route('rooms.screen', $watched))->assertOk();
+
+    // A closed room has no screen; an idle one neither.
+    $this->actingAs($this->resad)->post(route('rooms.close', $room));
+    $this->get(route('rooms.screen', $room))->assertForbidden();
+    $this->travelTo(now()->addHours(config('elifba.rooms.idle_hours') + 1));
+    $this->actingAs($watcher)->get(route('rooms.screen', $watched))->assertForbidden();
+
+    // A visitor is sent to the login.
+    auth()->logout();
+    $this->get(route('rooms.screen', $watched))->assertRedirect(route('login'));
+});

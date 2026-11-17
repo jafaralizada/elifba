@@ -9,6 +9,7 @@ use App\Http\Controllers\Rooms\RoomJoinController;
 use App\Http\Controllers\Rooms\RoomLeaveController;
 use App\Http\Controllers\Rooms\RoomMemberController;
 use App\Http\Controllers\Rooms\RoomNameController;
+use App\Http\Controllers\Rooms\RoomScreenController;
 use App\Http\Controllers\Rooms\RoomStateController;
 use Illuminate\Support\Facades\Route;
 
@@ -28,7 +29,6 @@ use Illuminate\Support\Facades\Route;
  * `RoomPolicy` (`->can()`). Both are ULIDs; a name never goes into a URL. A
  * new route with `{room}` or `{member}` must be added to
  * tests/Feature/Classroom/TeacherIsolationTest.php, which fails otherwise.
- * B4 adds the screen.
  */
 Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::middleware(Role::Player)])->group(function () {
     // «Otaqlar», the area's home: the account's rooms, the code field, «Otaq aç».
@@ -61,6 +61,12 @@ Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::mid
         ->whereUlid('room')
         ->can('play', 'room')
         ->name('rooms.leave');
+
+    // The big screen: the host's own session on a laptop or a television (B4).
+    Route::get('rooms/{room}/screen', RoomScreenController::class)
+        ->whereUlid('room')
+        ->can('screen', 'room')
+        ->name('rooms.screen');
 
     // A present player's own answer to the round open now (B3).
     Route::post('rooms/{room}/answers', RoomAnswerController::class)

@@ -35,5 +35,5 @@ it('has a builder for every mechanic', function (): void {
         expect(RoomPlayable::builder($mechanic))->not->toBeNull();
     }
 
-    expect(RoomPlayable::mechanics())->toBe([RoomMechanic::RecallOrder]);
+    expect(RoomPlayable::mechanics())->toBe([RoomMechanic::RecallOrder, RoomMechanic::RecallCells]);
 });

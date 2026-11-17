@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- damci: a drop, a shape of a memory round. Elifba own art, MIT. -->
+<path d="M16 2 C17.5 4.2 26 13.4 26 20 C26 25.5 21.5 30 16 30 C10.5 30 6 25.5 6 20 C6 13.4 14.5 4.2 16 2 Z" fill="url(#damci_fill1)"/>
+<path d="M16 2 C17.5 4.2 26 13.4 26 20 C26 25.5 21.5 30 16 30 C10.5 30 6 25.5 6 20 C6 13.4 14.5 4.2 16 2 Z" fill="url(#damci_fill2)"/>
+<g filter="url(#damci_blur06)"><ellipse cx="11.5" cy="18.5" rx="1.8" ry="3" fill="#FFFFFF" fill-opacity="0.55" transform="rotate(20 11.5 18.5)"/></g>
+<defs>
+<radialGradient id="damci_fill1" cx="0.35" cy="0.3" r="0.75"><stop stop-color="#8CBCE6"/><stop offset="0.55" stop-color="#3F8FD6"/><stop offset="1" stop-color="#2F6BA0"/></radialGradient>
+<radialGradient id="damci_fill2" cx="0.85" cy="0.88" r="0.7"><stop stop-color="#2F6BA0" stop-opacity="0.6"/><stop offset="0.85" stop-color="#2F6BA0" stop-opacity="0"/></radialGradient>
+<filter id="damci_blur06" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.6"/></filter>
+</defs>
+</svg>

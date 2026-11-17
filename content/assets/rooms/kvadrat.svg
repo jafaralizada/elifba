@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- kvadrat: a square with round corners, a shape of a memory round. Elifba own art, MIT. -->
+<path d="M8 3 H24 Q29 3 29 8 V24 Q29 29 24 29 H8 Q3 29 3 24 V8 Q3 3 8 3 Z" fill="url(#kvadrat_fill1)"/>
+<path d="M8 3 H24 Q29 3 29 8 V24 Q29 29 24 29 H8 Q3 29 3 24 V8 Q3 3 8 3 Z" fill="url(#kvadrat_fill2)"/>
+<g filter="url(#kvadrat_blur06)"><ellipse cx="9" cy="8.5" rx="3.2" ry="2" fill="#FFFFFF" fill-opacity="0.55" transform="rotate(-30 9 8.5)"/></g>
+<defs>
+<radialGradient id="kvadrat_fill1" cx="0.35" cy="0.3" r="0.75"><stop stop-color="#7896C6"/><stop offset="0.55" stop-color="#1E50A0"/><stop offset="1" stop-color="#163C78"/></radialGradient>
+<radialGradient id="kvadrat_fill2" cx="0.85" cy="0.88" r="0.7"><stop stop-color="#163C78" stop-opacity="0.6"/><stop offset="0.85" stop-color="#163C78" stop-opacity="0"/></radialGradient>
+<filter id="kvadrat_blur06" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.6"/></filter>
+</defs>
+</svg>

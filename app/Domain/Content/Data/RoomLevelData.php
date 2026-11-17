@@ -14,8 +14,10 @@ use App\Domain\Content\Enums\RoomMechanic;
  * empty. `ContentValidator` checks them all.
  *
  * - `recall_order`: `kinds` (one per round) and `length` (items in a row).
+ * - `recall_cells`: `grid` (`{cols, rows}`) and `lit` (how many of its
+ *   cells light up, fewer than the cells).
  *
- * @phpstan-type RoomLevelArray array{mechanic: string, difficulty: int, study_ms: int, answer_ms: int, kinds?: list<string>, length?: array{min: int, max: int}}
+ * @phpstan-type RoomLevelArray array{mechanic: string, difficulty: int, study_ms: int, answer_ms: int, kinds?: list<string>, length?: array{min: int, max: int}, grid?: array{cols: int, rows: int}, lit?: array{min: int, max: int}}
  */
 final readonly class RoomLevelData
 {
@@ -25,6 +27,8 @@ final readonly class RoomLevelData
      * @param  int  $answerMs  the time to answer
      * @param  list<RoomItemKind>  $kinds  what a `recall_order` round may show
      * @param  RangeData|null  $length  items in a `recall_order` row
+     * @param  GridData|null  $grid  a `recall_cells` round's grid
+     * @param  RangeData|null  $lit  how many cells of it a `recall_cells` round lights
      */
     public function __construct(
         public RoomMechanic $mechanic,
@@ -33,6 +37,8 @@ final readonly class RoomLevelData
         public int $answerMs,
         public array $kinds = [],
         public ?RangeData $length = null,
+        public ?GridData $grid = null,
+        public ?RangeData $lit = null,
     ) {}
 
     /**
@@ -47,6 +53,8 @@ final readonly class RoomLevelData
             answerMs: $data['answer_ms'],
             kinds: array_map(RoomItemKind::from(...), $data['kinds'] ?? []),
             length: isset($data['length']) ? RangeData::fromArray($data['length']) : null,
+            grid: isset($data['grid']) ? GridData::fromArray($data['grid']) : null,
+            lit: isset($data['lit']) ? RangeData::fromArray($data['lit']) : null,
         );
     }
 }

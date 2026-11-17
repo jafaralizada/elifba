@@ -652,6 +652,84 @@
             "correct": false
         },
         {
+            "name": "sequence: shapes in the order shown, read by their pictures",
+            "items": [
+                {
+                    "id": "s1ap7qk2",
+                    "kind": "shape",
+                    "text": null,
+                    "asset": "https://elifba.test/content/rooms/ulduz.svg?v=1",
+                    "cell": null
+                },
+                {
+                    "id": "m8dx3vr9",
+                    "kind": "shape",
+                    "text": null,
+                    "asset": "https://elifba.test/content/rooms/daire.svg?v=1",
+                    "cell": null
+                },
+                {
+                    "id": "c4hw6ez0",
+                    "kind": "shape",
+                    "text": null,
+                    "asset": "https://elifba.test/content/rooms/urek.svg?v=1",
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["m8dx3vr9", "c4hw6ez0", "s1ap7qk2"],
+                "accept": [
+                    [
+                        "https://elifba.test/content/rooms/daire.svg?v=1",
+                        "https://elifba.test/content/rooms/urek.svg?v=1",
+                        "https://elifba.test/content/rooms/ulduz.svg?v=1"
+                    ]
+                ]
+            },
+            "picked": ["m8dx3vr9", "c4hw6ez0", "s1ap7qk2"],
+            "correct": true
+        },
+        {
+            "name": "sequence: shapes in another order",
+            "items": [
+                {
+                    "id": "s1ap7qk2",
+                    "kind": "shape",
+                    "text": null,
+                    "asset": "https://elifba.test/content/rooms/ulduz.svg?v=1",
+                    "cell": null
+                },
+                {
+                    "id": "m8dx3vr9",
+                    "kind": "shape",
+                    "text": null,
+                    "asset": "https://elifba.test/content/rooms/daire.svg?v=1",
+                    "cell": null
+                },
+                {
+                    "id": "c4hw6ez0",
+                    "kind": "shape",
+                    "text": null,
+                    "asset": "https://elifba.test/content/rooms/urek.svg?v=1",
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["m8dx3vr9", "c4hw6ez0", "s1ap7qk2"],
+                "accept": [
+                    [
+                        "https://elifba.test/content/rooms/daire.svg?v=1",
+                        "https://elifba.test/content/rooms/urek.svg?v=1",
+                        "https://elifba.test/content/rooms/ulduz.svg?v=1"
+                    ]
+                ]
+            },
+            "picked": ["c4hw6ez0", "m8dx3vr9", "s1ap7qk2"],
+            "correct": false
+        },
+        {
             "name": "any shape: an item that is not the round's",
             "items": [
                 {

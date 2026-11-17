@@ -2,6 +2,7 @@
 
 use App\Domain\Content\Data\RangeData;
 use App\Domain\Content\Data\RoomLevelData;
+use App\Domain\Content\Data\RoomShapeData;
 use App\Domain\Content\Enums\RoomItemKind;
 use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Content\Support\ContentRepository;
@@ -18,7 +19,7 @@ use Random\Randomizer;
 
 /*
  * «Ardıcıllığı yadda saxla» (docs/architecture.md §12 "Room games"): a row
- * of digits or letters to study, then the same items shuffled, to tap in
+ * of digits, letters or shapes to study, then the same items shuffled, to tap in
  * the order shown. The question never comes in the order shown, its ids
  * are not the row's and carry no position, and the seed alone decides
  * everything.
@@ -29,7 +30,7 @@ use Random\Randomizer;
  */
 function recallOrderRounds(RoomLevelData $level, int $seed, int $count = 20): array
 {
-    return (new RecallOrderBuilder)->build($level, $count, new Randomizer(new Mt19937($seed)));
+    return (new RecallOrderBuilder(app(ContentRepository::class)->roomShapes()))->build($level, $count, new Randomizer(new Mt19937($seed)));
 }
 
 /**
@@ -55,14 +56,18 @@ function recallOrderLevels(): array
         $levels["difficulty {$difficulty}"] = [fn (): RoomLevelData => app(ContentRepository::class)->roomLevel(RoomMechanic::RecallOrder, $difficulty)];
     }
 
-    $levels['the shortest row'] = [fn (): RoomLevelData => new RoomLevelData(RoomMechanic::RecallOrder, 1, 2_000, 5_000, [RoomItemKind::Digit, RoomItemKind::Letter], new RangeData(3, 3))];
+    $levels['the shortest row'] = [fn (): RoomLevelData => new RoomLevelData(RoomMechanic::RecallOrder, 1, 2_000, 5_000, [RoomItemKind::Digit, RoomItemKind::Letter, RoomItemKind::Shape], new RangeData(3, 3))];
+    $levels['every shape'] = [fn (): RoomLevelData => new RoomLevelData(RoomMechanic::RecallOrder, 1, 2_000, 5_000, [RoomItemKind::Shape], new RangeData(12, 12))];
 
     return $levels;
 }
 
 it('shows one kind per round within the level\'s length', function (RoomLevelData $level): void {
-    $digits = array_map(strval(...), range(0, 9));
-    $letters = array_map(Az::upper(...), Alphabet::letters());
+    $pools = [
+        RoomItemKind::Digit->value => array_map(strval(...), range(0, 9)),
+        RoomItemKind::Letter->value => array_map(Az::upper(...), Alphabet::letters()),
+        RoomItemKind::Shape->value => array_map(static fn (RoomShapeData $shape): string => $shape->url(), app(ContentRepository::class)->roomShapes()),
+    ];
     $kinds = [];
 
     foreach (range(1, 10) as $seed) {
@@ -78,7 +83,7 @@ it('shows one kind per round within the level\'s length', function (RoomLevelDat
                 ->and(count($row))->toBeGreaterThanOrEqual($level->length->min ?? 0)->toBeLessThanOrEqual($level->length->max ?? 0)
                 ->and($level->kinds)->toContain($kind)
                 ->and(array_unique(array_map(static fn (RoomItemData $item): RoomItemKind => $item->kind, [...$study->items ?? [], ...$round->ask->items]), SORT_REGULAR))->toBe([$kind])
-                ->and(array_diff($row, $kind === RoomItemKind::Digit ? $digits : $letters))->toBe([])
+                ->and(array_diff($row, $pools[$kind?->value] ?? []))->toBe([])
                 ->and($round->studyMs)->toBe($level->studyMs)
                 ->and($round->answerMs)->toBe($level->answerMs);
 
@@ -153,6 +158,25 @@ it('never asks in the order shown', function (RoomLevelData $level): void {
 
     expect($sortedIntoTheRow)->toBeLessThan(intdiv($rounds, 2) + 1);
 })->with(recallOrderLevels());
+
+it('shows a shape as its picture, with no text, and judges a row of shapes by the pictures', function (): void {
+    $level = new RoomLevelData(RoomMechanic::RecallOrder, 2, 4_500, 15_000, [RoomItemKind::Shape], new RangeData(5, 6));
+
+    foreach (recallOrderRounds($level, 7) as $round) {
+        foreach ([...$round->study->items ?? [], ...$round->ask->items] as $item) {
+            expect($item->kind)->toBe(RoomItemKind::Shape)
+                ->and($item->text)->toBeNull()
+                ->and($item->cell)->toBeNull()
+                ->and($item->asset)->toMatch('#/content/rooms/[a-z]+\.svg\?v=\d+$#');
+        }
+
+        $solution = $round->solution;
+
+        expect(RoomJudge::correct($solution, $round->ask->items, $solution->ids))->toBeTrue()
+            ->and(RoomJudge::correct($solution, $round->ask->items, [...array_slice($solution->ids, 1), $solution->ids[0]]))->toBeFalse()
+            ->and(RoomJudge::correct($solution, $round->ask->items, array_reverse($solution->ids)))->toBeFalse();
+    }
+});
 
 it('builds the same rounds from the same seed', function (): void {
     $level = app(ContentRepository::class)->roomLevel(RoomMechanic::RecallOrder, 3);

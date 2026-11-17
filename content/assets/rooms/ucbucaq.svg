@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- ucbucaq: a triangle, a shape of a memory round. Elifba own art, MIT. -->
+<path d="M14.46 5.31 Q16 2.5 17.54 5.31 L28.46 25.19 Q30 28 26.8 28 L5.2 28 Q2 28 3.54 25.19 Z" fill="url(#ucbucaq_fill1)"/>
+<path d="M14.46 5.31 Q16 2.5 17.54 5.31 L28.46 25.19 Q30 28 26.8 28 L5.2 28 Q2 28 3.54 25.19 Z" fill="url(#ucbucaq_fill2)"/>
+<g filter="url(#ucbucaq_blur06)"><ellipse cx="13.2" cy="12" rx="2.6" ry="1.6" fill="#FFFFFF" fill-opacity="0.55" transform="rotate(-60 13.2 12)"/></g>
+<defs>
+<radialGradient id="ucbucaq_fill1" cx="0.35" cy="0.3" r="0.75"><stop stop-color="#9DC583"/><stop offset="0.55" stop-color="#5C9E31"/><stop offset="1" stop-color="#457625"/></radialGradient>
+<radialGradient id="ucbucaq_fill2" cx="0.85" cy="0.88" r="0.7"><stop stop-color="#457625" stop-opacity="0.6"/><stop offset="0.85" stop-color="#457625" stop-opacity="0"/></radialGradient>
+<filter id="ucbucaq_blur06" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.6"/></filter>
+</defs>
+</svg>

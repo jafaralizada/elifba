@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { useTranslation } from '@/hooks/use-translation';
 import { entrance, index, show, store } from '@/routes/rooms';
+import type { RoomMechanic } from '@/rooms/contract';
 
 type OpenRoom = {
     id: string;
@@ -14,14 +15,24 @@ type OpenRoom = {
     host: boolean;
     players: number;
 };
-type PastRoom = { id: string; date: string; host: boolean; players: number };
+/** A past room: its day, its games and the account's own row of its standing (null for a host who did not play). */
+type PastRoom = {
+    id: string;
+    date: string;
+    host: boolean;
+    players: number;
+    games: { mechanic: RoomMechanic; difficulty: number }[];
+    mine: { points: number; place: string | null } | null;
+};
 
 type Props = { open: OpenRoom[]; past: PastRoom[] };
 
 /**
  * «Otaqlar», the player area's home (architecture §12 "Rooms and joining",
  * ADR 020): «Otaq aç», the code field and the account's rooms — open ones
- * it hosts or is in, and past ones. Plain until B4 designs it.
+ * it hosts or is in, and past ones with their games and the account's own
+ * place, labelled on the server. Plain until B4's interface session
+ * designs it.
  */
 export default function RoomsIndex({ open, past }: Props) {
     const { t } = useTranslation();
@@ -130,11 +141,28 @@ export default function RoomsIndex({ open, past }: Props) {
                             <span className="block font-semibold">
                                 {room.date}
                             </span>
+                            {room.games.length > 0 && (
+                                <span className="block text-sm">
+                                    {room.games
+                                        .map(
+                                            (game) =>
+                                                `${t(`rooms.mechanics.${game.mechanic}.name`)} · ${t(`rooms.difficulty.${game.difficulty}`)}`,
+                                        )
+                                        .join(', ')}
+                                </span>
+                            )}
                             <span className="block text-sm text-muted-foreground">
                                 {t('rooms.index.players', {
                                     count: room.players,
                                 })}
                                 {room.host && ` · ${t('rooms.index.hosted')}`}
+                                {room.mine !== null &&
+                                    room.games.length > 0 &&
+                                    ` · ${
+                                        room.mine.place === null
+                                            ? t('rooms.index.no_points')
+                                            : `${t('rooms.index.place', { place: room.mine.place })} (${t('rooms.game.points', { count: room.mine.points })})`
+                                    }`}
                             </span>
                         </RoomLink>
                     ))}

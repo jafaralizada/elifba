@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- urek: a heart, a shape of a memory round. Elifba own art, MIT. -->
+<path d="M16 28.5 C14.5 27.4 2 19.6 2 10.9 C2 6.4 5.4 3 9.6 3 C12.4 3 14.8 4.6 16 7 C17.2 4.6 19.6 3 22.4 3 C26.6 3 30 6.4 30 10.9 C30 19.6 17.5 27.4 16 28.5 Z" fill="url(#urek_fill1)"/>
+<path d="M16 28.5 C14.5 27.4 2 19.6 2 10.9 C2 6.4 5.4 3 9.6 3 C12.4 3 14.8 4.6 16 7 C17.2 4.6 19.6 3 22.4 3 C26.6 3 30 6.4 30 10.9 C30 19.6 17.5 27.4 16 28.5 Z" fill="url(#urek_fill2)"/>
+<g filter="url(#urek_blur06)"><ellipse cx="8.5" cy="8.5" rx="3" ry="1.8" fill="#FFFFFF" fill-opacity="0.55" transform="rotate(-40 8.5 8.5)"/></g>
+<defs>
+<radialGradient id="urek_fill1" cx="0.35" cy="0.3" r="0.75"><stop stop-color="#E4827D"/><stop offset="0.55" stop-color="#D22F27"/><stop offset="1" stop-color="#9E231D"/></radialGradient>
+<radialGradient id="urek_fill2" cx="0.85" cy="0.88" r="0.7"><stop stop-color="#9E231D" stop-opacity="0.6"/><stop offset="0.85" stop-color="#9E231D" stop-opacity="0"/></radialGradient>
+<filter id="urek_blur06" x="0" y="0" width="32" height="32" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0.6"/></filter>
+</defs>
+</svg>
