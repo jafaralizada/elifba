@@ -1,14 +1,17 @@
 import {
     ChoiceOptions,
-    ChoiceSolution,
+    ChoiceReveal,
 } from '@/components/rooms/mechanics/choice';
 import { useTranslation } from '@/hooks/use-translation';
 import type { RoomAsk, RoomMine } from '@/rooms/contract';
 
 /*
- * «Artıq olanı tap» (docs/architecture.md §12 "Room games"): four or five
- * numbers or words, one of which does not belong; tap it. The reveal says
- * which one it was. Plain: the next session designs it.
+ * «Artıq olanı tap» (docs/architecture.md §12 "Room games",
+ * docs/frontend.md rule 15): four or five numbers or words as buttons of
+ * one size — four two by two, five in one column, so none stands apart —
+ * and a tap chooses the one that does not belong. The reveal marks the
+ * odd one from `reveal.solution` and the viewer's own choice by the
+ * server's verdict. The page never looks for what the others share.
  */
 
 export function OddOneOutAsk({
@@ -49,7 +52,5 @@ export function OddOneOutSolution({
     mine: RoomMine | null;
     big?: boolean;
 }) {
-    return (
-        <ChoiceSolution ask={ask} solution={solution} mine={mine} big={big} />
-    );
+    return <ChoiceReveal ask={ask} solution={solution} mine={mine} big={big} />;
 }

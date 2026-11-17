@@ -287,6 +287,8 @@ export function GameSetup({
                                 <p className="text-[0.8125rem] leading-snug text-muted-foreground tabular-nums">
                                     {t('rooms.setup.levels.sequence', {
                                         terms: level.terms ?? 0,
+                                        min: level.range?.min ?? 0,
+                                        max: level.range?.max ?? 0,
                                         rules: level.rules
                                             .map((rule) =>
                                                 t(`rooms.setup.rules.${rule}`),
@@ -400,24 +402,34 @@ export function GameSetup({
     );
 }
 
-/** A small drawing of a game's round, in the tokens: a row of shapes, a grid with lit cells, a row to continue, an odd one. */
+/** A small drawing of a game's round, in the tokens: a row of shapes, a grid with lit cells, a rising row with a dashed place, three alike and one apart. */
 function MechanicPicture({ mechanic }: { mechanic: RoomMechanic }) {
-    // B5, plain: the next session draws them.
-    if (mechanic === 'next_in_sequence' || mechanic === 'odd_one_out') {
+    if (mechanic === 'next_in_sequence') {
+        // A rising row and the dashed place of the next one.
         return (
             <span
                 aria-hidden
-                className="flex size-14 shrink-0 items-center justify-center gap-1 rounded-xl bg-muted p-1.5 text-xs font-semibold text-primary tabular-nums"
+                className="flex size-14 shrink-0 items-end justify-center gap-[3px] rounded-xl bg-muted p-2"
             >
-                {mechanic === 'next_in_sequence' ? (
-                    '2 4 6 ?'
-                ) : (
-                    <>
-                        <span className="size-3 rounded-full bg-primary" />
-                        <span className="size-3 rounded-full bg-primary" />
-                        <span className="size-3 rounded-[2px] bg-amber-400" />
-                    </>
-                )}
+                <span className="h-2 w-2 rounded-[2px] bg-primary/45" />
+                <span className="h-3.5 w-2 rounded-[2px] bg-primary/65" />
+                <span className="h-5 w-2 rounded-[2px] bg-primary/85" />
+                <span className="h-7 w-2 rounded-[2px] border border-dashed border-primary" />
+            </span>
+        );
+    }
+
+    if (mechanic === 'odd_one_out') {
+        // Three alike and one that is not.
+        return (
+            <span
+                aria-hidden
+                className="grid size-14 shrink-0 grid-cols-2 place-items-center gap-1 rounded-xl bg-muted p-2"
+            >
+                <span className="size-3.5 rounded-full bg-primary" />
+                <span className="size-3.5 rounded-full bg-primary" />
+                <span className="size-3.5 rounded-full bg-primary" />
+                <span className="size-3.5 rotate-45 rounded-[2px] bg-amber-400" />
             </span>
         );
     }

@@ -247,14 +247,14 @@ export function LiveRound({
                                         <Undo2 />
                                         {t('rooms.game.undo')}
                                     </Button>
-                                ) : (
+                                ) : round.ask.shape === 'set' ? (
                                     <span className="text-sm text-muted-foreground tabular-nums">
                                         {t('rooms.game.picked', {
                                             count: picked.length,
                                             total: round.ask.pick,
                                         })}
                                     </span>
-                                ))}
+                                ) : null)}
                             <span className="ml-auto flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground tabular-nums">
                                 <Users aria-hidden className="size-4" />
                                 {answeredCount}
