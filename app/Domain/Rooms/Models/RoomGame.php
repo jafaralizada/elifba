@@ -18,8 +18,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * One game played in a room (docs/architecture.md §1 `room_games`, §12
  * "The race", "Room games", ADRs 021 and 023): a mechanic at a difficulty
  * — the pair is the level of `content/rooms/levels.json` — with rounds
- * built from `seed` and the room content of `content_version` when it
- * started. A room plays several, one at a time, by `position`.
+ * built from `seed` (`RoomSeed`, never serialized) and the room content
+ * of `content_version` when it started. A room plays several, one at a time, by `position`.
  *
  * Only facts are stored: when round 0 opens (`started_ms`), how long a
  * reveal lasts in this game (`reveal_ms`, copied from the config at the
@@ -52,6 +52,13 @@ class RoomGame extends Model
      * The largest seed, the same on every engine (a signed 32-bit integer).
      */
     public const int MAX_SEED = 2_147_483_647;
+
+    /**
+     * The seed tells every round; it never leaves the server (`RoomSeed`).
+     *
+     * @var list<string>
+     */
+    protected $hidden = ['seed'];
 
     /**
      * The game's timetable, from its rounds as they are loaded.

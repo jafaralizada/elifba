@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Rooms;
 
+use App\Domain\Language\Support\Ordinal;
 use App\Domain\Rooms\Actions\DeleteRoom;
 use App\Domain\Rooms\Actions\LockRoom;
 use App\Domain\Rooms\Actions\OpenRoom;
@@ -15,6 +16,7 @@ use App\Models\User;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -26,8 +28,13 @@ use Inertia\Response;
  * A room's page gets the state (`RoomState`, names read now) for the host
  * and a present player of an open room, and for everyone who was in a
  * closed one — its results; a player who left an open room sees the page
- * without it and comes back with the code. No account id or address
- * reaches a room page, and no name goes into a URL or a flash.
+ * without it and comes back with the code. The state in the props is the
+ * one `GET /rooms/{room}/state` answers, phase by phase, with nothing more
+ * of a round. Places are labelled here (`place_labels`: the label of place
+ * n at n − 1, `Ordinal::label()`), as many as the room has players or may
+ * have, since a page never suffixes a number itself. No other account's id
+ * or address reaches a room page — the shared `auth.user` is the viewer's
+ * own — and no name goes into a URL or a flash.
  */
 final class RoomController extends Controller
 {
@@ -47,10 +54,13 @@ final class RoomController extends Controller
     {
         $gate = Gate::forUser($account);
         $open = $room->isOpen();
+        $places = max(Config::integer('elifba.rooms.max_players'), $room->players()->whereNull('removed_at')->count());
+        $locale = app()->getLocale();
 
         return Inertia::render('rooms/show', [
             'room' => ['id' => $room->id, 'status' => $room->status()->value],
             'state' => $gate->allows('watch', $room) || ! $open ? RoomState::for($room, $account)->toArray() : null,
+            'place_labels' => array_map(static fn (int $place): string => Ordinal::label($place, $locale), range(1, $places)),
             'can' => [
                 'host' => $gate->allows('host', $room),
                 'leave' => $gate->allows('play', $room),

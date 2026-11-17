@@ -56,7 +56,7 @@ it('keeps moments as whole milliseconds beyond 32 bits on every engine', functio
         ->and((string) DB::table('room_rounds')->where('id', $round->id)->value('closed_ms'))->toBe((string) ($started + 7_001));
 });
 
-it('hides a round\'s solution from every serialization', function (): void {
+it('hides a round\'s solution and payload from every serialization', function (): void {
     $room = Room::factory()->create();
     $game = RoomGame::factory()->for($room)->withRounds(3)->create();
     $round = $game->rounds->first();
@@ -74,10 +74,11 @@ it('hides a round\'s solution from every serialization', function (): void {
     ];
 
     expect($solution->accept)->not->toBeEmpty()
-        ->and(array_keys($round->toArray()))->toEqualCanonicalizing(['id', 'room_game_id', 'position', 'payload', 'study_ms', 'answer_ms', 'closed_ms']);
+        ->and(array_keys($round->toArray()))->toEqualCanonicalizing(['id', 'room_game_id', 'position', 'study_ms', 'answer_ms', 'closed_ms']);
 
     foreach ($serialized as $json) {
         expect($json)->not->toContain('"solution"')
+            ->and($json)->not->toContain('"payload"')
             ->not->toContain('"accept"')
             // the solution's order of ids appears nowhere
             ->not->toContain(implode('","', $solution->ids));

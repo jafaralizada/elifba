@@ -9,10 +9,9 @@ use App\Domain\Rooms\Models\RoomGame;
 use App\Domain\Rooms\Models\RoomRound;
 use App\Domain\Rooms\Support\RoomClock;
 use App\Domain\Rooms\Support\RoomPlayable;
+use App\Domain\Rooms\Support\RoomSeed;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Config;
-use Random\Engine\Mt19937;
-use Random\Randomizer;
 
 /**
  * A room game started now at `recall_order` «Asan», the next game of its
@@ -54,13 +53,14 @@ class RoomGameFactory extends Factory
     }
 
     /**
-     * Builds `$count` rounds from the game's level and seed.
+     * Builds `$count` rounds from the game's level and seed, from the
+     * source `StartRoomGame` uses (`RoomSeed`).
      */
     public function withRounds(int $count = 5): static
     {
         return $this->afterCreating(static function (RoomGame $game) use ($count): void {
             $level = app(ContentRepository::class)->roomLevel($game->mechanic, $game->difficulty);
-            $built = RoomPlayable::builder($game->mechanic)->build($level, $count, new Randomizer(new Mt19937($game->seed)));
+            $built = RoomPlayable::builder($game->mechanic)->build($level, $count, RoomSeed::random($game->seed));
 
             foreach ($built as $position => $round) {
                 RoomRound::factory()->for($game, 'game')->built($round)->create(['position' => $position]);

@@ -54,6 +54,9 @@ function roomsSwitchSnapshot(): array
         'roles' => $rows('roles', 'id'),
         'rooms' => $rows('rooms', 'id'),
         'room_players' => $rows('room_players', 'id'),
+        'room_games' => $rows('room_games', 'id'),
+        'room_rounds' => $rows('room_rounds', 'id'),
+        'room_answers' => $rows('room_answers', 'id'),
     ];
 }
 

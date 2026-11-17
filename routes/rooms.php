@@ -1,8 +1,10 @@
 <?php
 
 use App\Enums\Role;
+use App\Http\Controllers\Rooms\RoomAnswerController;
 use App\Http\Controllers\Rooms\RoomCloseController;
 use App\Http\Controllers\Rooms\RoomController;
+use App\Http\Controllers\Rooms\RoomGameController;
 use App\Http\Controllers\Rooms\RoomJoinController;
 use App\Http\Controllers\Rooms\RoomLeaveController;
 use App\Http\Controllers\Rooms\RoomMemberController;
@@ -26,7 +28,7 @@ use Illuminate\Support\Facades\Route;
  * `RoomPolicy` (`->can()`). Both are ULIDs; a name never goes into a URL. A
  * new route with `{room}` or `{member}` must be added to
  * tests/Feature/Classroom/TeacherIsolationTest.php, which fails otherwise.
- * B3 adds the game and the answers; B4 the screen.
+ * B4 adds the screen.
  */
 Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::middleware(Role::Player)])->group(function () {
     // «Otaqlar», the area's home: the account's rooms, the code field, «Otaq aç».
@@ -60,6 +62,13 @@ Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::mid
         ->can('play', 'room')
         ->name('rooms.leave');
 
+    // A present player's own answer to the round open now (B3).
+    Route::post('rooms/{room}/answers', RoomAnswerController::class)
+        ->whereUlid('room')
+        ->middleware('throttle:room-answers')
+        ->can('play', 'room')
+        ->name('rooms.answers.store');
+
     // The host's tools.
     Route::patch('rooms/{room}', [RoomController::class, 'update'])
         ->whereUlid('room')
@@ -74,6 +83,16 @@ Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::mid
         ->whereUlid('room')
         ->can('host', 'room')
         ->name('rooms.close');
+
+    // A game: started in an open room with none running, ended while it runs (B3).
+    Route::post('rooms/{room}/games', [RoomGameController::class, 'store'])
+        ->whereUlid('room')
+        ->can('start', 'room')
+        ->name('rooms.games.store');
+    Route::delete('rooms/{room}/game', [RoomGameController::class, 'destroy'])
+        ->whereUlid('room')
+        ->can('end', 'room')
+        ->name('rooms.game.destroy');
 
     // A closed room: the host deletes it, a player takes their name out.
     Route::delete('rooms/{room}', [RoomController::class, 'destroy'])

@@ -569,6 +569,7 @@
     "rooms.errors.code": "A code is 6 digits.",
     "rooms.errors.full": "This room is full.",
     "rooms.errors.locked": "This room is locked.",
+    "rooms.errors.picked": "This answer does not fit the round.",
     "rooms.flash.deleted": "The room was deleted.",
     "rooms.flash.forgotten": "Your name was removed from the room.",
     "rooms.flash.left": "You left the room.",

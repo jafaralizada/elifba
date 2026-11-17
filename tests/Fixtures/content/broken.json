@@ -1193,17 +1193,22 @@
     },
     "rooms levels: a row that cannot be shuffled": {
         "file": "rooms/levels.json",
-        "set": { "levels.0.length": { "min": 1, "max": 3 } },
-        "problem": "rooms/levels.json: levels[0].length needs whole numbers from 2 to 12, min ≤ max"
+        "set": { "levels.0.length": { "min": 2, "max": 3 } },
+        "problem": "rooms/levels.json: levels[0].length needs whole numbers from 3 to 12, min ≤ max"
     },
     "rooms levels: a row longer than twelve": {
         "file": "rooms/levels.json",
         "set": { "levels.3.length": { "min": 12, "max": 13 } },
-        "problem": "rooms/levels.json: levels[3].length needs whole numbers from 2 to 12, min ≤ max"
+        "problem": "rooms/levels.json: levels[3].length needs whole numbers from 3 to 12, min ≤ max"
     },
     "rooms levels: a length upside down": {
         "file": "rooms/levels.json",
         "set": { "levels.2.length": { "min": 8, "max": 6 } },
-        "problem": "rooms/levels.json: levels[2].length needs whole numbers from 2 to 12, min ≤ max"
+        "problem": "rooms/levels.json: levels[2].length needs whole numbers from 3 to 12, min ≤ max"
+    },
+    "rooms levels: a row of digits longer than the digits": {
+        "file": "rooms/levels.json",
+        "set": { "levels.0.length": { "min": 3, "max": 11 } },
+        "problem": "rooms/levels.json: levels[0].length: a row of digits holds at most 10, none twice"
     }
 }

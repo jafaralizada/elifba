@@ -569,6 +569,7 @@
     "rooms.errors.code": "Kod 6 rəqəmdən ibarətdir.",
     "rooms.errors.full": "Bu otaq doludur.",
     "rooms.errors.locked": "Bu otaq kilidlidir.",
+    "rooms.errors.picked": "Bu cavab bu raunda uyğun gəlmir.",
     "rooms.flash.deleted": "Otaq silindi.",
     "rooms.flash.forgotten": "Adınız otaqdan silindi.",
     "rooms.flash.left": "Otaqdan çıxdınız.",

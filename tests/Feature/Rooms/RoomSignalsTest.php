@@ -1,8 +1,11 @@
 <?php
 
 use App\Domain\Rooms\Actions\JoinRoom;
+use App\Domain\Rooms\Enums\RoomPhase;
 use App\Domain\Rooms\Exceptions\RoomChangeNotBroadcast;
+use App\Domain\Rooms\Models\RoomGame;
 use App\Domain\Rooms\Models\RoomPlayer;
+use App\Domain\Rooms\Support\RoomClock;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
@@ -12,7 +15,8 @@ use Tests\Support\Rooms;
  * `room.changed` on the room's channel (docs/architecture.md §12 "The
  * race", ADR 021 decisions 8–9): `{v: 1, revision}` and nothing else, sent
  * at once after the change commits — a join, a leave, a removal, the lock,
- * the close. Reverb being down never fails the change. Nothing reaches a
+ * the close, a game started or ended, an early close; never a single
+ * answer. Reverb being down never fails the change. Nothing reaches a
  * real Reverb: tests/Support/FakeReverb records what would have been
  * published.
  */
@@ -48,6 +52,56 @@ it('signals a change with the revision and nothing else', function (): void {
 
     $wire = json_encode($this->reverb->sent, JSON_UNESCAPED_UNICODE);
     foreach (['Rəşad', 'Aygün', 'Tural', 'aygun@example.com', $code] as $secret) {
+        expect($wire)->not->toContain($secret);
+    }
+});
+
+it('signals an early close and a game\'s start', function (): void {
+    $this->freezeTime();
+    $tural = User::factory()->player()->create(['name' => 'Tural Əliyev']);
+    Rooms::join($this->room, $this->player);
+    Rooms::join($this->room, $tural);
+    $this->reverb->sent = [];
+    $setup = ['mechanic' => 'recall_order', 'difficulty' => 1, 'rounds' => 5];
+
+    // The start: revision 3.
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), $setup)->assertNoContent();
+    $game = RoomGame::query()->sole();
+    [$first, $second] = [Rooms::round($game, 0), Rooms::round($game, 1)];
+
+    // Single answers, a refused one and the phases time brings: nothing.
+    $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    foreach ([$this->host, $this->player] as $account) {
+        $this->actingAs($account)->postJson(route('rooms.answers.store', $this->room), Rooms::answer($first, Rooms::right($first)))->assertJsonPath('status', 'accepted');
+    }
+    $this->actingAs($this->host)->postJson(route('rooms.answers.store', $this->room), Rooms::answer($first, Rooms::right($first)))->assertJsonPath('status', 'answered');
+    $this->getJson(route('rooms.state', $this->room));
+    expect($this->reverb->sent)->toHaveCount(1);
+
+    // The last present player answers: the early close, revision 4.
+    $this->actingAs($tural)->postJson(route('rooms.answers.store', $this->room), Rooms::answer($first, Rooms::wrong($first)))
+        ->assertExactJson(['status' => 'accepted', 'revision' => 4]);
+
+    // Round 1: two answer, the third leaves — the leave and the early close are one change, revision 5.
+    $this->travelTo(Rooms::at($game, RoomPhase::Answer, 1));
+    foreach ([$this->host, $this->player] as $account) {
+        $this->actingAs($account)->postJson(route('rooms.answers.store', $this->room), Rooms::answer($second, Rooms::right($second)));
+    }
+    $this->actingAs($tural)->post(route('rooms.leave', $this->room));
+    expect($second->refresh()->closed_ms)->toBe(RoomClock::nowMs());
+
+    // The host ends the game: revision 6.
+    $this->actingAs($this->host)->deleteJson(route('rooms.game.destroy', $this->room))->assertNoContent();
+
+    expect($this->reverb->sent)->toBe(array_map(fn (int $revision): array => [
+        'channels' => ['private-room.'.$this->room->id],
+        'event' => 'room.changed',
+        'data' => ['v' => 1, 'revision' => $revision],
+    ], range(3, 6)))->and($this->room->refresh()->revision)->toBe(6);
+
+    // No name, item, answer or result on the wire.
+    $wire = json_encode($this->reverb->sent, JSON_UNESCAPED_UNICODE);
+    foreach (['Rəşad', 'Aygün', 'Tural', $game->id, $first->id, ...Rooms::right($first), ...Rooms::right($second)] as $secret) {
         expect($wire)->not->toContain($secret);
     }
 });

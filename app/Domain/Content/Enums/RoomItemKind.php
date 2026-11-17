@@ -2,6 +2,8 @@
 
 namespace App\Domain\Content\Enums;
 
+use App\Domain\Language\Support\Alphabet;
+
 /**
  * What an item of a room round is (docs/architecture.md §12 "The state",
  * `Item.kind`): a digit, a letter or a word shown as text, a number, a
@@ -17,4 +19,18 @@ enum RoomItemKind: string
     case Number = 'number';
     case Shape = 'shape';
     case Cell = 'cell';
+
+    /**
+     * How many different items of this kind a `recall_order` row is drawn
+     * from — 10 digits, the alphabet's letters — so how long a row can be
+     * with no item twice; null for a kind whose material is not there yet.
+     */
+    public function distinct(): ?int
+    {
+        return match ($this) {
+            self::Digit => 10,
+            self::Letter => count(Alphabet::letters()),
+            default => null,
+        };
+    }
 }

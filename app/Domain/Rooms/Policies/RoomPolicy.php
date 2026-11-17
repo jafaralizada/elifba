@@ -4,6 +4,7 @@ namespace App\Domain\Rooms\Policies;
 
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomPlayer;
+use App\Domain\Rooms\Support\RoomClock;
 use App\Models\User;
 
 /**
@@ -13,6 +14,8 @@ use App\Models\User;
  * it also passes one of these (`->can()`). Three abilities are §12's —
  * `view`, `play`, `host` — and the others join one of them to the room's
  * state, one for each condition of §12's route table. None asks for a role.
+ * An answer takes `play`: a host who does not play has no row to answer
+ * with.
  */
 final class RoomPolicy
 {
@@ -38,6 +41,18 @@ final class RoomPolicy
     public function watch(User $user, Room $room): bool
     {
         return $this->host($user, $room) || $this->play($user, $room);
+    }
+
+    /** `host` of an open room with no game running: starting a game (B3). */
+    public function start(User $user, Room $room): bool
+    {
+        return $this->host($user, $room) && $room->isOpen() && $room->runningGame(RoomClock::nowMs()) === null;
+    }
+
+    /** `host` of an open room, while a game is running in it: ending the game (B3). */
+    public function end(User $user, Room $room): bool
+    {
+        return $this->host($user, $room) && $room->isOpen() && $room->runningGame(RoomClock::nowMs()) !== null;
     }
 
     /** `host`, and the row is a player's of this room, never the host's own. */

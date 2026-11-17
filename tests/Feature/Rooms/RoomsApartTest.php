@@ -3,8 +3,12 @@
 use App\Domain\Classroom\Models\SchoolClass;
 use App\Domain\Classroom\Models\Student;
 use App\Domain\Family\Models\Child;
+use App\Domain\Rooms\Enums\RoomPhase;
+use App\Domain\Rooms\Models\RoomAnswer;
+use App\Domain\Rooms\Models\RoomGame;
 use App\Enums\Role;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -19,8 +23,8 @@ use Tests\Support\Rooms;
  * remote, pult or guest board page hears of a room; no room route takes a
  * class, a student, a child, a game or a word; and the domains keep their
  * order — `Rooms` last, using only `Language`, `Content` and `DenseRank`,
- * and used by none. B3 adds "leaves the game tables untouched by a whole
- * room game".
+ * and used by none; and a whole room game writes nothing of a class or a
+ * child's game.
  */
 
 const DOMAIN_ORDER = ['Language', 'Content', 'Classroom', 'Family', 'Play', 'Rankings', 'Rooms'];
@@ -122,6 +126,47 @@ it('sends nothing about rooms to a class, child, ranking, words, setup, board, r
     });
 
     expect($student->refresh()->display_name)->toBe('Aysel');
+});
+
+it('leaves the game tables untouched by a whole room game', function (): void {
+    Rooms::on();
+    $this->travelTo('2026-11-24 10:00:00');
+    $account = User::factory()->teacherAndParent()->create(['player_agreed_at' => now()]);
+    $class = SchoolClass::factory()->for($account, 'teacher')->create();
+    Student::factory()->for($class)->create(['display_name' => 'Aysel']);
+    $child = Child::factory()->for($account, 'parent')->create(['display_name' => 'Firuzə']);
+    Games::start($class, seed: 1);
+    Games::start($child, seed: 2);
+    GuestBoards::showing(Games::start($class, seed: 3));
+    $tables = ['game_sessions', 'game_rounds', 'game_answers', 'guest_boards', 'school_classes', 'students', 'children', 'setup_choices'];
+    $children = static fn (): array => array_combine($tables, array_map(
+        static fn (string $table): array => DB::table($table)->orderBy('id')->get()->map(static fn (object $row): array => (array) $row)->all(),
+        $tables,
+    ));
+    $before = $children();
+
+    // The account hosts a room and plays a whole game in it over HTTP with a friend.
+    $room = Rooms::open($account);
+    $friend = User::factory()->player()->create();
+    Rooms::join($room, $friend);
+    $this->actingAs($account)->postJson(route('rooms.games.store', $room), ['mechanic' => 'recall_order', 'difficulty' => 2, 'rounds' => 5])->assertNoContent();
+    $game = RoomGame::query()->sole();
+
+    foreach (range(0, 4) as $index) {
+        $round = Rooms::round($game, $index);
+        $this->travelTo(Rooms::at($game, RoomPhase::Answer, $index));
+        $this->actingAs($account)->getJson(route('rooms.state', $room))->assertJsonPath('round.phase', 'answer');
+        $this->actingAs($account)->postJson(route('rooms.answers.store', $room), Rooms::answer($round, Rooms::right($round)))->assertJsonPath('status', 'accepted');
+        $this->actingAs($friend)->postJson(route('rooms.answers.store', $room), Rooms::answer($round, Rooms::wrong($round)))->assertJsonPath('status', 'accepted');
+        $this->actingAs($friend)->getJson(route('rooms.state', $room))->assertJsonPath('round.phase', 'reveal');
+    }
+
+    $this->travelTo(Rooms::at($game, RoomPhase::Over));
+    $this->actingAs($account)->getJson(route('rooms.state', $room))->assertJsonPath('game.phase', 'over');
+    $this->post(route('rooms.close', $room))->assertRedirect();
+
+    expect(RoomAnswer::query()->count())->toBe(10)
+        ->and($children())->toBe($before);
 });
 
 it('takes no class, student, child, game or word in any room route', function (): void {

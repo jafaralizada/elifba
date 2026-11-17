@@ -50,9 +50,12 @@ class RoomRound extends Model
     public $timestamps = false;
 
     /**
+     * Neither snapshot is ever serialized: the state serves each part of
+     * the payload in its own phase, and the solution only in the reveal.
+     *
      * @var list<string>
      */
-    protected $hidden = ['solution'];
+    protected $hidden = ['payload', 'solution'];
 
     /**
      * The material to study, or null for a round without it.

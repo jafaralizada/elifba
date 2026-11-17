@@ -27,13 +27,16 @@ use Random\Randomizer;
  *   letters of the alphabet (`Alphabet`) cased by `Az::upper`. Words (B6)
  *   and shapes (B4) are not built yet; the validator refuses a level that
  *   names them.
- * - The row's length is drawn from the level's `length` (2–12). An item
- *   may come back in a row, never right after itself, so a row always
- *   holds two different items.
+ * - The row's length is drawn from the level's `length` (3–12: two items
+ *   could only be asked reversed, which would tell the answer), and no
+ *   item comes twice in it (`RoomItemKind::distinct()` bounds the length):
+ *   a repeated item would let the question alone rule orders out — {1, 1,
+ *   2} with no item beside its equal can only be 1 2 1 — so the question
+ *   says nothing of the order but that it is not the one shown.
  * - The question's items have ids of their own, never the row's, and are
  *   never in the order shown: when a shuffle reads like the row, it is
- *   turned by one place, which can never read like it, since no item
- *   stands beside its equal.
+ *   turned by one place, which can never read like it, since its items
+ *   are all different.
  * - The solution is the question's ids in the row's order, and the row's
  *   reading as the one accepted reading: two tiles that say the same are
  *   interchangeable.
@@ -44,8 +47,8 @@ final readonly class RecallOrderBuilder implements RoomRoundBuilder
     {
         $length = $level->length;
 
-        if ($length === null || $length->min < 2 || $level->kinds === [] || $level->studyMs < 1) {
-            throw new InvalidArgumentException('A recall_order level needs kinds, rows of two or more and time to study.');
+        if ($length === null || $length->min < 3 || $level->kinds === [] || $level->studyMs < 1) {
+            throw new InvalidArgumentException('A recall_order level needs kinds, rows of three or more and time to study.');
         }
 
         $rounds = [];
@@ -104,29 +107,21 @@ final readonly class RecallOrderBuilder implements RoomRoundBuilder
     }
 
     /**
-     * A row of `$length` items of the pool, none right after itself.
+     * A row of `$length` different items of the pool.
      *
      * @param  list<string>  $pool
      * @return list<string>
      */
     private static function row(array $pool, int $length, Randomizer $random): array
     {
-        $row = [];
-        $last = null;
-
-        for ($index = 0; $index < $length; $index++) {
-            // Draw from the pool without the last item: skip over its place.
-            $pick = $random->getInt(0, count($pool) - ($last === null ? 1 : 2));
-
-            if ($last !== null && $pick >= $last) {
-                $pick++;
-            }
-
-            $row[] = $pool[$pick];
-            $last = $pick;
+        if ($length > count($pool)) {
+            throw new InvalidArgumentException("A row of {$length} would repeat an item of {$pool[0]}…");
         }
 
-        return $row;
+        /** @var list<string> $shuffled */
+        $shuffled = $random->shuffleArray($pool);
+
+        return array_slice($shuffled, 0, $length);
     }
 
     /**

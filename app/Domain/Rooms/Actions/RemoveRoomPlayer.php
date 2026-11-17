@@ -4,7 +4,9 @@ namespace App\Domain\Rooms\Actions;
 
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomPlayer;
+use App\Domain\Rooms\Support\RoomClock;
 use App\Domain\Rooms\Support\RoomLock;
+use App\Domain\Rooms\Support\RoomRoundClose;
 use App\Domain\Rooms\Support\RoomSignal;
 use Illuminate\Support\Facades\DB;
 
@@ -14,8 +16,8 @@ use Illuminate\Support\Facades\DB;
  * longer finds the room, cannot come back with the code, and its answers
  * leave the ranking. Never the host's own row (`RoomPolicy::remove`), and
  * nothing in a closed room, an idle one included. Raises the revision and
- * signals the room. B3 adds the early close of a round nobody else is
- * waiting for.
+ * signals the room. A round open for answers that every player still
+ * present has answered closes now (`RoomRoundClose`).
  */
 final readonly class RemoveRoomPlayer
 {
@@ -32,6 +34,7 @@ final readonly class RemoveRoomPlayer
             $row->removed_at = now();
             $row->save();
 
+            RoomRoundClose::whenPresenceChanges($locked, RoomClock::nowMs());
             RoomSignal::raise($locked);
         });
     }

@@ -156,10 +156,12 @@ final class ContentValidator
     public const int MAX_ROOM_STUDY_MS = 60_000;
 
     /**
-     * Items in a `recall_order` row: at least two, so the question can
-     * always show them in another order than the row; at most twelve.
+     * Items in a `recall_order` row: at least three, since the question
+     * never shows the row's order and two items in another order can only
+     * be the row reversed — the question would tell the answer; at most
+     * twelve.
      */
-    public const int MIN_ROOM_ROW = 2;
+    public const int MIN_ROOM_ROW = 3;
 
     public const int MAX_ROOM_ROW = 12;
 
@@ -722,7 +724,9 @@ final class ContentValidator
      *
      * - `recall_order`: `kinds`, distinct kinds of `RoomMechanic::kinds()`
      *   (digits and letters until the shapes and the word list exist);
-     *   `length`, 2–12 items, `min` ≤ `max`.
+     *   `length`, 3–12 items, `min` ≤ `max`, and no longer than each kind
+     *   has different items (`RoomItemKind::distinct()`: 10 digits), since
+     *   no item comes twice in a row.
      */
     private function roomLevels(): void
     {
@@ -828,6 +832,15 @@ final class ContentValidator
         }
 
         $this->range($level['length'], self::MIN_ROOM_ROW, self::MAX_ROOM_ROW, $file, "{$where}.length");
+        $max = is_array($level['length']) ? ($level['length']['max'] ?? null) : null;
+
+        foreach ($kinds as $kind) {
+            $distinct = $kind->distinct();
+
+            if (is_int($max) && $distinct !== null && $max > $distinct) {
+                $this->problem($file, "{$where}.length: a row of {$kind->value}s holds at most {$distinct}, none twice");
+            }
+        }
     }
 
     // ── names.json ──────────────────────────────────────────────────────

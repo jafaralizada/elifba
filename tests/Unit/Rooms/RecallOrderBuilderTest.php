@@ -55,7 +55,7 @@ function recallOrderLevels(): array
         $levels["difficulty {$difficulty}"] = [fn (): RoomLevelData => app(ContentRepository::class)->roomLevel(RoomMechanic::RecallOrder, $difficulty)];
     }
 
-    $levels['a row of two'] = [fn (): RoomLevelData => new RoomLevelData(RoomMechanic::RecallOrder, 1, 2_000, 5_000, [RoomItemKind::Digit, RoomItemKind::Letter], new RangeData(2, 2))];
+    $levels['the shortest row'] = [fn (): RoomLevelData => new RoomLevelData(RoomMechanic::RecallOrder, 1, 2_000, 5_000, [RoomItemKind::Digit, RoomItemKind::Letter], new RangeData(3, 3))];
 
     return $levels;
 }
@@ -82,7 +82,7 @@ it('shows one kind per round within the level\'s length', function (RoomLevelDat
                 ->and($round->studyMs)->toBe($level->studyMs)
                 ->and($round->answerMs)->toBe($level->answerMs);
 
-            // The question is the same items; no item stands right after itself.
+            // The question is the same items; no item comes twice in a row.
             $asked = recallOrderReading($round->ask->items);
             sort($asked);
             $sorted = $row;
@@ -93,9 +93,7 @@ it('shows one kind per round within the level\'s length', function (RoomLevelDat
                 ->and($round->ask->pick)->toBe(count($row))
                 ->and($round->ask->layout)->toBe(RoomLayout::Row);
 
-            foreach (array_keys($row) as $index) {
-                expect($index === 0 || $row[$index] !== $row[$index - 1])->toBeTrue(implode(' ', $row));
-            }
+            expect(array_unique($row))->toBe($row, implode(' ', $row));
         }
     }
 
@@ -174,6 +172,9 @@ it('builds only a level of its own with rows it can shuffle', function (RoomLeve
     expect(fn () => recallOrderRounds($level, 1))->toThrow(InvalidArgumentException::class);
 })->with([
     'a row of one' => [new RoomLevelData(RoomMechanic::RecallOrder, 1, 2_000, 5_000, [RoomItemKind::Digit], new RangeData(1, 3))],
+    // Asked in another order, two items could only be reversed: the question would be the answer.
+    'a row of two' => [new RoomLevelData(RoomMechanic::RecallOrder, 1, 2_000, 5_000, [RoomItemKind::Digit], new RangeData(2, 3))],
+    'more digits than there are' => [new RoomLevelData(RoomMechanic::RecallOrder, 1, 2_000, 5_000, [RoomItemKind::Digit], new RangeData(11, 11))],
     'no length' => [new RoomLevelData(RoomMechanic::RecallOrder, 1, 2_000, 5_000, [RoomItemKind::Digit])],
     'nothing to study' => [new RoomLevelData(RoomMechanic::RecallOrder, 1, 0, 5_000, [RoomItemKind::Digit], new RangeData(3, 4))],
     'words before the word list' => [new RoomLevelData(RoomMechanic::RecallOrder, 1, 2_000, 5_000, [RoomItemKind::Word], new RangeData(3, 4))],

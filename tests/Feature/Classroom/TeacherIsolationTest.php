@@ -9,6 +9,7 @@ use App\Domain\Play\Models\GameSession;
 use App\Domain\Rooms\Actions\CloseRoom;
 use App\Domain\Rooms\Actions\RemoveRoomPlayer;
 use App\Domain\Rooms\Models\Room;
+use App\Domain\Rooms\Models\RoomGame;
 use App\Domain\Rooms\Models\RoomPlayer;
 use App\Models\User;
 use Illuminate\Routing\Route as RoutingRoute;
@@ -44,9 +45,11 @@ const ISOLATED_PARAMETERS = ['class', 'student', 'game', 'word', 'child', 'room'
  * owns their own 1A with one student and a game, a word, and a child with a
  * home game. Both play too, with the rooms area on: A hosts an open room
  * where A and Aysel Quliyeva play, and a closed one with both; B has a room
- * of their own.
+ * of their own. A also hosts a room with a game running in it, made by the
+ * factories (`OpenRoom` gives a host one open room), since starting a game
+ * needs a room without one and ending it a room with one.
  *
- * @return array{a: User, b: User, classA: SchoolClass, otherClassA: SchoolClass, archivedClassA: SchoolClass, studentA: Student, secondStudentA: Student, archivedStudentA: Student, otherStudentA: Student, gameA: GameSession, classB: SchoolClass, studentB: Student, gameB: GameSession, wordA: CustomWord, wordB: CustomWord, childA: Child, secondChildA: Child, homeGameA: GameSession, childB: Child, homeGameB: GameSession, roomA: Room, memberA: RoomPlayer, closedRoomA: Room, roomB: Room, memberB: RoomPlayer}
+ * @return array{a: User, b: User, classA: SchoolClass, otherClassA: SchoolClass, archivedClassA: SchoolClass, studentA: Student, secondStudentA: Student, archivedStudentA: Student, otherStudentA: Student, gameA: GameSession, classB: SchoolClass, studentB: Student, gameB: GameSession, wordA: CustomWord, wordB: CustomWord, childA: Child, secondChildA: Child, homeGameA: GameSession, childB: Child, homeGameB: GameSession, roomA: Room, memberA: RoomPlayer, closedRoomA: Room, roomB: Room, memberB: RoomPlayer, playingRoomA: Room, roomGameA: RoomGame}
  */
 function isolationWorld(): array
 {
@@ -62,6 +65,8 @@ function isolationWorld(): array
     app(CloseRoom::class)->handle($closedRoomA);
     $roomA = Rooms::open($a);
     $roomB = Rooms::open($b);
+    $playingRoomA = Room::factory()->for($a, 'host')->create();
+    $roomGameA = RoomGame::factory()->for($playingRoomA)->withRounds(5)->create();
     $childA = Child::factory()->for($a, 'parent')->create(['display_name' => 'Aysel']);
     $childB = Child::factory()->for($b, 'parent')->create(['display_name' => 'Nigar']);
 
@@ -98,6 +103,8 @@ function isolationWorld(): array
         'closedRoomA' => $closedRoomA->refresh(),
         'roomB' => $roomB,
         'memberB' => Rooms::join($roomB),
+        'playingRoomA' => $playingRoomA,
+        'roomGameA' => $roomGameA->load('rounds'),
     ];
 }
 
@@ -165,6 +172,14 @@ function isolationCases(): array
         'PATCH rooms/{room}' => ['rooms.update', $roomA, static fn (array $w): array => ['locked' => true]],
         'DELETE rooms/{room}/members/{member}' => ['rooms.members.destroy', static fn (array $w): array => ['room' => $w['roomA']->id, 'member' => $w['memberA']->id], $none],
         'POST rooms/{room}/close' => ['rooms.close', $roomA, $none],
+        'POST rooms/{room}/games' => ['rooms.games.store', $roomA, static fn (array $w): array => ['mechanic' => 'recall_order', 'difficulty' => 1, 'rounds' => 5]],
+        'DELETE rooms/{room}/game' => ['rooms.game.destroy', static fn (array $w): array => ['room' => $w['playingRoomA']->id], $none],
+        // A present player's answer: a round of another room is only late for A.
+        'POST rooms/{room}/answers' => ['rooms.answers.store', $roomA, static fn (array $w): array => [
+            'event_id' => '01kaqs1x2y3z4a5b6c7d8e9f0g',
+            'round_id' => $w['roomGameA']->rounds[0]->id,
+            'picked' => $w['roomGameA']->rounds[0]->askData()->ids(),
+        ]],
         // A closed room: the host deletes it, a player takes their name out.
         'DELETE rooms/{room}' => ['rooms.destroy', $closedRoomA, $none],
         'DELETE rooms/{room}/name' => ['rooms.name.destroy', $closedRoomA, $none],
@@ -217,6 +232,9 @@ function isolationSnapshot(): array
         'setup_choices' => $rows('setup_choices'),
         'rooms' => $rows('rooms'),
         'room_players' => $rows('room_players'),
+        'room_games' => $rows('room_games'),
+        'room_rounds' => $rows('room_rounds'),
+        'room_answers' => $rows('room_answers'),
     ];
 }
 
@@ -410,10 +428,15 @@ it('lets the policies refuse another teacher on their own', function (): void {
             ->and(Gate::forUser($world['b'])->allows($ability, $world['homeGameA']))->toBeFalse();
     }
 
-    foreach (['view', 'play', 'host', 'watch'] as $ability) {
+    foreach (['view', 'play', 'host', 'watch', 'start'] as $ability) {
         expect(Gate::forUser($world['a'])->allows($ability, $world['roomA']))->toBeTrue()
             ->and(Gate::forUser($world['b'])->allows($ability, $world['roomA']))->toBeFalse();
     }
+
+    expect(Gate::forUser($world['a'])->allows('end', $world['playingRoomA']))->toBeTrue()
+        ->and(Gate::forUser($world['b'])->allows('end', $world['playingRoomA']))->toBeFalse()
+        ->and(Gate::forUser($world['a'])->allows('end', $world['roomA']))->toBeFalse()
+        ->and(Gate::forUser($world['a'])->allows('start', $world['playingRoomA']))->toBeFalse();
 
     expect(Gate::forUser($world['a'])->allows('remove', [$world['roomA'], $world['memberA']]))->toBeTrue()
         ->and(Gate::forUser($world['b'])->allows('remove', [$world['roomA'], $world['memberA']]))->toBeFalse()

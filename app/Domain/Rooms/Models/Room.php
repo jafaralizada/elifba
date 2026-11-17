@@ -80,6 +80,26 @@ class Room extends Model
         return $this->isOpen() ? RoomStatus::Open : RoomStatus::Closed;
     }
 
+    /**
+     * The room's latest game with its rounds, or null before the first.
+     */
+    public function latestGame(): ?RoomGame
+    {
+        return $this->games()->reorder()->orderByDesc('position')->with('rounds')->first();
+    }
+
+    /**
+     * The game being played at `$nowMs`: the latest, until its timetable
+     * says it is over (§12 "The race"). Whether the room is open is the
+     * caller's to ask.
+     */
+    public function runningGame(int $nowMs): ?RoomGame
+    {
+        $game = $this->latestGame();
+
+        return $game !== null && ! $game->timetable()->moment($nowMs)->isOver() ? $game : null;
+    }
+
     public function isHostedBy(User $account): bool
     {
         return $this->user_id === $account->id;

@@ -126,6 +126,9 @@ function bearerSnapshot(): array
         'children' => $rows('children'),
         'rooms' => $rows('rooms'),
         'room_players' => $rows('room_players'),
+        'room_games' => $rows('room_games'),
+        'room_rounds' => $rows('room_rounds'),
+        'room_answers' => $rows('room_answers'),
     ];
 }
 
@@ -179,7 +182,7 @@ it('answers a bearer like a visitor on every room route and changes nothing', fu
         }
     }
 
-    expect($checked)->toBeGreaterThanOrEqual(13)
+    expect($checked)->toBeGreaterThanOrEqual(16)
         ->and(bearerSnapshot())->toBe($before);
 });
 

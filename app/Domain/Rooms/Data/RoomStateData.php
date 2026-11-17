@@ -2,24 +2,31 @@
 
 namespace App\Domain\Rooms\Data;
 
+use App\Domain\Rooms\Enums\RoomGamePhase;
 use InvalidArgumentException;
 
 /**
  * A room's state (docs/architecture.md §12 "The state"; zod `RoomState` in
- * resources/js/rooms/contract.ts, fixture tests/Fixtures/rooms/state.*.json):
+ * resources/js/rooms/contract.ts, fixtures tests/Fixtures/rooms/state.*.json):
  * the one thing a room page reads after its first props, from
- * `GET /rooms/{room}/state`. Names reach a page only here and in the page's
- * props, in authenticated HTTP; a player is known by `room_players.id`.
+ * `GET /rooms/{room}/state`, and the `state` of those props. Names reach a
+ * page only here and in the page's props, in authenticated HTTP; a player
+ * is known by `room_players.id`.
  *
- * B2 serves a room without a game: `game` and `round` are null and
- * `ranking` is empty. B3 gives them their DTOs; until then a state that
- * carries one does not parse.
+ * Three shapes, which the constructor holds to: no game yet (`game` and
+ * `round` null, the room's ranking); a live game with its current round
+ * (the game's ranking over its closed rounds); a game that is over (no
+ * round, the room's standing). What a round serves in each phase is
+ * `RoomRoundData`'s rule.
  *
  * @phpstan-import-type RoomSummaryArray from RoomSummaryData
  * @phpstan-import-type RoomViewerArray from RoomViewerData
  * @phpstan-import-type RoomPlayerArray from RoomPlayerData
+ * @phpstan-import-type RoomGameArray from RoomGameData
+ * @phpstan-import-type RoomRoundArray from RoomRoundData
+ * @phpstan-import-type RoomRankedPlayerArray from RoomRankedPlayerData
  *
- * @phpstan-type RoomStateArray array{v: int, revision: int, server_ms: int, room: RoomSummaryArray, me: RoomViewerArray, players: list<RoomPlayerArray>, game: null, round: null, ranking: array{}}
+ * @phpstan-type RoomStateArray array{v: int, revision: int, server_ms: int, room: RoomSummaryArray, me: RoomViewerArray, players: list<RoomPlayerArray>, game: RoomGameArray|null, round: RoomRoundArray|null, ranking: list<RoomRankedPlayerArray>}
  */
 final readonly class RoomStateData
 {
@@ -27,6 +34,7 @@ final readonly class RoomStateData
 
     /**
      * @param  list<RoomPlayerData>  $players
+     * @param  list<RoomRankedPlayerData>  $ranking
      */
     public function __construct(
         public int $revision,
@@ -34,7 +42,20 @@ final readonly class RoomStateData
         public RoomSummaryData $room,
         public RoomViewerData $me,
         public array $players,
-    ) {}
+        public ?RoomGameData $game = null,
+        public ?RoomRoundData $round = null,
+        public array $ranking = [],
+    ) {
+        $live = $game?->phase === RoomGamePhase::Live;
+
+        if ($live !== ($round !== null)) {
+            throw new InvalidArgumentException('A live game has its current round, and nothing else has one.');
+        }
+
+        if ($round !== null && $round->total !== $game?->rounds) {
+            throw new InvalidArgumentException('The round counts another game\'s rounds.');
+        }
+    }
 
     /**
      * @param  array<string, mixed>  $data
@@ -45,10 +66,6 @@ final readonly class RoomStateData
             throw new InvalidArgumentException('A room state of another version.');
         }
 
-        if (($data['game'] ?? null) !== null || ($data['round'] ?? null) !== null || ($data['ranking'] ?? []) !== []) {
-            throw new InvalidArgumentException('A room state with a game is B3\'s.');
-        }
-
         /** @var RoomStateArray $data */
         return new self(
             revision: $data['revision'],
@@ -56,6 +73,9 @@ final readonly class RoomStateData
             room: RoomSummaryData::fromArray($data['room']),
             me: RoomViewerData::fromArray($data['me']),
             players: array_map(RoomPlayerData::fromArray(...), $data['players']),
+            game: $data['game'] === null ? null : RoomGameData::fromArray($data['game']),
+            round: $data['round'] === null ? null : RoomRoundData::fromArray($data['round']),
+            ranking: array_map(RoomRankedPlayerData::fromArray(...), $data['ranking']),
         );
     }
 
@@ -71,9 +91,9 @@ final readonly class RoomStateData
             'room' => $this->room->toArray(),
             'me' => $this->me->toArray(),
             'players' => array_map(static fn (RoomPlayerData $player): array => $player->toArray(), $this->players),
-            'game' => null,
-            'round' => null,
-            'ranking' => [],
+            'game' => $this->game?->toArray(),
+            'round' => $this->round?->toArray(),
+            'ranking' => array_map(static fn (RoomRankedPlayerData $row): array => $row->toArray(), $this->ranking),
         ];
     }
 }

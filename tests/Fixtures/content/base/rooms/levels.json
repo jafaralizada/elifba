@@ -7,7 +7,7 @@
             "study_ms": 2000,
             "answer_ms": 5000,
             "kinds": ["digit"],
-            "length": { "min": 2, "max": 3 }
+            "length": { "min": 3, "max": 3 }
         },
         {
             "mechanic": "recall_order",
@@ -30,7 +30,7 @@
             "difficulty": 4,
             "study_ms": 60000,
             "answer_ms": 60000,
-            "kinds": ["digit", "letter"],
+            "kinds": ["letter"],
             "length": { "min": 12, "max": 12 }
         }
     ]

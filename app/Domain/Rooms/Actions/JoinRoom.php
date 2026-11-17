@@ -4,7 +4,9 @@ namespace App\Domain\Rooms\Actions;
 
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomPlayer;
+use App\Domain\Rooms\Support\RoomClock;
 use App\Domain\Rooms\Support\RoomLock;
+use App\Domain\Rooms\Support\RoomRoundClose;
 use App\Domain\Rooms\Support\RoomSignal;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -19,7 +21,9 @@ use Illuminate\Validation\ValidationException;
  * 404 as an unknown code; a present player stays as they are; a locked and
  * a full room refuse (on `code`, with nothing else about the room); a
  * player who left comes back to the same row; anyone else gets a new row.
- * A change raises the revision, marks the room active and signals it.
+ * A change raises the revision, marks the room active and signals it; a
+ * player who had answered the open round and comes back alone to it
+ * closes it (`RoomRoundClose`).
  */
 final readonly class JoinRoom
 {
@@ -63,6 +67,7 @@ final readonly class JoinRoom
 
             $row->left_at = null;
             $row->save();
+            RoomRoundClose::whenPresenceChanges($locked, RoomClock::nowMs());
 
             $locked->last_activity_at = now();
             RoomSignal::raise($locked);
