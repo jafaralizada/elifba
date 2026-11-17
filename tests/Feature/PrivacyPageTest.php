@@ -2,10 +2,12 @@
 
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\Rooms;
 
 /*
  * The privacy notice (docs/architecture.md §7): public, az and en, with the
- * retention period and the operator from `.env`.
+ * retention period and the operator from `.env`; the section «Otaqlar» only
+ * while the rooms switch is on (§12 "Adults' privacy", ADR 024).
  */
 
 it('is public and shows the retention period and the operator', function (): void {
@@ -101,3 +103,81 @@ it('says what the board says aloud, a name only from the built-in list and sent 
     'az' => [null, 'Lövhənin səsi', 'hazır ad lüğətindədirsə', 'ad heç yerə göndərilmir'],
     'en' => ['en', "The board's voice", 'built-in name list', 'the name is sent nowhere'],
 ]);
+
+it('has the section for rooms in both languages when the switch is on', function (?string $locale, string $title, string $intro, string $stored, string $who, string $age, string $contact, string $profile): void {
+    Rooms::on();
+    config(['elifba.retention_days' => 400, 'elifba.rooms.idle_hours' => 3]);
+    $request = $locale === null ? $this : $this->withSession(['locale' => $locale]);
+
+    // The parts the page draws, in its order (ADR 024 decision 10).
+    preg_match('/const ROOMS = \[(.*?)\];/s', (string) file_get_contents(resource_path('js/pages/privacy.tsx')), $list);
+    preg_match_all("/'([a-z_]+)'/", $list[1] ?? '', $parts);
+
+    expect($parts[1])->toBe(['what', 'stored', 'not_stored', 'why', 'who', 'contact', 'how_long', 'delete', 'where']);
+
+    $request->get(route('privacy'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('privacy')
+            ->where('rooms', ['idleHours' => 3])
+            ->where('retentionDays', 400)
+            ->where('translations', function ($translations) use ($parts, $title, $intro, $stored, $who, $age, $contact, $profile): bool {
+                foreach (['intro', 'title', ...$parts[1]] as $part) {
+                    if (trim((string) ($translations["privacy.rooms.{$part}"] ?? '')) === '') {
+                        return false;
+                    }
+                }
+
+                return $translations['privacy.rooms.title'] === $title
+                    // The introduction names the third use.
+                    && str_contains($translations['privacy.rooms.intro'], $intro)
+                    // What is stored for an account that plays and for a room.
+                    && str_contains($translations['privacy.rooms.stored'], $stored)
+                    && str_contains($translations['privacy.rooms.stored'], $translations['roles.player.title'])
+                    // Who sees a name, and for how long.
+                    && str_contains($translations['privacy.rooms.who'], $who)
+                    && str_contains($translations['privacy.rooms.how_long'], ':hours')
+                    && str_contains($translations['privacy.rooms.how_long'], ':days')
+                    // No age, and no way to write to another player.
+                    && str_contains($translations['privacy.rooms.contact'], $age)
+                    && str_contains($translations['privacy.rooms.contact'], $contact)
+                    // The four ways out, by the names the room pages give them (ADR 022 decision 7).
+                    && str_contains($translations['privacy.rooms.delete'], $translations['rooms.show.forget'])
+                    && str_contains($translations['privacy.rooms.delete'], $translations['rooms.show.delete'])
+                    && str_contains($translations['privacy.rooms.delete'], $profile)
+                    && str_contains($translations['privacy.rooms.delete'], ':days');
+            }));
+
+    // The operator closes the section, as it closes the notice.
+    expect((string) file_get_contents(resource_path('js/pages/privacy.tsx')))
+        ->toMatch('/data-test="rooms".*?<Operator \{\.\.\.operator\} \/>.*?<\/section>/s');
+})->with([
+    'az' => [null, 'Otaqlar: böyüklərin oyunları', 'otaqlarda', 'razılığının verildiyi vaxt', 'həmin otaqların oyunçuları görür', 'yaşını soruşmur', 'bir-birinə yazması', 'Ayarlar → Profil'],
+    'en' => ['en', 'Rooms: games for adults', 'in rooms', 'when its agreement was given', 'seen only by the hosts and the players', "asks no one's age", 'write to each other', 'Settings → Profile'],
+]);
+
+it('says nothing of rooms when it is off', function (): void {
+    // `Tests\TestCase` leaves the switch off, as an instance has it.
+    foreach ([null, User::factory()->teacherAndPlayer()->create()] as $account) {
+        $request = $account === null ? $this : $this->actingAs($account);
+
+        $request->get(route('privacy'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('privacy')
+                ->missing('rooms')
+                // The sections for teachers and parents and the class note stay.
+                ->has('retentionDays')
+                ->has('childrenMax')
+                ->has('operator'));
+    }
+
+    // Every part of the section and the introduction's sentence are drawn
+    // only under `rooms`, which the page gets only while the switch is on.
+    $page = (string) file_get_contents(resource_path('js/pages/privacy.tsx'));
+    preg_match_all('/privacy\.rooms\./', $page, $uses);
+
+    expect($uses[0])->toHaveCount(3)
+        ->and($page)->toContain("{rooms && ` \${t('privacy.rooms.intro')}`}")
+        ->toMatch('/\{rooms && \(\s*<section[^>]*data-test="rooms"/s');
+});

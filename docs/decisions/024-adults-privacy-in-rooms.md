@@ -1,6 +1,6 @@
 # 024 — Adults in rooms: what is stored, who sees a name, and no age
 
-- **Status:** Proposed, 2026-11-17 (roadmap step B1; accepted when the owner approves the design in B1-O; built in B2, B3 and B7)
+- **Status:** Proposed, 2026-11-17 (roadmap step B1; accepted when the owner approves the design in B1-O; built in B2, B3 and B7 — the section «Otaqlar» of `/privacy` on 2026-11-18, whose sentences the owner reads before the switch is turned on, B7-O)
 - **Sections:** architecture.md §7 "Agreements", §12 "Adults' privacy"
 - **Amends:** nothing for children: [001](001-students-without-accounts.md), [013](013-parents-and-their-childrens-privacy.md) and [018](018-students-full-names.md) stand. It adds a third kind of data subject to §7 — an account holder whose name other account holders see.
 - **Why it is hard to reverse:** it is a public promise on `/privacy`, and each account accepts a sentence that is stamped once. A field collected, a name shown wider or a result kept longer cannot be taken back from the people who saw it or from the backups.

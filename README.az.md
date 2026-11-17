@@ -58,6 +58,23 @@ Elifba sinifsiz də işləyir. **Valideyn** qeydiyyatdan keçir, «Valideyn» ro
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | <img src="docs/screenshots/home-board.png" width="560" alt="Evdə lövhə: zürafə və pişik şəkilləri üzərində «zürafə» hansıdır? tapşırığı, küncdə oynayan Tural"> | <img src="docs/screenshots/home-remote.png" width="220" alt="Valideynin telefonunda pult: cavab kimi işarələnmiş zürafə, pişik, oynayan Tural, fasilə, keç və oyunu bitir düymələri"> |
 
+## Otaqlar, böyüklər üçün
+
+Server böyüklər üçün ayrıca bir bölmə də aça bilər: Elifba hesabı olan insanlar orada **otaqda** bir-biri ilə yarışır. Onlardan biri otaq açır və onun altı rəqəmli kodunu başqalarına verir, ya da QR kodunu böyük ekranda göstərir; hər kəs öz telefonundan, hesabındakı adla qoşulur. Hamı eyni raundları eyni vaxtda oynayır; cavabları yalnız server yoxlayır və vaxtı yalnız server ölçür, hər raunddan sonra isə otaq düzgün cavabı və sıralamanı görür.
+
+- **Üç qrupda altı oyun,** hər biri dörd çətinlikdə («Asan»dan «Çox çətin»ə qədər), bir oyunda 5–20 raund, bir otaqda 20 nəfərədək:
+    - _Yaddaş:_ «Ardıcıllığı yadda saxla» (rəqəm, hərf, söz və ya fiqur sırası göstərilir, sonra gizlənir) və «Xanaları yadda saxla» (cədvəlin xanaları yanır, sonra sönür);
+    - _Məntiq və ardıcıllıq:_ «Sıranı davam etdir» (sonra hansı ədəd gəlir) və «Artıq olanı tap» (ədədlər və ya sözlər arasında);
+    - _Söz oyunları:_ «Anaqram» (sözün qarışıq hərflərinə toxunub sözü yığmaq) və «Düzgün yazılış» (bir Azərbaycan sözü dörd cür yazılıb).
+- **Kodu bölüşən insanlar arasında yalnız ad.** Yaş, ləqəb, çat və profil yoxdur. Nəticələr adlarla yalnız hər otağın içində saxlanılır, oyunçu isə bağlanmış otaqdan adını silə bilər. Müəllimin şagirdləri və valideynin uşaqları otağa heç vaxt düşmür.
+- **Böyük ekran.** Otağı açan onu noutbukda və ya televizorda aça bilər: otaq gözləyəndə kod və QR kod, sonra hər raund, gələn cavablar və sıralama.
+
+Bu bölmə **server `ELIFBA_ROOMS=true` təyin etməyənə qədər bağlıdır** ([Öz serverinizdə](#öz-serverinizdə)). Bağlı olanda ondan heç yerdə heç nə görünmür və məktəblər üçün server olduğu kimi qalır.
+
+| Otağı açanın böyük ekranı                                                                                                                                                                                                                                                                          | Oyunçunun telefonu                                                                                                                                                                                   |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <img src="docs/screenshots/room-screen.png" width="560" alt="Otağı açanın böyük ekranında «Düzgün yazılış» oyununun 5 raundundan 3-cüsü: dörd yazılış arasında çalışqan düzgün kimi işarələnib, yanında sıralama — Kamran Əliyev 55 xal, Günel Hüseynova 37, Elvin Rzayev 35, Səbinə Qasımova 32"> | <img src="docs/screenshots/room-phone.png" width="220" alt="Oyunçunun telefonunda həmin raund: çalışqan sözünün dörd yazılışı üzərində «Düzgün yazılışı seçin», 14 saniyə qalıb, hələ cavab yoxdur"> |
+
 ## Kömək edin
 
 Elifba müəllimlərlə birlikdə hazırlanır və ona lazım olan köməyin çoxu kod deyil:
@@ -87,13 +104,14 @@ tr -d '\r' < storage/logs/laravel.log | grep -oE 'https?://[^] ()<]+/email/verif
 
 - **Əsl telefon pult kimi.** Telefonlar `elifba.test` ünvanını tanımır. `composer dev`-i dayandırıb əvəzinə `composer dev:lan` işə salın: o, tətbiqi və Reverb-i noutbukun yerli şəbəkə ünvanında açır və həmin ünvanı göstərir (`http://192.168.1.20:8000`). Bu ünvanı noutbukda da açın, daxil olun, oyun başladın, eyni Wi-Fi-dakı telefonda isə `/pult` səhifəsini açın. `.env` dəyişmir.
 - **Qaliblər şəkli üçün HTTPS.** Qaliblər səhifəsindəki «Paylaş» düyməsi (Web Share API) yalnız https-də işləyir. `herd secure elifba` işə salın və `.env` faylındakı Reverb sətirlərini onların üstündəki şərhdə yazıldığı kimi dəyişin; bundan sonra `composer dev` tətbiqi `https://elifba.test`, Reverb-i isə `wss` ilə açır. Telefonda yoxlamaq üçün `composer dev` işləyərkən `herd share` işə salın.
+- **Böyüklər üçün otaqlar** susmaya görə bağlıdır. Yoxlamaq üçün `.env`-də `ELIFBA_ROOMS=true` yazın, «Oyunçu» rolunu götürün, `/rooms` səhifəsində otaq açın və ikinci brauzerdən və ya gizli pəncərədən başqa hesabla ona qoşulun.
 - **Pull request-dən əvvəl:** `composer ci:check` — CI-nin işlətdiyi eyni yoxlama: oxlint və oxfmt, `tsc`, Vitest, Pint, PHPStan 8-ci səviyyə və Pest. `npm run check:fix` və `composer lint` formatı özləri düzəldir.
 
 Kod:
 
 - **Texnologiyalar:** Laravel 13, Inertia 3, React 19, TypeScript, Tailwind 4, shadcn/ui, lövhə üçün Phaser, telefon üçün Laravel Reverb, Wayfinder, Pest. Rəsmi Laravel React starter kit üzərində qurulub.
 - **Dizayn:** [`docs/architecture.md`](docs/architecture.md) kodun əməl etdiyi müqavilədir; [`docs/glossary.md`](docs/glossary.md) Azərbaycan terminlərini koddakı adlarla uyğunlaşdırır; [`docs/decisions/`](docs/decisions/) geri qaytarılması çətin qərarları saxlayır; [`docs/frontend.md`](docs/frontend.md) interfeys qaydalarıdır. Sənədlər ingiliscədir.
-- **Domenlər:** `app/Domain/{Language,Content,Classroom,Family,Play,Rankings}`, bu ardıcıllıqla bir istiqamətdə.
+- **Domenlər:** `app/Domain/{Language,Content,Classroom,Family,Play,Rankings}`, bu ardıcıllıqla bir istiqamətdə, sonda isə `Rooms`: o yalnız `Language` və `Content`-dən istifadə edir, ondan isə heç nə istifadə etmir.
 - **Məzmun:** hərflər, sözlər, cümlələr, tapşırıqlar və temaların şəkilləri [`content/`](content/) qovluğundakı fayllardır; `php artisan content:validate` onları yoxlayır.
 - **Dillər:** `lang/az.json` (əsas) və `lang/en.json`; test onların açarlarını eyni saxlayır.
 - **CI:** GitHub Actions `composer ci:check` yoxlamasını SQLite-da, Pest testlərini PostgreSQL 17-də, [`scripts/docker-smoke.sh`](scripts/docker-smoke.sh) skriptini isə Docker yığınında işlədir.
@@ -120,6 +138,7 @@ Sonra `.env` faylını açın (`nano .env`) və doldurun:
 
 - `ELIFBA_OPERATOR_NAME` və `ELIFBA_OPERATOR_EMAIL`: bu serverə cavabdeh olan şəxs və ya məktəb. Məxfilik səhifəsi (`/privacy`) onları məlumatı saxlayan və valideynlərə cavab verən tərəf kimi göstərir.
 - `MAIL_*` sətirləri (`MAIL_MAILER=smtp`, host, port, istifadəçi, parol, göndərən ünvan): müəllimlər e-poçtlarını təsdiqləmək və parolu bərpa etmək üçün məktub alırlar. O vaxta qədər məktublar loga yazılır (aşağıya baxın).
+- İstəyə görə: `ELIFBA_ROOMS=true` — [böyüklər üçün otaqları](#otaqlar-böyüklər-üçün) açır ([ADR 019](docs/decisions/019-rooms-area-and-player-role.md)): «Oyunçu» rolu, `/rooms` və `/otaq`, ana səhifədəki bölməsi və `/privacy`-dəki «Otaqlar» bölməsi. Təyin edilməyib və ya `false` = bunların heç biri görünmür; otaqların cədvəlləri hər halda var.
 - İstəyə görə: `GOOGLE_CLIENT_ID` və `GOOGLE_CLIENT_SECRET` — müəllimlər Google ilə daxil ola bilsin deyə (Google Cloud Console-da "Web application" tipli OAuth client, yönləndirmə ünvanı `https://<domeniniz>/auth/google/callback`; [ADR 008](docs/decisions/008-google-sign-in.md)). Google-un təsdiqlədiyi Gmail və ya Google Workspace ünvanı müəllimin ünvanını da məktubsuz təsdiqləyir. Boş = Google düyməsi yoxdur.
 
 **İşə salmaq.**
@@ -130,7 +149,7 @@ docker compose up -d --build --wait
 
 İlk build bir neçə dəqiqə çəkir. Əmr bütün xidmətlər sağlam olanda qayıdır; `docker compose ps` onları göstərir, `docker compose logs -f app` isə logu izləyir. Tətbiq hər dəfə başlayanda bazanın miqrasiyalarını işlədir.
 
-**İlk hesab.** `https://elifba.example.az/register` ünvanını açıb qeydiyyatdan keçin. Ünvanı aça bilən hər kəs müəllim və ya valideyn kimi qeydiyyatdan keçə bilər və hər hesab yalnız öz siniflərini və uşaqlarını görür. SMTP olmayanda təsdiq keçidi logdadır:
+**İlk hesab.** `https://elifba.example.az/register` ünvanını açıb qeydiyyatdan keçin. Ünvanı aça bilən hər kəs müəllim və ya valideyn kimi (`ELIFBA_ROOMS=true` olanda həm də oyunçu kimi) qeydiyyatdan keçə bilər və hər hesab yalnız öz siniflərini, uşaqlarını və otaqlarını görür. SMTP olmayanda təsdiq keçidi logdadır:
 
 ```bash
 docker compose logs app | tr -d '\r' | grep -oE 'https?://[^] ()<]+/email/verify/[^] ()<]+$' | tail -n 1
@@ -138,7 +157,7 @@ docker compose logs app | tr -d '\r' | grep -oE 'https?://[^] ()<]+/email/verify
 
 Telefonlar `https://elifba.example.az/pult` ünvanını açır.
 
-**`.env` dəyişəndə.** Operatoru və ya poçtu dəyişəndən sonra `docker compose up -d --wait` işə salın; konteynerlər yeni dəyərlərlə yenidən yaradılır. `ELIFBA_DOMAIN`, `ELIFBA_SCHEME`, `ELIFBA_PORT` və ya `REVERB_APP_KEY` dəyişəndən sonra isə `docker compose up -d --build --wait` lazımdır: brauzerin Reverb ünvanı build zamanı fayllara yazılır.
+**`.env` dəyişəndə.** Operatoru, poçtu və ya `ELIFBA_ROOMS`-u dəyişəndən sonra `docker compose up -d --wait` işə salın; konteynerlər yeni dəyərlərlə yenidən yaradılır. `ELIFBA_DOMAIN`, `ELIFBA_SCHEME`, `ELIFBA_PORT` və ya `REVERB_APP_KEY` dəyişəndən sonra isə `docker compose up -d --build --wait` lazımdır: brauzerin Reverb ünvanı build zamanı fayllara yazılır.
 
 **Ehtiyat nüsxələr.** `backup` xidməti hər gecə Bakı vaxtı ilə saat 03:00-da bazanın nüsxəsini `backups` həcminə yazır və 14 gün saxlayır (`.env` faylında `BACKUP_AT`, `BACKUP_KEEP_DAYS`). İndi nüsxə çıxarmaq, nüsxələrin siyahısına baxmaq və onları Docker həcmindən kənara köçürmək:
 
@@ -179,7 +198,7 @@ docker compose up -d --build --wait
 
 ## Məxfilik
 
-Elifba uşaqlar haqqında minimum məlumat saxlayır: ad (iki eyni adlı uşağı ayırmaq üçün yalnız soyadın ilk hərfi) və cizgi avatarı — hamısı bir müəllimə aiddir. Valideynin uşağı da belədir: ad və avatar, bir valideynə aiddir, yaş və doğum tarixi yoxdur. Şagird girişi, şəkil, doğum tarixi, üçüncü tərəf skriptləri, şriftləri və analitikası yoxdur. Şagirdi, sinfi və ya uşağı silmək onu həqiqətən silir. Ətraflı: [arxitektura §7](docs/architecture.md#7-childrens-privacy).
+Elifba uşaqlar haqqında minimum məlumat saxlayır: ad (iki eyni adlı uşağı ayırmaq üçün yalnız soyadın ilk hərfi) və cizgi avatarı — hamısı bir müəllimə aiddir. Valideynin uşağı da belədir: ad və avatar, bir valideynə aiddir, yaş və doğum tarixi yoxdur. Şagird girişi, şəkil, doğum tarixi, üçüncü tərəf skriptləri, şriftləri və analitikası yoxdur. Şagirdi, sinfi və ya uşağı silmək onu həqiqətən silir. Ətraflı: [arxitektura §7](docs/architecture.md#7-childrens-privacy). Otaqlarda (server onları açanda) böyüyün hesabdakı adını yalnız həmin otağı açan və otağın oyunçuları görür; yaş, ləqəb və çat yoxdur: [arxitektura §12](docs/architecture.md#adults-privacy).
 
 ## Təhlükəsizlik
 

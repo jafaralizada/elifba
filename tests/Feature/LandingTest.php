@@ -3,6 +3,7 @@
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\Rooms;
 
 /*
  * There is no dashboard (docs/frontend.md §1): a signed-in account lands by
@@ -41,7 +42,12 @@ it('sends a guest from the classes to the login page', function (): void {
     $this->get(route('classes.index'))->assertRedirect(route('login'));
 });
 
-it('makes no third-party request from the welcome page', function (): void {
+it('makes no third-party request from the welcome page', function (bool $rooms): void {
+    // With the adults' rooms section too (B7); `Tests\TestCase` leaves it off.
+    if ($rooms) {
+        Rooms::on();
+    }
+
     $html = $this->get(route('home'))->assertOk()->getContent();
     $host = parse_url((string) config('app.url'), PHP_URL_HOST);
 
@@ -64,4 +70,7 @@ it('makes no third-party request from the welcome page', function (): void {
     foreach ($files as $file) {
         expect((string) file_get_contents($file))->not->toMatch('#https?://#');
     }
-});
+})->with([
+    'the rooms switch off' => [false],
+    'the rooms switch on' => [true],
+]);

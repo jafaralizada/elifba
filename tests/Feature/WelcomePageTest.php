@@ -2,20 +2,25 @@
 
 use App\Domain\Content\Data\PackData;
 use App\Domain\Content\Enums\Mechanic;
+use App\Domain\Content\Enums\RoomFamily;
+use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Content\Enums\Unit;
 use App\Domain\Content\Support\Avatars;
 use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Language\Support\Alphabet;
 use App\Domain\Play\Support\Playable;
+use App\Domain\Rooms\Support\RoomPlayable;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Config;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\Rooms;
 
 /*
  * The welcome page (docs/frontend.md rule 10): public, the same page for a
- * guest and a teacher, every fact a prop from the content and the code, and
- * the tags a shared link shows rendered by the server.
+ * guest and a teacher, every fact a prop from the content and the code, the
+ * adults' rooms only while their switch is on, and the tags a shared link
+ * shows rendered by the server.
  */
 
 beforeEach(function (): void {
@@ -176,4 +181,83 @@ it('renders the tags in English when English is chosen', function (): void {
         ->toContain('<meta property="og:title" content="Elifba: reading games on the classroom wall">')
         ->toContain('<meta property="og:locale" content="en_US">')
         ->toContain('<html lang="en"');
+});
+
+it('shows rooms only when the switch is on', function (): void {
+    $player = User::factory()->teacherAndPlayer()->create();
+
+    // Off, as `Tests\TestCase` and an instance have it: no prop about rooms,
+    // for a guest or an account that holds the player role.
+
+    foreach ([null, $player] as $account) {
+        ($account === null ? $this : $this->actingAs($account))
+            ->get(route('home'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('welcome')->missing('rooms')->has('sample'));
+    }
+
+    // On: the families with the games a room offers, the difficulties and the limits.
+    Rooms::on();
+    $families = [];
+
+    foreach (RoomFamily::cases() as $family) {
+        $families[] = [
+            'key' => $family->value,
+            'mechanics' => array_values(array_map(
+                static fn (RoomMechanic $mechanic): string => $mechanic->value,
+                array_filter(RoomPlayable::mechanics(), static fn (RoomMechanic $mechanic): bool => $mechanic->family() === $family),
+            )),
+        ];
+    }
+
+    expect(array_merge(...array_column($families, 'mechanics')))->toHaveCount(count(RoomMechanic::cases()));
+
+    $this->withSession(['locale' => 'en'])
+        ->get(route('home'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('welcome')
+            ->where('rooms', [
+                'families' => $families,
+                'difficulties' => [1, 2, 3, 4],
+                'maxPlayers' => Config::integer('elifba.rooms.max_players'),
+                'rounds' => ['min' => Config::integer('elifba.rooms.rounds.min'), 'max' => Config::integer('elifba.rooms.rounds.max')],
+            ]));
+
+    // Every name the section draws is in both languages.
+    $keys = [
+        'welcome.rooms.title', 'welcome.rooms.text', 'welcome.rooms.players', 'welcome.rooms.rounds',
+        'welcome.rooms.difficulties', 'welcome.rooms.screen_alt', 'welcome.rooms.phone_alt',
+        'welcome.rooms.join_title', 'welcome.rooms.join_text', 'welcome.rooms.open', 'welcome.rooms.enter',
+        'welcome.rooms.names', 'welcome.rooms.privacy', 'welcome.rooms.hero',
+        ...array_map(static fn (int $difficulty): string => "rooms.difficulty.{$difficulty}", [1, 2, 3, 4]),
+    ];
+
+    foreach ($families as $family) {
+        $keys[] = "rooms.setup.families.{$family['key']}";
+
+        foreach ($family['mechanics'] as $mechanic) {
+            array_push($keys, "rooms.mechanics.{$mechanic}.name", "rooms.mechanics.{$mechanic}.line");
+        }
+    }
+
+    foreach (['az', 'en'] as $locale) {
+        $translations = json_decode((string) file_get_contents(lang_path("{$locale}.json")), true);
+
+        foreach ($keys as $key) {
+            expect($translations)->toHaveKey($key)
+                ->and(trim($translations[$key]))->not->toBe('');
+        }
+    }
+
+    // The page draws the section only from the prop, after the children's
+    // data and before the price, with its two screenshots of a room.
+    $page = (string) file_get_contents(resource_path('js/pages/welcome.tsx'));
+
+    expect($page)->toContain('{rooms && <RoomsSection rooms={rooms} />}')
+        ->and(strpos($page, 'id="welcome-privacy"'))->toBeLessThan(strpos($page, '<RoomsSection'))
+        ->and(strpos($page, '<RoomsSection'))->toBeLessThan(strpos($page, 'id="welcome-free"'))
+        ->and(substr_count($page, 'RoomsSection'))->toBe(2)
+        ->and(resource_path('images/welcome/rooms-screen.webp'))->toBeFile()
+        ->and(resource_path('images/welcome/rooms-phone.webp'))->toBeFile();
 });

@@ -22,6 +22,24 @@ export type Sample = {
     rounds: SampleRound[];
 };
 
+/**
+ * The adults' rooms (architecture §12), sent only while the rooms switch is
+ * on (frontend.md rule 10, ADR 019 decision 4).
+ */
+export type WelcomeRooms = {
+    /**
+     * `RoomFamily` keys in order, each with its `RoomMechanic` keys that have
+     * levels; named by `rooms.setup.families.*` and `rooms.mechanics.*`.
+     */
+    families: { key: string; mechanics: string[] }[];
+    /** The difficulties of `content/rooms/levels.json`, named by `rooms.difficulty.*`. */
+    difficulties: number[];
+    /** `elifba.rooms.max_players`. */
+    maxPlayers: number;
+    /** `elifba.rooms.rounds`: how many rounds a game may have. */
+    rounds: { min: number; max: number };
+};
+
 export type WelcomeProps = {
     /** `elifba.source_url`. */
     sourceUrl: string;
@@ -37,4 +55,6 @@ export type WelcomeProps = {
     avatars: Avatar[];
     /** Null when the content has no letter level that `find` plays. */
     sample: Sample | null;
+    /** Absent while the rooms switch is off. */
+    rooms?: WelcomeRooms;
 };

@@ -12,6 +12,8 @@ import { GitHubLink } from '@/components/github-link';
 import { InstallBanner } from '@/components/install-banner';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Picture } from '@/components/welcome/picture';
+import { RoomsSection } from '@/components/welcome/rooms-section';
 import { SampleWall } from '@/components/welcome/sample-wall';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
@@ -25,8 +27,8 @@ const MAIN_ACTION =
 /**
  * The landing page (`/`, frontend.md rule 10): what Elifba is, how a lesson
  * goes, what a teacher gets, what a parent does at home (R7), what is kept
- * about children and what it costs. Every fact is a prop from
- * `WelcomeController`.
+ * about children, the adults' rooms while their switch is on (B7) and what
+ * it costs. Every fact is a prop from `WelcomeController`.
  */
 export default function Welcome({
     sourceUrl,
@@ -36,23 +38,29 @@ export default function Welcome({
     letters,
     avatars,
     sample,
+    rooms,
 }: WelcomeProps) {
     const { auth, name } = usePage().props;
     const { t } = useTranslation();
     const signedIn = auth.user !== null;
     // A signed-in account goes on through `/start`, which lands it by area.
+    // The player area exists only while the rooms switch is on (ADR 019).
     const areaAction =
         auth.area === 'parent'
             ? 'welcome.hero.children'
             : auth.area === 'teacher'
               ? 'welcome.hero.classes'
-              : 'welcome.hero.start';
+              : auth.area === 'player'
+                ? 'welcome.rooms.hero'
+                : 'welcome.hero.start';
     const areaLink =
         auth.area === 'parent'
             ? 'nav.children'
             : auth.area === 'teacher'
               ? 'nav.classes'
-              : 'welcome.hero.start';
+              : auth.area === 'player'
+                ? 'nav.rooms'
+                : 'welcome.hero.start';
     const homePacks = packs.filter((pack) => picturePacks.includes(pack.key));
 
     const mainAction = signedIn ? (
@@ -456,6 +464,8 @@ export default function Welcome({
                         </div>
                     </section>
 
+                    {rooms && <RoomsSection rooms={rooms} />}
+
                     <section
                         aria-labelledby="welcome-free"
                         className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-x-12 gap-y-6 px-4 pb-24 sm:px-6 lg:grid-cols-12 lg:px-8 lg:pb-32"
@@ -543,33 +553,6 @@ function Step({ number, title, text, children }: StepProps) {
             </div>
             <div className="mt-6">{children}</div>
         </li>
-    );
-}
-
-type PictureProps = {
-    src: string;
-    width: number;
-    height: number;
-    alt: string;
-    /** Which part stays in the 16:9 frame. */
-    position: 'object-top' | 'object-center' | 'object-bottom';
-};
-
-/** A screenshot of the app in a 16:9 frame, loaded when it comes near. */
-function Picture({ src, width, height, alt, position }: PictureProps) {
-    return (
-        <img
-            src={src}
-            width={width}
-            height={height}
-            alt={alt}
-            loading="lazy"
-            decoding="async"
-            className={cn(
-                'aspect-video w-full rounded-xl bg-muted object-cover ring-1 ring-black/10 dark:ring-white/15',
-                position,
-            )}
-        />
     );
 }
 

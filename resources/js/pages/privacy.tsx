@@ -17,6 +17,12 @@ type Props = {
     googleSignIn: boolean;
     /** Who runs this instance, from `ELIFBA_OPERATOR_*`; null when not set. */
     operator: { name: string | null; email: string | null };
+    /**
+     * Only while the rooms switch is on (ADR 019 decision 4): then the
+     * notice has the section «Otaqlar» (architecture §12 "Adults' privacy").
+     * `idleHours`: how long a room with no activity keeps its code.
+     */
+    rooms?: { idleHours: number };
 };
 
 /**
@@ -38,16 +44,35 @@ const SECTIONS = [
 const HOME = ['stored', 'why', 'who', 'not_shared', 'delete', 'how_long'];
 
 /**
+ * The parts of the section for adults in rooms, in order (ADR 024 decision
+ * 10); the operator follows them.
+ */
+const ROOMS = [
+    'what',
+    'stored',
+    'not_stored',
+    'why',
+    'who',
+    'contact',
+    'how_long',
+    'delete',
+    'where',
+];
+
+/**
  * The privacy notice (docs/architecture.md §7), public and in every
  * interface language: what Elifba keeps for a class, a section for parents
  * who play with their own children at home (§7 "Parents and their
- * children"), and the note a teacher copies for a class's parents.
+ * children"), the section for adults in rooms while the rooms switch is on
+ * (§12 "Adults' privacy"), and the note a teacher copies for a class's
+ * parents.
  */
 export default function Privacy({
     retentionDays,
     childrenMax,
     googleSignIn,
     operator,
+    rooms,
 }: Props) {
     const { auth, name } = usePage().props;
     const { t } = useTranslation();
@@ -90,6 +115,8 @@ export default function Privacy({
                         </h1>
                         <p className="text-lg text-muted-foreground">
                             {t('privacy.intro')}
+                            {/* The third use, only where rooms are on (ADR 024 decision 10). */}
+                            {rooms && ` ${t('privacy.rooms.intro')}`}
                         </p>
                     </div>
 
@@ -124,6 +151,36 @@ export default function Privacy({
                             </p>
                         ))}
                     </section>
+
+                    {rooms && (
+                        <section
+                            className="scroll-mt-6 space-y-3"
+                            id="rooms"
+                            aria-labelledby="rooms-title"
+                            data-test="rooms"
+                        >
+                            <h2
+                                id="rooms-title"
+                                className="text-xl font-semibold"
+                            >
+                                {t('privacy.rooms.title')}
+                            </h2>
+                            {ROOMS.map((part) => (
+                                <p
+                                    key={part}
+                                    className="leading-relaxed whitespace-pre-line"
+                                >
+                                    {t(`privacy.rooms.${part}`, {
+                                        ...days,
+                                        hours: rooms.idleHours,
+                                    })}
+                                </p>
+                            ))}
+                            <p className="leading-relaxed">
+                                <Operator {...operator} />
+                            </p>
+                        </section>
+                    )}
 
                     {googleSignIn && (
                         <section className="space-y-2" data-test="google">

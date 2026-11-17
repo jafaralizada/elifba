@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Support\GoogleSignIn;
+use App\Support\RoomsArea;
 use Illuminate\Support\Facades\Config;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -12,8 +13,11 @@ use Inertia\Response;
  * long, how to delete it, what the board says aloud (a first name only from
  * the built-in name list, sent nowhere; ADR 016), who operates this
  * instance, a section for parents who play with their own children at home
- * (§7 "Parents and their children", ADR 013) and the note a teacher copies
- * for a class's parents.
+ * (§7 "Parents and their children", ADR 013), the note a teacher copies
+ * for a class's parents and — only while the rooms switch is on — the
+ * section «Otaqlar» for adults who play in rooms (§12 "Adults' privacy",
+ * ADR 024 decision 10). With the switch off the page gets nothing about
+ * rooms (ADR 019 decision 4).
  * Public, in every interface language.
  */
 final class PrivacyController extends Controller
@@ -33,6 +37,8 @@ final class PrivacyController extends Controller
                 'name' => is_string($name) && trim($name) !== '' ? trim($name) : null,
                 'email' => is_string($email) && trim($email) !== '' ? trim($email) : null,
             ],
+            // How long an idle room keeps its code (§12 "Rooms and joining").
+            ...(RoomsArea::enabled() ? ['rooms' => ['idleHours' => Config::integer('elifba.rooms.idle_hours')]] : []),
         ]);
     }
 }

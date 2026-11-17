@@ -58,6 +58,23 @@ Elifba works without a class too. A **parent** registers, chooses «Valideyn» (
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | <img src="docs/screenshots/home-board.png" width="560" alt="The board at home: «zürafə» hansıdır? over a giraffe and a cat, and Tural playing in the corner"> | <img src="docs/screenshots/home-remote.png" width="220" alt="The remote on the parent's phone: the giraffe marked as the answer, the cat, Tural playing, and pause, skip and end buttons"> |
 
+## Rooms, for adults
+
+An instance can also open an area of its own for adults, where people who have an Elifba account race each other in a **room**. One of them opens the room and gives its six-digit code to the others, or shows its QR code on a big screen; each joins from their own phone, under their account's name. Everyone plays the same rounds at the same time; the server alone judges the answers and keeps the time, and after each round the room sees the right answer and the ranking.
+
+- **Six games in three families,** each at four difficulties («Asan», Easy, to «Çox çətin», Very hard), with 5 to 20 rounds a game and up to 20 people in a room:
+    - _Memory:_ remember the order (a row of digits, letters, words or shapes is shown, then hidden) and remember the cells (cells of a grid light up, then go dark);
+    - _Logic and sequences:_ continue the row (which number comes next) and find the odd one out (among numbers or words);
+    - _Word games:_ anagram (tap a word's shuffled letters into the word) and right spelling (one Azerbaijani word written four ways).
+- **A name among the people who share a code, and nothing more.** No age, nickname, chat or profile. Results are kept with names only inside each room, and a player can take their name out of a closed room. A teacher's students and a parent's children never enter a room.
+- **The big screen.** The host can open the room on a laptop or a television: the code and its QR code while the room waits, then each round, the answers coming in and the ranking.
+
+The area is **off unless the instance sets `ELIFBA_ROOMS=true`** ([Run your own instance](#run-your-own-instance)). While it is off, nothing of it shows anywhere, and an instance for schools stays exactly as it is.
+
+| The host's big screen                                                                                                                                                                                                                                                                               | A player's phone                                                                                                                                                                             |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <img src="docs/screenshots/room-screen.png" width="560" alt="The host's big screen in round 3 of 5 of «Düzgün yazılış» (Right spelling): çalışqan marked right among four spellings, and the ranking beside it — Kamran Əliyev 55 points, Günel Hüseynova 37, Elvin Rzayev 35, Səbinə Qasımova 32"> | <img src="docs/screenshots/room-phone.png" width="220" alt="A player's phone in the same round: «Düzgün yazılışı seçin» over four spellings of çalışqan, 14 seconds left and no answer yet"> |
+
 ## Help
 
 Elifba is made together with teachers, and most of the help it needs is not code:
@@ -87,13 +104,14 @@ tr -d '\r' < storage/logs/laravel.log | grep -oE 'https?://[^] ()<]+/email/verif
 
 - **A real phone as the remote.** Phones cannot resolve `elifba.test`. Stop `composer dev` and run `composer dev:lan` instead: it serves the app and Reverb on the laptop's LAN address and prints it (`http://192.168.1.20:8000`). Open that address on the laptop too, log in, start a game, and open `/pult` on a phone on the same Wi-Fi. `.env` is not changed.
 - **HTTPS for the share card.** The podium's Share button (the Web Share API) works only on https. Run `herd secure elifba` and change the Reverb lines in `.env` as the comment above them describes; `composer dev` then serves `https://elifba.test` with `wss` for Reverb. To try it on a phone, run `herd share` while `composer dev` is running.
+- **The adults' rooms** are off by default. To try them, set `ELIFBA_ROOMS=true` in `.env`, take the «Oyunçu» (Player) role, open a room at `/rooms` and join it from a second browser or a private window with another account.
 - **Before a pull request:** `composer ci:check`, the same gate CI runs: oxlint and oxfmt, `tsc`, Vitest, Pint, PHPStan level 8 and Pest. `npm run check:fix` and `composer lint` fix formatting.
 
 The code:
 
 - **Stack:** Laravel 13, Inertia 3, React 19, TypeScript, Tailwind 4, shadcn/ui, Phaser for the board, Laravel Reverb for the phone, Wayfinder, Pest. Built on the official Laravel React starter kit.
 - **Design:** [`docs/architecture.md`](docs/architecture.md) is the contract the code follows; [`docs/glossary.md`](docs/glossary.md) maps Azerbaijani terms to code names; [`docs/decisions/`](docs/decisions/) records the hard-to-reverse choices; [`docs/frontend.md`](docs/frontend.md) has the UI rules.
-- **Domains:** `app/Domain/{Language,Content,Classroom,Family,Play,Rankings}`, one-way in that order.
+- **Domains:** `app/Domain/{Language,Content,Classroom,Family,Play,Rankings}`, one-way in that order, and `Rooms` at the end, which uses only `Language` and `Content` and which nothing uses.
 - **Content:** letters, words, sentences, prompts and theme pictures are files in [`content/`](content/), checked by `php artisan content:validate`.
 - **Languages:** `lang/az.json` (base) and `lang/en.json`; a test keeps them in step.
 - **CI:** GitHub Actions runs `composer ci:check` on SQLite, the Pest suite on PostgreSQL 17, and [`scripts/docker-smoke.sh`](scripts/docker-smoke.sh) against the Docker stack.
@@ -120,6 +138,7 @@ Then open `.env` (`nano .env`) and fill in:
 
 - `ELIFBA_OPERATOR_NAME` and `ELIFBA_OPERATOR_EMAIL`: the person or school responsible for this instance. The privacy page (`/privacy`) names them as the one who keeps the data and answers parents.
 - The `MAIL_*` lines (`MAIL_MAILER=smtp`, host, port, user, password, from address): teachers confirm their address and reset passwords by mail. Until then mail goes to the log (see below).
+- Optional: `ELIFBA_ROOMS=true`, to open the [rooms for adults](#rooms-for-adults) ([ADR 019](docs/decisions/019-rooms-area-and-player-role.md)): the «Oyunçu» (Player) role, `/rooms` and `/otaq`, their section on the welcome page and the section «Otaqlar» of `/privacy`. Unset or `false` = none of it shows; the rooms' tables exist either way.
 - Optional: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, to let teachers sign in with Google (an OAuth client of type "Web application" in Google Cloud Console, with the redirect URI `https://<your domain>/auth/google/callback`; [ADR 008](docs/decisions/008-google-sign-in.md)). A Gmail or Google Workspace address confirmed by Google also confirms the teacher's, without mail. Empty = no Google button.
 
 **Start.**
@@ -130,7 +149,7 @@ docker compose up -d --build --wait
 
 The first build takes a few minutes. The command returns when every service is healthy; `docker compose ps` shows them, and `docker compose logs -f app` follows the log. The app runs its database migrations each time it starts.
 
-**The first account.** Open `https://elifba.example.az/register` and register. Anyone who can open the address can register as a teacher or a parent, and each account sees only its own classes and children. Without SMTP, the confirmation link is in the log:
+**The first account.** Open `https://elifba.example.az/register` and register. Anyone who can open the address can register as a teacher or a parent (and, with `ELIFBA_ROOMS=true`, as a player), and each account sees only its own classes, children and rooms. Without SMTP, the confirmation link is in the log:
 
 ```bash
 docker compose logs app | tr -d '\r' | grep -oE 'https?://[^] ()<]+/email/verify/[^] ()<]+$' | tail -n 1
@@ -138,7 +157,7 @@ docker compose logs app | tr -d '\r' | grep -oE 'https?://[^] ()<]+/email/verify
 
 Phones open `https://elifba.example.az/pult`.
 
-**Changing `.env`.** After changing the operator or mail, run `docker compose up -d --wait`; the containers are recreated with the new values. After changing `ELIFBA_DOMAIN`, `ELIFBA_SCHEME`, `ELIFBA_PORT` or `REVERB_APP_KEY`, run `docker compose up -d --build --wait`: the browser's Reverb address is built into the assets.
+**Changing `.env`.** After changing the operator, mail or `ELIFBA_ROOMS`, run `docker compose up -d --wait`; the containers are recreated with the new values. After changing `ELIFBA_DOMAIN`, `ELIFBA_SCHEME`, `ELIFBA_PORT` or `REVERB_APP_KEY`, run `docker compose up -d --build --wait`: the browser's Reverb address is built into the assets.
 
 **Backups.** The `backup` service dumps the database every night at 03:00 Baku time into the `backups` volume and keeps 14 days (`BACKUP_AT`, `BACKUP_KEEP_DAYS` in `.env`). Make a dump now, list the dumps, and copy them off the server's Docker volume:
 
@@ -179,7 +198,7 @@ Open `http://localhost:8088/register`; the confirmation link is in the log as ab
 
 ## Privacy
 
-Elifba stores the minimum about children: a first name (and a surname initial only to tell two apart) and a cartoon avatar, owned by one teacher. A parent's child is the same: a first name and an avatar, owned by one parent, with no age or birth date. No student login, no photos, no birth dates, no third-party scripts, fonts or analytics. Deleting a student, a class or a child deletes it. Details: [architecture §7](docs/architecture.md#7-childrens-privacy).
+Elifba stores the minimum about children: a first name (and a surname initial only to tell two apart) and a cartoon avatar, owned by one teacher. A parent's child is the same: a first name and an avatar, owned by one parent, with no age or birth date. No student login, no photos, no birth dates, no third-party scripts, fonts or analytics. Deleting a student, a class or a child deletes it. Details: [architecture §7](docs/architecture.md#7-childrens-privacy). In rooms (when an instance turns them on) an adult's account name is shown only to the host and the players of that room, with no age, nickname or chat: [architecture §12](docs/architecture.md#adults-privacy).
 
 ## Security
 
