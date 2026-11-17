@@ -1,25 +1,276 @@
-import { RecallOrderAsk } from '@/components/rooms/mechanics/recall-order';
+import type { CSSProperties, ReactNode } from 'react';
+import { Mark } from '@/components/rooms/mechanics/choice';
+import {
+    anagramMine,
+    lettersOf,
+    slotText,
+    tileRows,
+} from '@/components/rooms/mechanics/word-layout';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import type { RoomAsk, RoomMine } from '@/rooms/contract';
 
 /*
- * «Anaqram» (docs/architecture.md §12 "Room games"), plain: B6 part 2
- * designs it. The question is the word's letters as the server sent them —
- * cased there, shuffled there, never in the order of a word they spell —
- * tapped in order like a row to recall, with «Geri» on the page; the
- * reveal is the word, from `reveal.word`, and the viewer's own letters.
- * Nothing here knows the word before the reveal, and right or wrong is the
- * server's word (`mine.correct`): another word the letters spell is right
- * too.
+ * «Anaqram» (docs/architecture.md §12 "Room games", docs/frontend.md rule
+ * 15): the word's letters as the server sent them — cased there (Az::upper,
+ * so «İ» and «I» stay two letters in every locale), shuffled there, never
+ * in the order of a word they spell — under a row of places, one for each
+ * letter. Each tap moves a letter into the next place and leaves a dashed
+ * gap where its tile stood; «Geri» (on the page) takes back the last. The
+ * tap that fills the last place sends the word. Nothing here knows the
+ * word before the reveal, and right or wrong is the server's word
+ * (`mine.correct`): another word the letters spell is right too, and its
+ * reveal says so rather than drawing it as a mistake.
+ *
+ * No case is changed here: no `uppercase` class, no `toUpperCase()`.
  */
 
-/** The letters to tap into a word, as a row is tapped. */
-export const AnagramAsk = RecallOrderAsk;
+/** A tile: 60px on a phone (five to a row at 375px), up to 13vh on the screen. */
+const TILE = { phone: 60, phoneGap: 8 } as const;
+const BIG_TILE = 'min(13vh,9vw)';
+const BIG_GAP = '1.6vh';
 
-/** The word, and the letters the viewer tapped, in their order. */
+/** The tiles' box, as wide as `perRow` tiles, so they wrap into even rows. */
+function tilesWidth(count: number, big: boolean): CSSProperties {
+    const { perRow } = tileRows(count, big ? 6 : 5);
+
+    return {
+        maxWidth: big
+            ? `calc(${perRow} * ${BIG_TILE} + ${perRow - 1} * ${BIG_GAP})`
+            : `${perRow * TILE.phone + (perRow - 1) * TILE.phoneGap}px`,
+    };
+}
+
+/** The row of places the word is built in: up to 44px each on a phone, narrower for a long word. */
+function Places({
+    letters,
+    places,
+    big,
+    label,
+}: {
+    letters: (string | null)[];
+    places: number;
+    big: boolean;
+    label: string;
+}) {
+    return (
+        <ol
+            aria-label={label}
+            className={cn(
+                'grid w-full justify-center',
+                big ? 'gap-[1vh]' : 'gap-1.5',
+            )}
+            style={{
+                gridTemplateColumns: big
+                    ? `repeat(${places}, minmax(0, min(8vh, 5.5vw)))`
+                    : `repeat(${places}, minmax(0, 2.75rem))`,
+            }}
+        >
+            {Array.from({ length: places }, (_, index) => {
+                const letter = letters[index] ?? null;
+                const next = letter === null && index === letters.length;
+
+                return (
+                    <li
+                        key={index}
+                        className={cn(
+                            'flex items-center justify-center font-semibold select-none',
+                            big
+                                ? 'h-[10vh] rounded-[1.2vh] text-[min(6vh,4vw)]'
+                                : cn('h-12 rounded-lg', slotText(places)),
+                            letter === null
+                                ? cn(
+                                      'border border-dashed',
+                                      next
+                                          ? 'border-2 border-primary'
+                                          : 'border-muted-foreground/40',
+                                  )
+                                : 'border bg-card shadow-xs',
+                        )}
+                    >
+                        {letter}
+                    </li>
+                );
+            })}
+        </ol>
+    );
+}
+
+/**
+ * The places, then the tiles in the server's order. On the screen the
+ * same, larger, with the places empty: the room sees how long the word
+ * is and its letters, never anyone's taps.
+ */
+export function AnagramAsk({
+    ask,
+    picked,
+    disabled,
+    onPick,
+    big = false,
+}: {
+    ask: RoomAsk;
+    picked: string[];
+    disabled: boolean;
+    onPick: (id: string) => void;
+    big?: boolean;
+}) {
+    const { t } = useTranslation();
+
+    if (big) {
+        return (
+            <div className="flex w-full flex-col items-center gap-[5vh]">
+                <Places
+                    letters={[]}
+                    places={ask.pick}
+                    big
+                    label={t('rooms.game.word')}
+                />
+                <ul
+                    className="flex flex-wrap justify-center gap-[1.6vh]"
+                    style={tilesWidth(ask.items.length, true)}
+                >
+                    {ask.items.map((item) => (
+                        <li
+                            key={item.id}
+                            className="flex size-[min(13vh,9vw)] items-center justify-center rounded-[min(2.5vh,1.8vw)] border bg-card text-[min(8vh,5.5vw)] font-semibold shadow-sm"
+                        >
+                            {item.text ?? ''}
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex w-full flex-col items-center gap-5">
+            <Places
+                letters={lettersOf(ask, picked)}
+                places={ask.pick}
+                big={false}
+                label={t('rooms.game.yours')}
+            />
+
+            <div
+                className="flex w-full flex-wrap justify-center gap-2"
+                style={tilesWidth(ask.items.length, false)}
+            >
+                {ask.items.map((item) => {
+                    const used = picked.includes(item.id);
+
+                    return (
+                        <button
+                            key={item.id}
+                            type="button"
+                            disabled={disabled || used}
+                            aria-pressed={used}
+                            aria-label={item.text ?? ''}
+                            onClick={() => onPick(item.id)}
+                            className={cn(
+                                'flex size-15 items-center justify-center rounded-2xl border text-3xl font-semibold transition-[opacity,transform] outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100',
+                                used
+                                    ? 'border-dashed border-muted-foreground/40 bg-transparent'
+                                    : 'bg-card shadow-sm',
+                                disabled && !used && 'opacity-60',
+                            )}
+                        >
+                            {/* A moved letter leaves its gap: it now stands in the word above. */}
+                            <span className={cn(used && 'invisible')}>
+                                {item.text ?? ''}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+/** A word in coloured cells, read by screen readers as one word, with its mark under it. */
+function Word({
+    kind,
+    letters,
+    tone,
+    big,
+    label,
+    mark,
+}: {
+    /** For checks (`data-word`): the round's word or the viewer's. */
+    kind: 'word' | 'yours';
+    letters: string[];
+    tone: 'right' | 'wrong';
+    big: boolean;
+    label: string;
+    mark: ReactNode;
+}) {
+    return (
+        <div
+            data-word={kind}
+            data-tone={tone}
+            className={cn(
+                'flex w-full flex-col items-center gap-1.5',
+                big && '@container',
+            )}
+        >
+            <span
+                className={cn(
+                    'text-sm text-muted-foreground',
+                    big && 'text-[2.6vh]',
+                )}
+            >
+                {label}
+            </span>
+            <span className="sr-only">{letters.join('')}</span>
+            <span
+                aria-hidden
+                className={cn(
+                    'grid w-full justify-center',
+                    big ? 'gap-[1vh]' : 'gap-1.5',
+                )}
+                style={{
+                    gridTemplateColumns: big
+                        ? `repeat(${letters.length}, minmax(0, 11vh))`
+                        : `repeat(${letters.length}, minmax(0, 2.75rem))`,
+                    // On the screen the cells share the reveal's column; a letter fills about 0.6 of its cell.
+                    fontSize: big
+                        ? `min(7vh, calc(100cqw / ${Math.max(1, letters.length)} * 0.6))`
+                        : undefined,
+                }}
+            >
+                {letters.map((letter, index) => (
+                    <span
+                        key={index}
+                        className={cn(
+                            'flex items-center justify-center border font-semibold',
+                            big
+                                ? 'h-[12vh] rounded-[1.4vh] border-[0.3vh]'
+                                : cn(
+                                      'h-12 rounded-lg',
+                                      slotText(letters.length),
+                                  ),
+                            tone === 'right'
+                                ? 'border-emerald-600 bg-emerald-600/10 dark:border-emerald-400'
+                                : 'border-red-600 bg-destructive/10 dark:border-red-400',
+                        )}
+                    >
+                        {letter}
+                    </span>
+                ))}
+            </span>
+            {mark}
+        </div>
+    );
+}
+
+/**
+ * The round's word in green cells (from `reveal.solution`, as the tiles
+ * write it), and the viewer's own word by the server's verdict: the same
+ * word marked «Düzgün · sizin»; another word the letters spell, green
+ * under it, «Sizin · bu söz də düzgündür»; a wrong one red, «Sizin».
+ */
 export function AnagramSolution({
     ask,
+    solution,
     mine,
     word,
     big = false,
@@ -31,44 +282,65 @@ export function AnagramSolution({
     big?: boolean;
 }) {
     const { t } = useTranslation();
-    const letters = new Map(ask.items.map((item) => [item.id, item.text]));
+    const theirs = anagramMine(ask, solution, mine);
+    const right = lettersOf(ask, solution);
+    const letters = right.some((letter) => letter !== '')
+        ? right
+        : word
+          ? [word]
+          : [];
 
     return (
         <div
             className={cn(
                 'flex flex-col items-center',
-                big ? 'gap-[3vh]' : 'gap-3',
+                big ? 'gap-[4vh]' : 'gap-4',
             )}
         >
-            <div className="flex flex-col items-center gap-1">
-                <span
-                    className={cn(
-                        'text-sm text-muted-foreground',
-                        big && 'text-[2.4vh]',
-                    )}
-                >
-                    {t('rooms.game.word')}
-                </span>
-                <span
-                    className={cn(
-                        'font-semibold tracking-widest',
-                        big ? 'text-[min(8vh,6vw)]' : 'text-3xl',
-                    )}
-                >
-                    {word ?? ''}
-                </span>
-            </div>
-            {mine !== null && (
-                <div className="flex flex-col items-center gap-1">
-                    <span className="text-sm text-muted-foreground">
-                        {t('rooms.game.yours')}
-                    </span>
-                    <span className="text-xl font-semibold tracking-widest">
-                        {mine.picked
-                            .map((id) => letters.get(id) ?? '')
-                            .join('')}
-                    </span>
-                </div>
+            <Word
+                kind="word"
+                letters={letters}
+                tone="right"
+                big={big}
+                label={t('rooms.game.word')}
+                mark={
+                    theirs === null ? null : (
+                        <Mark
+                            mark={{
+                                right: true,
+                                yours: theirs === 'same',
+                                tone: 'right',
+                            }}
+                            big={big}
+                            keepLine={false}
+                        />
+                    )
+                }
+            />
+            {mine !== null && (theirs === 'other' || theirs === 'wrong') && (
+                <Word
+                    kind="yours"
+                    letters={lettersOf(ask, mine.picked)}
+                    tone={theirs === 'other' ? 'right' : 'wrong'}
+                    big={big}
+                    label={t('rooms.game.yours')}
+                    mark={
+                        <Mark
+                            mark={{
+                                right: false,
+                                yours: true,
+                                tone: theirs === 'other' ? 'right' : 'wrong',
+                            }}
+                            big={big}
+                            keepLine={false}
+                            words={
+                                theirs === 'other'
+                                    ? t('rooms.game.mark_also_right')
+                                    : undefined
+                            }
+                        />
+                    }
+                />
             )}
         </div>
     );

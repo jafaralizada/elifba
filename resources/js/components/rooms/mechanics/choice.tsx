@@ -58,7 +58,7 @@ function bigHeight(count: number): string {
     return optionColumns(count) === 1 ? 'min-h-[8.5vh]' : 'min-h-[10vh]';
 }
 
-const TILE =
+export const TILE =
     'flex min-w-0 items-center justify-center border text-center font-semibold break-words tabular-nums';
 
 /** The options to tap; on the screen (`big`) the same options, with no taps. */
@@ -131,15 +131,18 @@ export function ChoiceOptions({
 }
 
 /** The words and the icon of a mark: «Düzgün», «Sizin», «Düzgün · sizin». */
-function Mark({
+export function Mark({
     mark,
     big,
     keepLine,
+    words: wording,
 }: {
     mark: OptionMark;
     big: boolean;
     /** Two to a row: an unmarked option keeps the mark's line, so the texts of a row stay level. */
     keepLine: boolean;
+    /** Other words for the mark (an anagram's second right word). */
+    words?: string;
 }) {
     const { t } = useTranslation();
     const line = cn(
@@ -155,11 +158,13 @@ function Mark({
         ) : null;
     }
 
-    const words = mark.right
-        ? mark.yours
-            ? t('rooms.game.mark_right_yours')
-            : t('rooms.game.mark_right')
-        : t('rooms.game.mark_yours');
+    const words =
+        wording ??
+        (mark.right
+            ? mark.yours
+                ? t('rooms.game.mark_right_yours')
+                : t('rooms.game.mark_right')
+            : t('rooms.game.mark_yours'));
     const Icon = mark.tone === 'right' ? Check : X;
 
     return (

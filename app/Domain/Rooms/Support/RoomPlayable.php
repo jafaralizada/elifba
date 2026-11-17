@@ -22,8 +22,8 @@ use App\Domain\Rooms\Support\Mechanics\SpellingBuilder;
  *
  * B3 lists `recall_order`, whose view B3 builds with the room page; B4
  * `recall_cells`, with its view; B5 `next_in_sequence` and `odd_one_out`,
- * with theirs; B6 `anagram` and `spelling`, with plain views the next
- * session designs.
+ * with theirs; B6 `anagram` and `spelling`, with theirs (part 2 designed
+ * them: tiles under the word's places, four spellings in one column).
  */
 final class RoomPlayable
 {
