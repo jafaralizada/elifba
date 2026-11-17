@@ -599,12 +599,16 @@ it('starts no second game while one is running', function (): void {
 
 it('offers the setup of a game to the host of an open room alone, as the server accepts it', function (): void {
     // Each mechanic the room can play with its difficulties, and the rounds' bounds; never the content's own list.
+    // (What each level holds is RoomPagesTest's.)
     $offered = ['mechanics' => [
-        ['mechanic' => 'recall_order', 'difficulties' => [1, 2, 3, 4]],
-        ['mechanic' => 'recall_cells', 'difficulties' => [1, 2, 3, 4]],
+        ['mechanic' => 'recall_order', 'family' => 'memory', 'difficulties' => [1, 2, 3, 4]],
+        ['mechanic' => 'recall_cells', 'family' => 'memory', 'difficulties' => [1, 2, 3, 4]],
     ], 'rounds' => ['min' => 5, 'max' => 20]];
-    $this->actingAs($this->host)->get(route('rooms.show', $this->room))
-        ->assertInertia(fn (Assert $page) => $page->where('setup', $offered));
+    $setup = $this->actingAs($this->host)->get(route('rooms.show', $this->room))->viewData('page')['props']['setup'];
+    expect([
+        'mechanics' => array_map(static fn (array $offer): array => array_diff_key($offer, ['levels' => true]), $setup['mechanics']),
+        'rounds' => $setup['rounds'],
+    ])->toBe($offered);
     $this->actingAs($this->aygun)->get(route('rooms.show', $this->room))
         ->assertInertia(fn (Assert $page) => $page->where('setup', null));
 

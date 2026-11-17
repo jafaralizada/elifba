@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Content\Enums\RoomMechanic;
+use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Language\Support\Ordinal;
 use App\Domain\Rooms\Enums\RoomPhase;
 use App\Domain\Rooms\Models\Room;
@@ -405,4 +406,48 @@ it('gives the screen only to the host', function (): void {
     // A visitor is sent to the login.
     auth()->logout();
     $this->get(route('rooms.screen', $watched))->assertRedirect(route('login'));
+});
+
+it('names the family of each game the setup offers and what each level holds', function (): void {
+    $room = Rooms::open($this->resad);
+    Rooms::join($room, $this->aygun);
+    $content = app(ContentRepository::class);
+
+    $setup = pagesProps($this->actingAs($this->resad)->get(route('rooms.show', $room)))['setup'];
+
+    expect(array_column($setup['mechanics'], 'mechanic'))->toBe(['recall_order', 'recall_cells']);
+
+    foreach ($setup['mechanics'] as $offer) {
+        $mechanic = RoomMechanic::from($offer['mechanic']);
+
+        expect($offer['family'])->toBe($mechanic->family()->value)
+            ->and(array_column($offer['levels'], 'difficulty'))->toBe($offer['difficulties']);
+
+        // Each level as levels.json holds it: the times, how many items a round asks to recall, a grid.
+        foreach ($offer['levels'] as $described) {
+            $level = $content->roomLevel($mechanic, $described['difficulty']);
+            $count = $level->length ?? $level->lit;
+
+            expect($described)->toBe([
+                'difficulty' => $level->difficulty,
+                'study_ms' => $level->studyMs,
+                'answer_ms' => $level->answerMs,
+                'count' => ['min' => $count?->min, 'max' => $count?->max],
+                'grid' => $level->grid?->toArray(),
+            ]);
+        }
+    }
+
+    // A row's length for a row, the lit cells and the grid for cells.
+    $cells = collect($setup['mechanics'])->firstWhere('mechanic', 'recall_cells');
+    $rows = collect($setup['mechanics'])->firstWhere('mechanic', 'recall_order');
+    expect($cells['levels'][1]['grid'])->toBe($content->roomLevel(RoomMechanic::RecallCells, 2)->grid?->toArray())
+        ->and($cells['levels'][1]['count'])->toBe(['min' => $content->roomLevel(RoomMechanic::RecallCells, 2)->lit?->min, 'max' => $content->roomLevel(RoomMechanic::RecallCells, 2)->lit?->max])
+        ->and($rows['levels'][0]['grid'])->toBeNull()
+        ->and($rows['levels'][0]['count'])->toBe(['min' => $content->roomLevel(RoomMechanic::RecallOrder, 1)->length?->min, 'max' => $content->roomLevel(RoomMechanic::RecallOrder, 1)->length?->max]);
+
+    // Nobody else gets it: a player, and the host once the room is closed.
+    $this->actingAs($this->aygun)->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('setup', null));
+    $this->actingAs($this->resad)->post(route('rooms.close', $room));
+    $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('setup', null));
 });

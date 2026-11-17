@@ -15,7 +15,7 @@
  * The local clock and the timers come from outside, so Vitest fakes them;
  * nothing here judges, scores or derives a phase.
  */
-import type { RoomState } from './contract';
+import type { RoomRound, RoomState } from './contract';
 import { POLL_MS } from './live';
 
 /** A local clock in milliseconds; monotonic in the browser. */
@@ -241,4 +241,46 @@ export function followRoom(options: {
             cancel();
         },
     };
+}
+
+/**
+ * How much of a stretch of the timetable is left at `now` on the server's
+ * clock, from 1 at `from` to 0 at `to` (docs/frontend.md rule 15, "The
+ * time bar"). `now` is the estimated server clock (`ServerClock.now()`),
+ * never the device's, so two phones whose clocks disagree draw the same
+ * bar. For show only: it decides nothing. Before the first state (`now`
+ * null) the bar is full.
+ */
+export function timeLeft(from: number, to: number, now: number | null): number {
+    if (now === null) {
+        return 1;
+    }
+
+    if (to <= from) {
+        return 0;
+    }
+
+    return Math.min(1, Math.max(0, (to - now) / (to - from)));
+}
+
+/**
+ * The stretch a round's time bar measures in its phase: the study from
+ * the round's opening to the question, the answer from the question to
+ * the bell, the reveal from the close to the next round's opening (after
+ * the last, to the game's end). The countdown has no bar: the state does
+ * not say when it began.
+ */
+export function barStretch(
+    round: RoomRound,
+): { from: number; to: number } | null {
+    switch (round.phase) {
+        case 'countdown':
+            return null;
+        case 'study':
+            return { from: round.opens_ms, to: round.answer_from_ms };
+        case 'answer':
+            return { from: round.answer_from_ms, to: round.bell_ms };
+        case 'reveal':
+            return { from: round.closes_ms, to: round.next_ms };
+    }
 }

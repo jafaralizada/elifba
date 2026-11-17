@@ -21,6 +21,9 @@ void createInertiaApp({
                 name === 'lovhe' ||
                 name.startsWith('pult/'):
                 return null;
+            // A room's screen fills a laptop or a television (docs/frontend.md rule 15).
+            case name === 'rooms/screen':
+                return null;
             case name.startsWith('auth/'):
                 return AuthLayout;
             case name.startsWith('settings/'):

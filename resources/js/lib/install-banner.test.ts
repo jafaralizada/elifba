@@ -93,14 +93,14 @@ describe('bannerAllowedOn', () => {
             'privacy',
             'pult/guest-board',
             'pult/index',
-            // The player area waits for B4's shell (architecture §12).
-            'rooms/index',
+            // The player area shows it on «Otaqlar» only (docs/frontend.md rule 15).
             'rooms/join',
             'rooms/screen',
             'rooms/show',
         ]);
         expect(allowed).toContain('welcome');
         expect(allowed).toContain('classes/index');
+        expect(allowed).toContain('rooms/index');
     });
 
     it('does not match a page by a prefix of its name', () => {

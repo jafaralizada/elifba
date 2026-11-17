@@ -21,7 +21,7 @@ use Inertia\Response;
  * host may) and the place labels — and `join`, the addresses of the QR and
  * the code field (`RoomJoinLink`), built on the server. It writes nothing,
  * and it is not the guest board: `/lovhe`, the `board` guard and its
- * bearer never show a room. Plain until B4's interface session designs it.
+ * bearer never show a room. The page is docs/frontend.md rule 15's.
  */
 final class RoomScreenController extends Controller
 {

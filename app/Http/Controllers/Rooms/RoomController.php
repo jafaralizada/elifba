@@ -26,7 +26,7 @@ use Inertia\Response;
 
 /**
  * «Otaqlar» and a room's page, in the player area (docs/architecture.md §12
- * "Rooms and joining", ADR 020). Plain pages until B4 designs them.
+ * "Rooms and joining", ADR 020); the pages are docs/frontend.md rule 15's.
  *
  * A room's page gets the state (`RoomState`, names read now) for the host
  * and a present player of an open room, and for everyone who was in a
@@ -37,7 +37,8 @@ use Inertia\Response;
  * n at n − 1, `Ordinal::label()`), as many as the room has players or may
  * have, since a page never suffixes a number itself (`RoomPlaces`). The
  * host of an open room also gets `setup`, what a new game may be
- * (`RoomGameSetupData::options()`); whoever gets the state of an open room
+ * (`RoomGameSetupData::options()`: each game with its family and what
+ * each level holds); whoever gets the state of an open room
  * gets `join`, the addresses its QR and its code field are at
  * (`RoomJoinLink`); and everyone who was in a closed room gets `games`,
  * each game with its ranking (`RoomResults`), named from the state's

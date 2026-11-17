@@ -3,10 +3,12 @@ import type { Delays, ServerClock } from './clock';
 import {
     AGAIN_MS,
     LATE_MS,
+    barStretch,
     followRoom,
     phaseEnds,
     pollsWithoutChannel,
     serverClock,
+    timeLeft,
 } from './clock';
 import { RoomState } from './contract';
 import { POLL_MS } from './live';
@@ -336,5 +338,68 @@ describe('followRoom', () => {
         room.failed();
         room.listening(false);
         expect(time.pending.size).toBe(0);
+    });
+});
+
+describe('the time bar', () => {
+    it('draws the same bar on a slow clock', () => {
+        // Two phones fetch the same state at the same real moment; the second one's clock is 37 s behind.
+        const fast = fakeTime(1000);
+        const slow = fakeTime(1000 - 37_000);
+        const clocks = [fast, slow].map((time) => {
+            const clock = serverClock(time.local);
+            // Sent at the real moment 1000, answered 80 ms later; the server read its clock in between.
+            const sent = time.local();
+            time.advance(80);
+            clock.observe(T.answerFrom + 2000, sent, time.local());
+
+            return { time, clock };
+        });
+        const round = at('answer').round;
+        expect(round).not.toBeNull();
+
+        const stretch = barStretch(round!);
+        expect(stretch).toEqual({ from: T.answerFrom, to: T.bell });
+
+        const bars = () =>
+            clocks.map(({ clock }) =>
+                timeLeft(stretch!.from, stretch!.to, clock.now()),
+            );
+
+        // 2 s of the 10 s answer have gone (and half the request's 80 ms): the same on both.
+        const [first, second] = bars();
+        expect(first).toBeCloseTo(1 - 2040 / 10_000, 9);
+        expect(second).toBe(first);
+
+        // Later, still the same; the device's own clock would have drawn the slow phone's bar 37 s off.
+        for (const { time } of clocks) {
+            time.advance(5000);
+        }
+        const [later, laterSlow] = bars();
+        expect(later).toBeCloseTo(1 - 7040 / 10_000, 9);
+        expect(laterSlow).toBe(later);
+        expect(
+            timeLeft(stretch!.from, stretch!.to, slow.local() + OFFSET),
+        ).not.toBeCloseTo(later, 2);
+    });
+
+    it('is full before the first state and empty after its end, never beyond', () => {
+        expect(timeLeft(1000, 2000, null)).toBe(1);
+        expect(timeLeft(1000, 2000, 500)).toBe(1);
+        expect(timeLeft(1000, 2000, 1500)).toBe(0.5);
+        expect(timeLeft(1000, 2000, 2500)).toBe(0);
+        expect(timeLeft(2000, 2000, 2000)).toBe(0);
+    });
+
+    it('measures the study, the answer and the wait to the next round', () => {
+        expect(barStretch(at('countdown').round!)).toBeNull();
+        expect(barStretch(at('study').round!)).toEqual({
+            from: T.opens,
+            to: T.answerFrom,
+        });
+        expect(barStretch(at('reveal').round!)).toEqual({
+            from: T.bell,
+            to: T.next,
+        });
     });
 });

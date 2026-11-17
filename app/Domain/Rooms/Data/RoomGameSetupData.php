@@ -63,30 +63,57 @@ final readonly class RoomGameSetupData
 
     /**
      * What the host's setup offers, as `rules()` accepts it: each mechanic
-     * `RoomPlayable` lists with the difficulties of its levels, and the
-     * bounds of the rounds. The room page names them; it never lists them
-     * itself.
+     * `RoomPlayable` lists with its family, the difficulties of its levels
+     * and what each of them holds — the times, how many items (a row's
+     * length, the lit cells) and a grid — and the bounds of the rounds.
+     * The room page names them (docs/frontend.md rule 15); it never lists
+     * them itself.
      *
-     * @return array{mechanics: list<array{mechanic: string, difficulties: list<int>}>, rounds: array{min: int, max: int}}
+     * @return array{mechanics: list<array{mechanic: string, family: string, difficulties: list<int>, levels: list<array{difficulty: int, study_ms: int, answer_ms: int, count: array{min: int, max: int}|null, grid: array{cols: int, rows: int}|null}>}>, rounds: array{min: int, max: int}}
      */
     public static function options(): array
     {
         $mechanics = [];
 
         foreach (self::playableLevels() as $level) {
-            $mechanics[$level->mechanic->value][] = $level->difficulty;
+            $mechanics[$level->mechanic->value][$level->difficulty] = $level;
         }
 
         $options = [];
 
-        foreach ($mechanics as $mechanic => $difficulties) {
-            sort($difficulties);
-            $options[] = ['mechanic' => $mechanic, 'difficulties' => $difficulties];
+        foreach ($mechanics as $mechanic => $levels) {
+            ksort($levels);
+            $options[] = [
+                'mechanic' => $mechanic,
+                'family' => RoomMechanic::from($mechanic)->family()->value,
+                'difficulties' => array_keys($levels),
+                'levels' => array_values(array_map(self::levelOption(...), $levels)),
+            ];
         }
 
         return [
             'mechanics' => $options,
             'rounds' => ['min' => Config::integer('elifba.rooms.rounds.min'), 'max' => Config::integer('elifba.rooms.rounds.max')],
+        ];
+    }
+
+    /**
+     * A level as the setup describes it: `count` is how many items a round
+     * asks to recall — a row's length, the lit cells — and `grid` a cell
+     * game's grid.
+     *
+     * @return array{difficulty: int, study_ms: int, answer_ms: int, count: array{min: int, max: int}|null, grid: array{cols: int, rows: int}|null}
+     */
+    private static function levelOption(RoomLevelData $level): array
+    {
+        $count = $level->length ?? $level->lit;
+
+        return [
+            'difficulty' => $level->difficulty,
+            'study_ms' => $level->studyMs,
+            'answer_ms' => $level->answerMs,
+            'count' => $count === null ? null : ['min' => $count->min, 'max' => $count->max],
+            'grid' => $level->grid?->toArray(),
         ];
     }
 

@@ -4,22 +4,43 @@ import { cn } from '@/lib/utils';
 import type { RoomAsk, RoomItem, RoomMine, RoomStudy } from '@/rooms/contract';
 
 /*
- * «Xanaları yadda saxla» on the room page (docs/architecture.md §12 "Room
- * games", B4): the grid with its lit cells to study, the dark grid to tap
- * the cells that were lit, and the cells that were. The study holds the lit
- * cells only and is drawn only from a state in its study phase; the
- * question is every cell of the grid, the same whichever were lit, and
- * only `reveal.solution` says which. Plain on purpose; B4's interface
- * session designs it.
+ * «Xanaları yadda saxla» (docs/architecture.md §12 "Room games",
+ * docs/frontend.md rule 15): the grid with its lit cells to study, the
+ * dark grid to tap the cells that were lit, and the cells that were. The
+ * study holds the lit cells only and is drawn only from a state in its
+ * study phase; the question is every cell of the grid, the same whichever
+ * were lit, and only `reveal.solution` says which. A lit cell is amber, a
+ * lamp in both themes; the viewer's taps are the primary colour. The
+ * reveal draws the lit cells and marks the viewer's taps on them; whether
+ * the answer was right is the server's word (`mine.correct`).
  */
 
 type Grid = { cols: number; rows: number };
 
-function gridStyle(grid: Grid): CSSProperties {
+/**
+ * The grid's columns and its width, square cells. On a phone as wide as
+ * the page allows and no taller than what 375 × 667 leaves beside the
+ * shell and the round's head and footer (`100svh − 22rem`), never with
+ * cells under 44px; on the screen up to 62vh.
+ */
+function gridStyle(grid: Grid, big: boolean): CSSProperties {
+    const side = Math.max(grid.cols, grid.rows);
+    const least = grid.cols * 2.75 + (grid.cols - 1) * 0.375;
+
     return {
         gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`,
-        maxWidth: `${grid.cols * 4}rem`,
+        width: big
+            ? `min(${(62 * grid.cols) / side}vh, ${(46 * grid.cols) / side}vw)`
+            : `max(${least}rem, min(100%, ${grid.cols * 4.75}rem, calc((100svh - 22rem) * ${grid.cols / grid.rows})))`,
     };
+}
+
+function gap(grid: Grid, big: boolean): string {
+    if (big) {
+        return 'gap-[1.2vh]';
+    }
+
+    return Math.max(grid.cols, grid.rows) > 4 ? 'gap-1.5' : 'gap-2';
 }
 
 /** `[col, row]` as one key. */
@@ -35,20 +56,33 @@ function places(grid: Grid): string[] {
     );
 }
 
+const CELL = 'aspect-square rounded-[18%] border';
+const DARK = 'border-border bg-muted';
+const LIT =
+    'border-amber-500 bg-amber-400 shadow-[0_0_0.9rem_rgb(251_191_36/0.55)] dark:border-amber-300';
+
 /** The grid with its lit cells; drawn only from a state in its study phase. */
-export function RecallCellsStudy({ study }: { study: RoomStudy }) {
+export function RecallCellsStudy({
+    study,
+    big = false,
+}: {
+    study: RoomStudy;
+    big?: boolean;
+}) {
     const grid = study.grid ?? { cols: 1, rows: 1 };
     const lit = new Set(study.items.map(place));
 
     return (
-        <div className="grid w-full gap-1.5" style={gridStyle(grid)}>
+        <div
+            className={cn('mx-auto grid', gap(grid, big))}
+            style={gridStyle(grid, big)}
+        >
             {places(grid).map((key) => (
                 <span
                     key={key}
-                    className={cn(
-                        'aspect-square rounded-md border',
-                        lit.has(key) ? 'bg-primary' : 'bg-card',
-                    )}
+                    data-cell={key}
+                    data-lit={lit.has(key) ? '' : undefined}
+                    className={cn(CELL, lit.has(key) ? LIT : DARK)}
                 />
             ))}
         </div>
@@ -57,93 +91,136 @@ export function RecallCellsStudy({ study }: { study: RoomStudy }) {
 
 /**
  * The dark grid: each cell is an item of the question, in the server's
- * order; a tap adds a cell to the answer, which is sent once it holds
- * `ask.pick` cells.
+ * order (reading order). A tap chooses a cell and a second tap takes it
+ * back; the tap that makes `ask.pick` cells sends the answer (the page's
+ * `tap()`). On the screen the same grid, with no taps.
  */
 export function RecallCellsAsk({
     ask,
     picked,
     disabled,
     onPick,
+    big = false,
 }: {
     ask: RoomAsk;
     picked: string[];
     disabled: boolean;
     onPick: (id: string) => void;
+    big?: boolean;
 }) {
     const { t } = useTranslation();
     const grid = ask.grid ?? { cols: 1, rows: 1 };
 
-    return (
-        <div className="flex w-full flex-col items-center gap-2">
-            <div className="grid w-full gap-1.5" style={gridStyle(grid)}>
-                {ask.items.map((item) => {
-                    const chosen = picked.includes(item.id);
-
-                    return (
-                        <button
-                            key={item.id}
-                            type="button"
-                            aria-pressed={chosen}
-                            disabled={disabled || chosen}
-                            onClick={() => onPick(item.id)}
-                            className={cn(
-                                'aspect-square rounded-md border transition-colors',
-                                chosen ? 'bg-primary' : 'bg-card',
-                                !disabled && !chosen && 'hover:bg-accent',
-                            )}
-                        />
-                    );
-                })}
+    if (big) {
+        return (
+            <div
+                className={cn('mx-auto grid', gap(grid, true))}
+                style={gridStyle(grid, true)}
+            >
+                {ask.items.map((item) => (
+                    <span key={item.id} className={cn(CELL, DARK)} />
+                ))}
             </div>
-            <span className="text-sm text-muted-foreground tabular-nums">
-                {t('rooms.game.picked', {
-                    count: picked.length,
-                    total: ask.pick,
-                })}
-            </span>
+        );
+    }
+
+    return (
+        <div
+            role="group"
+            aria-label={t(`rooms.mechanics.recall_cells.ask`)}
+            className={cn('mx-auto grid', gap(grid, false))}
+            style={gridStyle(grid, false)}
+        >
+            {ask.items.map((item) => {
+                const chosen = picked.includes(item.id);
+
+                return (
+                    <button
+                        key={item.id}
+                        type="button"
+                        aria-pressed={chosen}
+                        data-cell={place(item)}
+                        aria-label={t('rooms.game.cell', {
+                            col: (item.cell?.[0] ?? 0) + 1,
+                            row: (item.cell?.[1] ?? 0) + 1,
+                        })}
+                        disabled={disabled}
+                        onClick={() => onPick(item.id)}
+                        className={cn(
+                            CELL,
+                            'min-h-11 transition-[background-color,transform] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100',
+                            chosen
+                                ? 'border-primary bg-primary'
+                                : 'border-border bg-muted',
+                            disabled && !chosen && 'opacity-60',
+                        )}
+                    />
+                );
+            })}
         </div>
     );
 }
 
-/** The cells that were lit, from the reveal, and the viewer's own taps on them. */
+/** The cells that were lit, from the reveal, with the viewer's own taps marked on the grid. */
 export function RecallCellsSolution({
     ask,
     solution,
     mine,
+    big = false,
 }: {
     ask: RoomAsk;
     solution: string[];
     mine: RoomMine | null;
+    big?: boolean;
 }) {
     const { t } = useTranslation();
     const grid = ask.grid ?? { cols: 1, rows: 1 };
-    const right = new Set(solution);
+    const lit = new Set(solution);
     const tapped = new Set(mine?.picked ?? []);
 
     return (
-        <div className="flex w-full flex-col items-center gap-2">
-            <span className="text-sm text-muted-foreground">
+        <div
+            className={cn(
+                'flex w-full flex-col items-center',
+                big ? 'gap-[2vh]' : 'gap-2',
+            )}
+        >
+            <span
+                className={cn(
+                    'text-sm text-muted-foreground',
+                    big && 'text-[2.4vh]',
+                )}
+            >
                 {t('rooms.game.lit_cells')}
             </span>
-            <div className="grid w-full gap-1.5" style={gridStyle(grid)}>
+            <div
+                className={cn('mx-auto grid', gap(grid, big))}
+                style={gridStyle(grid, big)}
+            >
                 {ask.items.map((item) => (
                     <span
                         key={item.id}
                         className={cn(
-                            'flex aspect-square items-center justify-center rounded-md border text-xs',
-                            right.has(item.id) ? 'bg-primary' : 'bg-card',
-                            tapped.has(item.id) &&
-                                !right.has(item.id) &&
-                                'border-destructive bg-destructive/20',
+                            CELL,
+                            'flex items-center justify-center',
+                            lit.has(item.id) ? LIT : DARK,
                         )}
                     >
-                        {tapped.has(item.id) && '•'}
+                        {tapped.has(item.id) && (
+                            <span
+                                aria-hidden
+                                className="size-[34%] rounded-full bg-primary ring-2 ring-background"
+                            />
+                        )}
                     </span>
                 ))}
             </div>
             {mine !== null && (
-                <span className="text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span
+                        aria-hidden
+                        className="inline-block size-2.5 rounded-full bg-primary"
+                    />
                     {t('rooms.game.yours_marked')}
                 </span>
             )}
