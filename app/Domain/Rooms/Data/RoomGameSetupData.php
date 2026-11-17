@@ -4,6 +4,7 @@ namespace App\Domain\Rooms\Data;
 
 use App\Domain\Content\Data\RoomLevelData;
 use App\Domain\Content\Enums\RoomMechanic;
+use App\Domain\Content\Enums\RoomSequenceRule;
 use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Rooms\Support\RoomPlayable;
 use Illuminate\Support\Facades\Config;
@@ -65,11 +66,13 @@ final readonly class RoomGameSetupData
      * What the host's setup offers, as `rules()` accepts it: each mechanic
      * `RoomPlayable` lists with its family, the difficulties of its levels
      * and what each of them holds — the times, how many items (a row's
-     * length, the lit cells) and a grid — and the bounds of the rounds.
+     * length, the lit cells) and a grid; for a logic game (B5) the rules,
+     * terms and range of a row, or the source and options — and the
+     * bounds of the rounds.
      * The room page names them (docs/frontend.md rule 15); it never lists
      * them itself.
      *
-     * @return array{mechanics: list<array{mechanic: string, family: string, difficulties: list<int>, levels: list<array{difficulty: int, study_ms: int, answer_ms: int, count: array{min: int, max: int}|null, grid: array{cols: int, rows: int}|null}>}>, rounds: array{min: int, max: int}}
+     * @return array{mechanics: list<array{mechanic: string, family: string, difficulties: list<int>, levels: list<array{difficulty: int, study_ms: int, answer_ms: int, count: array{min: int, max: int}|null, grid: array{cols: int, rows: int}|null, rules: list<string>|null, terms: int|null, range: array{min: int, max: int}|null, source: string|null, options: int|null}>}>, rounds: array{min: int, max: int}}
      */
     public static function options(): array
     {
@@ -100,9 +103,12 @@ final readonly class RoomGameSetupData
     /**
      * A level as the setup describes it: `count` is how many items a round
      * asks to recall — a row's length, the lit cells — and `grid` a cell
-     * game's grid.
+     * game's grid; `rules`, `terms` and `range` say what a
+     * `next_in_sequence` row follows, how long it is and its numbers;
+     * `source` and `options` what an `odd_one_out` round offers. A key of
+     * another mechanic is null.
      *
-     * @return array{difficulty: int, study_ms: int, answer_ms: int, count: array{min: int, max: int}|null, grid: array{cols: int, rows: int}|null}
+     * @return array{difficulty: int, study_ms: int, answer_ms: int, count: array{min: int, max: int}|null, grid: array{cols: int, rows: int}|null, rules: list<string>|null, terms: int|null, range: array{min: int, max: int}|null, source: string|null, options: int|null}
      */
     private static function levelOption(RoomLevelData $level): array
     {
@@ -114,6 +120,11 @@ final readonly class RoomGameSetupData
             'answer_ms' => $level->answerMs,
             'count' => $count === null ? null : ['min' => $count->min, 'max' => $count->max],
             'grid' => $level->grid?->toArray(),
+            'rules' => $level->rules === [] ? null : array_map(static fn (RoomSequenceRule $rule): string => $rule->value, $level->rules),
+            'terms' => $level->terms,
+            'range' => $level->range === null ? null : ['min' => $level->range->min, 'max' => $level->range->max],
+            'source' => $level->source?->value,
+            'options' => $level->options,
         ];
     }
 

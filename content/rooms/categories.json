@@ -1,0 +1,145 @@
+{
+    "version": 1,
+    "groups": [
+        {
+            "key": "heyvanlar",
+            "words": [
+                "pişik",
+                "it",
+                "at",
+                "inək",
+                "qoyun",
+                "keçi",
+                "dovşan",
+                "ayı",
+                "canavar",
+                "tülkü",
+                "fil",
+                "dəvə",
+                "meymun",
+                "zürafə"
+            ]
+        },
+        {
+            "key": "meyveler",
+            "words": [
+                "alma",
+                "armud",
+                "heyva",
+                "nar",
+                "gilas",
+                "albalı",
+                "ərik",
+                "şaftalı",
+                "gavalı",
+                "üzüm",
+                "banan",
+                "limon",
+                "portağal",
+                "əncir"
+            ]
+        },
+        {
+            "key": "neqliyyat",
+            "words": [
+                "avtobus",
+                "maşın",
+                "qatar",
+                "təyyarə",
+                "gəmi",
+                "velosiped",
+                "tramvay",
+                "metro",
+                "taksi",
+                "motosiklet",
+                "helikopter",
+                "qayıq"
+            ]
+        },
+        {
+            "key": "geyim",
+            "words": [
+                "köynək",
+                "şalvar",
+                "palto",
+                "gödəkcə",
+                "papaq",
+                "corab",
+                "ayaqqabı",
+                "ətək",
+                "kəmər",
+                "şərf",
+                "əlcək",
+                "jaket"
+            ]
+        },
+        {
+            "key": "metbex",
+            "words": [
+                "qaşıq",
+                "çəngəl",
+                "bıçaq",
+                "boşqab",
+                "fincan",
+                "stəkan",
+                "qazan",
+                "tava",
+                "çaynik",
+                "nimçə",
+                "sini",
+                "çömçə"
+            ]
+        },
+        {
+            "key": "musiqi-aletleri",
+            "words": [
+                "tar",
+                "kamança",
+                "saz",
+                "nağara",
+                "qaval",
+                "balaban",
+                "tütək",
+                "piano",
+                "skripka",
+                "gitara",
+                "zurna",
+                "qarmon"
+            ]
+        },
+        {
+            "key": "idman",
+            "words": [
+                "futbol",
+                "voleybol",
+                "basketbol",
+                "tennis",
+                "şahmat",
+                "boks",
+                "güləş",
+                "üzgüçülük",
+                "xokkey",
+                "gimnastika",
+                "cüdo",
+                "qaçış"
+            ]
+        },
+        {
+            "key": "mekteb",
+            "words": [
+                "qələm",
+                "dəftər",
+                "kitab",
+                "pozan",
+                "xətkeş",
+                "çanta",
+                "karandaş",
+                "lövhə",
+                "təbaşir",
+                "qovluq",
+                "pərgar",
+                "albom"
+            ]
+        }
+    ]
+}

@@ -4,6 +4,8 @@ namespace App\Domain\Rooms\Support;
 
 use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Content\Support\ContentRepository;
+use App\Domain\Rooms\Support\Mechanics\NextInSequenceBuilder;
+use App\Domain\Rooms\Support\Mechanics\OddOneOutBuilder;
 use App\Domain\Rooms\Support\Mechanics\RecallCellsBuilder;
 use App\Domain\Rooms\Support\Mechanics\RecallOrderBuilder;
 use App\Domain\Rooms\Support\Mechanics\RoomRoundBuilder;
@@ -16,7 +18,8 @@ use App\Domain\Rooms\Support\Mechanics\RoomRoundBuilder;
  * Every mechanic listed has its four levels (`RoomPlayableTest`).
  *
  * B3 lists `recall_order`, whose view B3 builds with the room page; B4
- * `recall_cells`, with its view.
+ * `recall_cells`, with its view; B5 `next_in_sequence` and `odd_one_out`,
+ * with theirs.
  */
 final class RoomPlayable
 {
@@ -25,7 +28,7 @@ final class RoomPlayable
      */
     public static function mechanics(): array
     {
-        return [RoomMechanic::RecallOrder, RoomMechanic::RecallCells];
+        return [RoomMechanic::RecallOrder, RoomMechanic::RecallCells, RoomMechanic::NextInSequence, RoomMechanic::OddOneOut];
     }
 
     public static function plays(RoomMechanic $mechanic): bool
@@ -41,6 +44,8 @@ final class RoomPlayable
         return match ($mechanic) {
             RoomMechanic::RecallOrder => new RecallOrderBuilder(app(ContentRepository::class)->roomShapes()),
             RoomMechanic::RecallCells => new RecallCellsBuilder,
+            RoomMechanic::NextInSequence => new NextInSequenceBuilder,
+            RoomMechanic::OddOneOut => new OddOneOutBuilder(app(ContentRepository::class)->roomCategories()),
         };
     }
 }

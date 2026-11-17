@@ -56,6 +56,8 @@ it('has every phase\'s fixture, the answer and the receipt', function (): void {
         'state.lobby', 'state.countdown', 'state.study', 'state.answer', 'state.reveal', 'state.over', 'answer', 'receipt',
         // B4: a grid of cells to study, answer and reveal, and a row of shapes.
         'state.study.cells', 'state.answer.cells', 'state.reveal.cells', 'state.study.shapes',
+        // B5: a row to continue and an odd one to find, asked and revealed.
+        'state.answer.sequence', 'state.reveal.sequence', 'state.answer.odd', 'state.reveal.odd',
     ]);
 });
 

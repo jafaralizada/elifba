@@ -26,6 +26,13 @@ export type SetupLevel = {
     /** How many items a round asks to recall: a row's length, the lit cells. */
     count: { min: number; max: number } | null;
     grid: { cols: number; rows: number } | null;
+    /** B5, `next_in_sequence`: the rules a row follows, its terms and numbers. */
+    rules: string[] | null;
+    terms: number | null;
+    range: { min: number; max: number } | null;
+    /** B5, `odd_one_out`: numbers or words, and how many options. */
+    source: string | null;
+    options: number | null;
 };
 
 export type GameSetupOptions = {
@@ -276,6 +283,30 @@ export function GameSetup({
                                     </button>
                                 ))}
                             </div>
+                            {level !== undefined && level.rules !== null && (
+                                <p className="text-[0.8125rem] leading-snug text-muted-foreground tabular-nums">
+                                    {t('rooms.setup.levels.sequence', {
+                                        terms: level.terms ?? 0,
+                                        rules: level.rules
+                                            .map((rule) =>
+                                                t(`rooms.setup.rules.${rule}`),
+                                            )
+                                            .join(', '),
+                                        answer: seconds(level.answer_ms, mark),
+                                    })}
+                                </p>
+                            )}
+                            {level !== undefined && level.source !== null && (
+                                <p className="text-[0.8125rem] leading-snug text-muted-foreground tabular-nums">
+                                    {t('rooms.setup.levels.odd', {
+                                        options: level.options ?? 0,
+                                        source: t(
+                                            `rooms.setup.sources.${level.source}`,
+                                        ),
+                                        answer: seconds(level.answer_ms, mark),
+                                    })}
+                                </p>
+                            )}
                             {level !== undefined && level.count !== null && (
                                 <p className="text-[0.8125rem] leading-snug text-muted-foreground tabular-nums">
                                     {level.grid !== null
@@ -369,8 +400,28 @@ export function GameSetup({
     );
 }
 
-/** A small drawing of a game's round, in the tokens: a row of shapes, a grid with lit cells. */
+/** A small drawing of a game's round, in the tokens: a row of shapes, a grid with lit cells, a row to continue, an odd one. */
 function MechanicPicture({ mechanic }: { mechanic: RoomMechanic }) {
+    // B5, plain: the next session draws them.
+    if (mechanic === 'next_in_sequence' || mechanic === 'odd_one_out') {
+        return (
+            <span
+                aria-hidden
+                className="flex size-14 shrink-0 items-center justify-center gap-1 rounded-xl bg-muted p-1.5 text-xs font-semibold text-primary tabular-nums"
+            >
+                {mechanic === 'next_in_sequence' ? (
+                    '2 4 6 ?'
+                ) : (
+                    <>
+                        <span className="size-3 rounded-full bg-primary" />
+                        <span className="size-3 rounded-full bg-primary" />
+                        <span className="size-3 rounded-[2px] bg-amber-400" />
+                    </>
+                )}
+            </span>
+        );
+    }
+
     if (mechanic === 'recall_cells') {
         const lit = new Set([0, 4, 5, 7]);
 

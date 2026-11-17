@@ -109,13 +109,17 @@ final class Rooms
      * A wrong answer of the right shape: for a sequence, the solution turned
      * by one place, which never reads like the row, since no item stands
      * beside its equal; for a set, one of its items swapped for an item of
-     * the question that is not in it.
+     * the question that is not in it; for a choice, another option.
      *
      * @return list<string>
      */
     public static function wrong(RoomRound $round): array
     {
         $ids = self::right($round);
+
+        if ($round->solutionData()->shape === RoomAnswerShape::Choice) {
+            return [array_values(array_diff($round->askData()->ids(), $ids))[0]];
+        }
 
         if ($round->solutionData()->shape === RoomAnswerShape::Set) {
             $other = array_values(array_diff($round->askData()->ids(), $ids));

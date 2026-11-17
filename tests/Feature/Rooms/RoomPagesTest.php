@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Content\Enums\RoomMechanic;
+use App\Domain\Content\Enums\RoomSequenceRule;
 use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Language\Support\Ordinal;
 use App\Domain\Rooms\Enums\RoomPhase;
@@ -415,7 +416,8 @@ it('names the family of each game the setup offers and what each level holds', f
 
     $setup = pagesProps($this->actingAs($this->resad)->get(route('rooms.show', $room)))['setup'];
 
-    expect(array_column($setup['mechanics'], 'mechanic'))->toBe(['recall_order', 'recall_cells']);
+    expect(array_column($setup['mechanics'], 'mechanic'))->toBe(['recall_order', 'recall_cells', 'next_in_sequence', 'odd_one_out'])
+        ->and(array_column($setup['mechanics'], 'family'))->toBe(['memory', 'memory', 'logic', 'logic']);
 
     foreach ($setup['mechanics'] as $offer) {
         $mechanic = RoomMechanic::from($offer['mechanic']);
@@ -423,7 +425,8 @@ it('names the family of each game the setup offers and what each level holds', f
         expect($offer['family'])->toBe($mechanic->family()->value)
             ->and(array_column($offer['levels'], 'difficulty'))->toBe($offer['difficulties']);
 
-        // Each level as levels.json holds it: the times, how many items a round asks to recall, a grid.
+        // Each level as levels.json holds it: the times, how many items a round asks to recall, a grid;
+        // a row's rules, terms and range; an odd one's source and options.
         foreach ($offer['levels'] as $described) {
             $level = $content->roomLevel($mechanic, $described['difficulty']);
             $count = $level->length ?? $level->lit;
@@ -432,8 +435,13 @@ it('names the family of each game the setup offers and what each level holds', f
                 'difficulty' => $level->difficulty,
                 'study_ms' => $level->studyMs,
                 'answer_ms' => $level->answerMs,
-                'count' => ['min' => $count?->min, 'max' => $count?->max],
+                'count' => $count === null ? null : ['min' => $count->min, 'max' => $count->max],
                 'grid' => $level->grid?->toArray(),
+                'rules' => $level->rules === [] ? null : array_map(static fn (RoomSequenceRule $rule): string => $rule->value, $level->rules),
+                'terms' => $level->terms,
+                'range' => $level->range === null ? null : ['min' => $level->range->min, 'max' => $level->range->max],
+                'source' => $level->source?->value,
+                'options' => $level->options,
             ]);
         }
     }
@@ -445,6 +453,15 @@ it('names the family of each game the setup offers and what each level holds', f
         ->and($cells['levels'][1]['count'])->toBe(['min' => $content->roomLevel(RoomMechanic::RecallCells, 2)->lit?->min, 'max' => $content->roomLevel(RoomMechanic::RecallCells, 2)->lit?->max])
         ->and($rows['levels'][0]['grid'])->toBeNull()
         ->and($rows['levels'][0]['count'])->toBe(['min' => $content->roomLevel(RoomMechanic::RecallOrder, 1)->length?->min, 'max' => $content->roomLevel(RoomMechanic::RecallOrder, 1)->length?->max]);
+
+    // B5: a logic game is answered at once; a row says its rules, terms and numbers, an odd one its source and options.
+    $sequence = collect($setup['mechanics'])->firstWhere('mechanic', 'next_in_sequence');
+    $odd = collect($setup['mechanics'])->firstWhere('mechanic', 'odd_one_out');
+    expect(array_unique(array_column([...$sequence['levels'], ...$odd['levels']], 'study_ms')))->toBe([0])
+        ->and($sequence['levels'][0])->toMatchArray(['count' => null, 'grid' => null, 'rules' => ['arithmetic'], 'terms' => 4, 'range' => ['min' => 1, 'max' => 50], 'source' => null, 'options' => null])
+        ->and($sequence['levels'][3]['rules'])->toHaveCount(6)
+        ->and($odd['levels'][0])->toMatchArray(['count' => null, 'rules' => null, 'terms' => null, 'range' => null, 'source' => 'words', 'options' => 4])
+        ->and(array_column($odd['levels'], 'source'))->toBe(['words', 'numbers', 'words', 'numbers']);
 
     // Nobody else gets it: a player, and the host once the room is closed.
     $this->actingAs($this->aygun)->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('setup', null));

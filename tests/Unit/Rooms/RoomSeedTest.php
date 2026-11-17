@@ -16,26 +16,26 @@ use Illuminate\Support\Facades\Config;
 /**
  * @return list<array<string, mixed>>
  */
-function seededRounds(int $seed): array
+function seededRounds(int $seed, RoomMechanic $mechanic = RoomMechanic::RecallOrder): array
 {
-    $level = app(ContentRepository::class)->roomLevel(RoomMechanic::RecallOrder, 2);
+    $level = app(ContentRepository::class)->roomLevel($mechanic, 2);
 
     return array_map(
         static fn (BuiltRoomRoundData $round): array => [$round->payload(), $round->solution->toArray()],
-        RoomPlayable::builder(RoomMechanic::RecallOrder)->build($level, 5, RoomSeed::random($seed)),
+        RoomPlayable::builder($mechanic)->build($level, 5, RoomSeed::random($seed)),
     );
 }
 
-it('tells the same rounds from the same seed, and other rounds under another key', function (): void {
+it('tells the same rounds from the same seed, and other rounds under another key', function (RoomMechanic $mechanic): void {
     Config::set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
-    $rounds = seededRounds(1234);
+    $rounds = seededRounds(1234, $mechanic);
 
-    expect(seededRounds(1234))->toBe($rounds)
-        ->and(seededRounds(1235))->not->toBe($rounds);
+    expect(seededRounds(1234, $mechanic))->toBe($rounds)
+        ->and(seededRounds(1235, $mechanic))->not->toBe($rounds);
 
     Config::set('app.key', 'base64:'.base64_encode(str_repeat('b', 32)));
-    expect(seededRounds(1234))->not->toBe($rounds);
-});
+    expect(seededRounds(1234, $mechanic))->not->toBe($rounds);
+})->with(RoomMechanic::cases());
 
 it('draws new seeds within the column', function (): void {
     foreach (range(1, 50) as $_) {

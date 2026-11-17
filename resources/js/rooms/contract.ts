@@ -59,8 +59,13 @@ export const RoomPlayer = z.strictObject({
     host: z.boolean(),
 });
 
-/** The mechanics a room plays; grows with B5–B6. */
-export const RoomMechanic = z.enum(['recall_order', 'recall_cells']);
+/** The mechanics a room plays; grows with B6. */
+export const RoomMechanic = z.enum([
+    'recall_order',
+    'recall_cells',
+    'next_in_sequence',
+    'odd_one_out',
+]);
 
 export const RoomItem = z.strictObject({
     id: itemId,
@@ -86,13 +91,19 @@ export const RoomStudy = z.strictObject({
     items: z.array(RoomItem).min(1),
 });
 
-/** The question; from the phase `answer` on. For a sequence, never in the order to tap. */
+/**
+ * The question; from the phase `answer` on. For a sequence, never in the
+ * order to tap. `shown` is what is shown with it and never picked (B5: the
+ * row `next_in_sequence` continues; empty for the other mechanics);
+ * `items` are what an answer is made of.
+ */
 export const RoomAsk = z.strictObject({
     shape: z.enum(['choice', 'sequence', 'set']),
     /** How many items an answer holds. */
     pick: z.number().int().positive(),
     layout: RoomLayout,
     grid: RoomGrid.nullable(),
+    shown: z.array(RoomItem),
     items: z.array(RoomItem).min(1),
 });
 

@@ -2,6 +2,7 @@
 
 use App\Domain\Content\Data\LevelData;
 use App\Domain\Content\Data\PackData;
+use App\Domain\Content\Data\RoomCategoryData;
 use App\Domain\Content\Data\RoomLevelData;
 use App\Domain\Content\Data\RoomShapeData;
 use App\Domain\Content\Data\WordData;
@@ -12,9 +13,12 @@ use App\Domain\Content\Enums\Mechanic;
 use App\Domain\Content\Enums\RoomFamily;
 use App\Domain\Content\Enums\RoomItemKind;
 use App\Domain\Content\Enums\RoomMechanic;
+use App\Domain\Content\Enums\RoomSequenceRule;
+use App\Domain\Content\Enums\RoomSource;
 use App\Domain\Content\Enums\SlotStyle;
 use App\Domain\Content\Enums\Unit;
 use App\Domain\Content\Support\ContentRepository;
+use App\Domain\Language\Support\Az;
 use App\Domain\Language\Support\Syllabifier;
 use Illuminate\Support\Facades\File;
 use Tests\Support\ContentFixture;
@@ -258,7 +262,7 @@ it('reads the room levels', function (): void {
 
     // B3: «Ardıcıllığı yadda saxla» at the four difficulties, digits first,
     // then digits, letters and (B4) shapes; B4: «Xanaları yadda saxla».
-    expect($content->roomVersion())->toBeGreaterThanOrEqual(2)
+    expect($content->roomVersion())->toBeGreaterThanOrEqual(3)
         ->and(array_map(static fn (RoomLevelData $level): array => [$level->mechanic, $level->difficulty], $levels))->toBe([
             [RoomMechanic::RecallOrder, 1],
             [RoomMechanic::RecallOrder, 2],
@@ -268,6 +272,14 @@ it('reads the room levels', function (): void {
             [RoomMechanic::RecallCells, 2],
             [RoomMechanic::RecallCells, 3],
             [RoomMechanic::RecallCells, 4],
+            [RoomMechanic::NextInSequence, 1],
+            [RoomMechanic::NextInSequence, 2],
+            [RoomMechanic::NextInSequence, 3],
+            [RoomMechanic::NextInSequence, 4],
+            [RoomMechanic::OddOneOut, 1],
+            [RoomMechanic::OddOneOut, 2],
+            [RoomMechanic::OddOneOut, 3],
+            [RoomMechanic::OddOneOut, 4],
         ])
         ->and($orders[0]->kinds)->toBe([RoomItemKind::Digit])
         ->and($orders[3]->kinds)->toBe([RoomItemKind::Digit, RoomItemKind::Letter, RoomItemKind::Shape])
@@ -304,6 +316,32 @@ it('reads the room levels', function (): void {
         }
     }
 
+    // B5: the logic games, studied for no time; a row's rules grow with the difficulty, all six at the hardest.
+    $sequences = array_values(array_filter($levels, static fn (RoomLevelData $level): bool => $level->mechanic === RoomMechanic::NextInSequence));
+    $odd = array_values(array_filter($levels, static fn (RoomLevelData $level): bool => $level->mechanic === RoomMechanic::OddOneOut));
+
+    foreach ([...$sequences, ...$odd] as $level) {
+        expect($level->studyMs)->toBe(0)
+            ->and($level->mechanic->family())->toBe(RoomFamily::Logic)
+            ->and($level->mechanic->studies())->toBeFalse()
+            ->and($level->kinds)->toBe([]);
+    }
+
+    foreach ($sequences as $index => $level) {
+        expect($level->terms)->toBeGreaterThanOrEqual(max(array_map(static fn (RoomSequenceRule $rule): int => $rule->minTerms(), $level->rules)))
+            ->and($level->range?->max)->toBeLessThanOrEqual(999)
+            ->and($level->source)->toBeNull();
+
+        if ($index > 0) {
+            expect(count($level->rules))->toBeGreaterThan(count($sequences[$index - 1]->rules));
+        }
+    }
+
+    expect($sequences[0]->rules)->toBe([RoomSequenceRule::Arithmetic])
+        ->and($sequences[3]->rules)->toEqualCanonicalizing(RoomSequenceRule::cases())
+        ->and(array_map(static fn (RoomLevelData $level): ?RoomSource => $level->source, $odd))->toBe([RoomSource::Words, RoomSource::Numbers, RoomSource::Words, RoomSource::Numbers])
+        ->and(array_map(static fn (RoomLevelData $level): ?int => $level->options, $odd))->toBe([4, 4, 5, 5]);
+
     expect($content->roomLevel(RoomMechanic::RecallOrder, 2))->toBe($orders[1])
         ->and($content->roomLevel(RoomMechanic::RecallCells, 3))->toBe($cells[2])
         ->and(fn () => $content->roomLevel(RoomMechanic::RecallOrder, 5))->toThrow(InvalidArgumentException::class);
@@ -311,7 +349,9 @@ it('reads the room levels', function (): void {
     // A fixture root reads its own.
     $fixture = new ContentRepository(ContentFixture::make());
 
-    expect(array_map(static fn (RoomLevelData $level): ?int => $level->length?->max, $fixture->roomLevels()))->toBe([3, 4, 8, 12, null, null, null, null])
+    expect(array_map(static fn (RoomLevelData $level): ?int => $level->length?->max, $fixture->roomLevels()))->toBe([3, 4, 8, 12, null, null, null, null, null, null, null, null, null, null, null, null])
+        ->and($fixture->roomLevel(RoomMechanic::NextInSequence, 4)->terms)->toBe(7)
+        ->and($fixture->roomLevel(RoomMechanic::OddOneOut, 2)->source)->toBe(RoomSource::Numbers)
         ->and($fixture->roomLevel(RoomMechanic::RecallOrder, 4)->studyMs)->toBe(60_000)
         ->and($fixture->roomLevel(RoomMechanic::RecallCells, 4)->grid?->toArray())->toBe(['cols' => 4, 'rows' => 5])
         ->and($fixture->roomLevel(RoomMechanic::RecallCells, 3)->lit?->max)->toBe(35);
@@ -336,6 +376,30 @@ it('reads the room shapes', function (): void {
     $fixture = new ContentRepository(ContentFixture::make());
 
     expect(array_map(static fn (RoomShapeData $shape): string => $shape->key, $fixture->roomShapes()))->toBe(['circle', 'square', 'triangle', 'star']);
+});
+
+it('reads the room categories', function (): void {
+    $categories = app(ContentRepository::class)->roomCategories();
+    $words = array_merge(...array_map(static fn (RoomCategoryData $category): array => $category->words, $categories));
+
+    // B5: groups far apart in meaning, at least 8 lowercase words each, no word in two of them.
+    expect(count($categories))->toBeGreaterThanOrEqual(4)
+        ->and(array_map(static fn (RoomCategoryData $category): string => $category->key, $categories))->toContain('heyvanlar', 'meyveler')
+        ->and(array_unique(array_map(Az::lower(...), $words)))->toHaveCount(count($words));
+
+    foreach ($categories as $category) {
+        expect(count($category->words))->toBeGreaterThanOrEqual(8);
+
+        foreach ($category->words as $word) {
+            expect($word)->toBe(Az::lower($word));
+        }
+    }
+
+    // A fixture root reads its own.
+    $fixture = new ContentRepository(ContentFixture::make());
+
+    expect(array_map(static fn (RoomCategoryData $category): string => $category->key, $fixture->roomCategories()))->toBe(['fruit', 'transport', 'clothes', 'music'])
+        ->and($fixture->roomCategories()[0]->words[0])->toBe('alma');
 });
 
 it('says which pack, level or prompt does not exist', function (Closure $read): void {

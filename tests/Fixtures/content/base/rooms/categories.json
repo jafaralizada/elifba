@@ -1,0 +1,57 @@
+{
+    "version": 1,
+    "groups": [
+        {
+            "key": "fruit",
+            "words": [
+                "alma",
+                "armud",
+                "heyva",
+                "nar",
+                "gilas",
+                "ərik",
+                "üzüm",
+                "limon"
+            ]
+        },
+        {
+            "key": "transport",
+            "words": [
+                "avtobus",
+                "maşın",
+                "qatar",
+                "təyyarə",
+                "gəmi",
+                "tramvay",
+                "metro",
+                "taksi"
+            ]
+        },
+        {
+            "key": "clothes",
+            "words": [
+                "köynək",
+                "şalvar",
+                "palto",
+                "papaq",
+                "corab",
+                "ətək",
+                "kəmər",
+                "şərf"
+            ]
+        },
+        {
+            "key": "music",
+            "words": [
+                "tar",
+                "kamança",
+                "saz",
+                "nağara",
+                "qaval",
+                "balaban",
+                "tütək",
+                "zurna"
+            ]
+        }
+    ]
+}

@@ -1,5 +1,5 @@
 {
-    "version": 2,
+    "version": 3,
     "levels": [
         {
             "mechanic": "recall_order",
@@ -64,6 +64,87 @@
             "answer_ms": 25000,
             "grid": { "cols": 6, "rows": 6 },
             "lit": { "min": 9, "max": 11 }
+        },
+        {
+            "mechanic": "next_in_sequence",
+            "difficulty": 1,
+            "study_ms": 0,
+            "answer_ms": 15000,
+            "rules": ["arithmetic"],
+            "terms": 4,
+            "range": { "min": 1, "max": 50 }
+        },
+        {
+            "mechanic": "next_in_sequence",
+            "difficulty": 2,
+            "study_ms": 0,
+            "answer_ms": 20000,
+            "rules": ["arithmetic", "geometric", "squares"],
+            "terms": 5,
+            "range": { "min": 1, "max": 300 }
+        },
+        {
+            "mechanic": "next_in_sequence",
+            "difficulty": 3,
+            "study_ms": 0,
+            "answer_ms": 25000,
+            "rules": [
+                "arithmetic",
+                "geometric",
+                "squares",
+                "alternating",
+                "fibonacci"
+            ],
+            "terms": 5,
+            "range": { "min": 1, "max": 500 }
+        },
+        {
+            "mechanic": "next_in_sequence",
+            "difficulty": 4,
+            "study_ms": 0,
+            "answer_ms": 30000,
+            "rules": [
+                "arithmetic",
+                "geometric",
+                "squares",
+                "alternating",
+                "fibonacci",
+                "interleaved"
+            ],
+            "terms": 6,
+            "range": { "min": 1, "max": 999 }
+        },
+        {
+            "mechanic": "odd_one_out",
+            "difficulty": 1,
+            "study_ms": 0,
+            "answer_ms": 10000,
+            "source": "words",
+            "options": 4
+        },
+        {
+            "mechanic": "odd_one_out",
+            "difficulty": 2,
+            "study_ms": 0,
+            "answer_ms": 20000,
+            "source": "numbers",
+            "options": 4
+        },
+        {
+            "mechanic": "odd_one_out",
+            "difficulty": 3,
+            "study_ms": 0,
+            "answer_ms": 12000,
+            "source": "words",
+            "options": 5
+        },
+        {
+            "mechanic": "odd_one_out",
+            "difficulty": 4,
+            "study_ms": 0,
+            "answer_ms": 25000,
+            "source": "numbers",
+            "options": 5
         }
     ]
 }

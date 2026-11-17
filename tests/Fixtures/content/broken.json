@@ -1119,7 +1119,7 @@
     "rooms levels: an unknown mechanic": {
         "file": "rooms/levels.json",
         "set": { "levels.0.mechanic": "find" },
-        "problem": "rooms/levels.json: levels[0].mechanic must be one of recall_order, recall_cells"
+        "problem": "rooms/levels.json: levels[0].mechanic must be one of recall_order, recall_cells, next_in_sequence, odd_one_out"
     },
     "rooms levels: a difficulty outside 1–4": {
         "file": "rooms/levels.json",
@@ -1334,5 +1334,235 @@
             "assets/rooms/star.svg": "<svg width=\"32\" height=\"32\" viewBox=\"0 0 32 32\" xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script><path d=\"M16 2 L30 30 L2 30 Z\"/></svg>\n"
         },
         "problem": "assets/rooms/star.svg: has a <script> element; asset SVGs must be plain drawings"
+    },
+    "rooms levels: a logic game studied": {
+        "file": "rooms/levels.json",
+        "set": {
+            "levels.8.study_ms": 2000
+        },
+        "problem": "rooms/levels.json: levels[8].study_ms must be 0: only a memory game is studied"
+    },
+    "rooms levels: a row of no rule": {
+        "file": "rooms/levels.json",
+        "set": {
+            "levels.8.rules": []
+        },
+        "problem": "rooms/levels.json: levels[8].rules must be a non-empty list of non-empty strings"
+    },
+    "rooms levels: an unknown rule": {
+        "file": "rooms/levels.json",
+        "set": {
+            "levels.9.rules": ["geometric", "spiral"]
+        },
+        "problem": "rooms/levels.json: levels[9].rules[1] must be one of arithmetic, geometric, alternating, squares, fibonacci, interleaved"
+    },
+    "rooms levels: a rule twice": {
+        "file": "rooms/levels.json",
+        "set": {
+            "levels.9.rules": ["squares", "squares"]
+        },
+        "problem": "rooms/levels.json: levels[9].rules lists a value twice"
+    },
+    "rooms levels: too few terms to tell a rule": {
+        "file": "rooms/levels.json",
+        "set": {
+            "levels.9.terms": 4
+        },
+        "problem": "rooms/levels.json: levels[9].terms: a row of geometric shows at least 5 terms, so no other rule continues it otherwise"
+    },
+    "rooms levels: two interleaved rows of five": {
+        "file": "rooms/levels.json",
+        "set": {
+            "levels.11.terms": 5
+        },
+        "problem": "rooms/levels.json: levels[11].terms: a row of interleaved shows at least 6 terms, so no other rule continues it otherwise"
+    },
+    "rooms levels: a row too long for a phone": {
+        "file": "rooms/levels.json",
+        "set": {
+            "levels.11.terms": 8
+        },
+        "problem": "rooms/levels.json: levels[11].terms must be a whole number from 1 to 7"
+    },
+    "rooms levels: a row without its terms": {
+        "file": "rooms/levels.json",
+        "unset": ["levels.10.terms"],
+        "problem": "rooms/levels.json: levels[10] needs `terms`"
+    },
+    "rooms levels: a row without its range": {
+        "file": "rooms/levels.json",
+        "unset": ["levels.10.range"],
+        "problem": "rooms/levels.json: levels[10] needs `range`"
+    },
+    "rooms levels: numbers too long for a phone": {
+        "file": "rooms/levels.json",
+        "set": {
+            "levels.11.range": {
+                "min": 1,
+                "max": 1000
+            }
+        },
+        "problem": "rooms/levels.json: levels[11].range needs whole numbers from 1 to 999, min ≤ max"
+    },
+    "rooms levels: a row from zero": {
+        "file": "rooms/levels.json",
+        "set": {
+            "levels.8.range": {
+                "min": 0,
+                "max": 50
+            }
+        },
+        "problem": "rooms/levels.json: levels[8].range needs whole numbers from 1 to 999, min ≤ max"
+    },
+    "rooms levels: a range of one number": {
+        "file": "rooms/levels.json",
+        "set": {
+            "levels.8.range": {
+                "min": 7,
+                "max": 7
+            }
+        },
+        "problem": "rooms/levels.json: levels[8].range: a row needs more than one number"
+    },
+    "rooms levels: a row with an odd one's options": {
+        "file": "rooms/levels.json",
+        "set": {
+            "levels.8.options": 4
+        },
+        "problem": "rooms/levels.json: levels[8] has an unknown key `options`"
+    },
+    "rooms levels: an odd one without its source": {
+        "file": "rooms/levels.json",
+        "unset": ["levels.13.source"],
+        "problem": "rooms/levels.json: levels[13] needs `source`"
+    },
+    "rooms levels: an unknown source": {
+        "file": "rooms/levels.json",
+        "set": {
+            "levels.12.source": "pictures"
+        },
+        "problem": "rooms/levels.json: levels[12].source must be one of numbers, words"
+    },
+    "rooms levels: too few options": {
+        "file": "rooms/levels.json",
+        "set": {
+            "levels.12.options": 3
+        },
+        "problem": "rooms/levels.json: levels[12].options must be a whole number from 4 to 5"
+    },
+    "rooms levels: too many options": {
+        "file": "rooms/levels.json",
+        "set": {
+            "levels.15.options": 6
+        },
+        "problem": "rooms/levels.json: levels[15].options must be a whole number from 4 to 5"
+    },
+    "rooms levels: an odd one with a row's rules": {
+        "file": "rooms/levels.json",
+        "set": {
+            "levels.14.rules": ["arithmetic"]
+        },
+        "problem": "rooms/levels.json: levels[14] has an unknown key `rules`"
+    },
+    "rooms categories: no file": {
+        "file": "rooms/categories.json",
+        "delete": ["rooms/categories.json"],
+        "problem": "rooms/categories.json: is missing"
+    },
+    "rooms categories: no version": {
+        "file": "rooms/categories.json",
+        "unset": ["version"],
+        "problem": "rooms/categories.json: the file needs `version`"
+    },
+    "rooms categories: a version below 1": {
+        "file": "rooms/categories.json",
+        "set": {
+            "version": 0
+        },
+        "problem": "rooms/categories.json: version must be a whole number from 1"
+    },
+    "rooms categories: too few groups": {
+        "file": "rooms/categories.json",
+        "keep": {
+            "groups": 3
+        },
+        "problem": "rooms/categories.json: `groups` must hold at least 4 groups"
+    },
+    "rooms categories: a group too small": {
+        "file": "rooms/categories.json",
+        "keep": {
+            "groups.2.words": 7
+        },
+        "problem": "rooms/categories.json: groups[2].words must hold at least 8 words"
+    },
+    "rooms categories: a group of nothing": {
+        "file": "rooms/categories.json",
+        "set": {
+            "groups.2.words": []
+        },
+        "problem": "rooms/categories.json: groups[2].words must be a non-empty list of non-empty strings"
+    },
+    "rooms categories: a word in two groups": {
+        "file": "rooms/categories.json",
+        "set": {
+            "groups.3.words.7": "tramvay"
+        },
+        "problem": "rooms/categories.json: groups[3].words[7] \"tramvay\" is already groups[1].words[5]: a word is in one group only"
+    },
+    "rooms categories: a word twice in a group": {
+        "file": "rooms/categories.json",
+        "set": {
+            "groups.0.words.7": "heyva"
+        },
+        "problem": "rooms/categories.json: groups[0].words[7] \"heyva\" is already groups[0].words[2]: a word is in one group only"
+    },
+    "rooms categories: a word with a capital": {
+        "file": "rooms/categories.json",
+        "set": {
+            "groups.0.words.3": "Nar"
+        },
+        "problem": "rooms/categories.json: groups[0].words[3] \"Nar\" must be one lowercase word of the alphabet's letters with a vowel"
+    },
+    "rooms categories: two words in one": {
+        "file": "rooms/categories.json",
+        "set": {
+            "groups.0.words.3": "qırmızı alma"
+        },
+        "problem": "rooms/categories.json: groups[0].words[3] \"qırmızı alma\" must be one lowercase word of the alphabet's letters with a vowel"
+    },
+    "rooms categories: a word without a vowel": {
+        "file": "rooms/categories.json",
+        "set": {
+            "groups.0.words.3": "brr"
+        },
+        "problem": "rooms/categories.json: groups[0].words[3] \"brr\" must be one lowercase word of the alphabet's letters with a vowel"
+    },
+    "rooms categories: a first name": {
+        "file": "rooms/categories.json",
+        "set": {
+            "groups.2.words.7": "aysel"
+        },
+        "problem": "rooms/categories.json: groups[2].words[7] \"aysel\" is a first name of names.json"
+    },
+    "rooms categories: a key twice": {
+        "file": "rooms/categories.json",
+        "set": {
+            "groups.1.key": "fruit"
+        },
+        "problem": "rooms/categories.json: groups[1].key \"fruit\" is already a group's"
+    },
+    "rooms categories: a key that is no key": {
+        "file": "rooms/categories.json",
+        "set": {
+            "groups.1.key": "Nəqliyyat"
+        },
+        "problem": "rooms/categories.json: groups[1].key must be lowercase letters and digits joined by single hyphens"
+    },
+    "rooms categories: a key of no group": {
+        "file": "rooms/categories.json",
+        "set": {
+            "groups.0.title": "Meyvələr"
+        },
+        "problem": "rooms/categories.json: groups[0] has an unknown key `title`"
     }
 }

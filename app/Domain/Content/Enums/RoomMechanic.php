@@ -29,10 +29,23 @@ enum RoomMechanic: string
      */
     case RecallCells = 'recall_cells';
 
+    /**
+     * «Sıranı davam etdir»: a row of numbers follows a rule; choose what
+     * comes next among four (`choice`).
+     */
+    case NextInSequence = 'next_in_sequence';
+
+    /**
+     * «Artıq olanı tap»: one of the numbers or words does not belong with
+     * the others; choose it (`choice`).
+     */
+    case OddOneOut = 'odd_one_out';
+
     public function family(): RoomFamily
     {
         return match ($this) {
             self::RecallOrder, self::RecallCells => RoomFamily::Memory,
+            self::NextInSequence, self::OddOneOut => RoomFamily::Logic,
         };
     }
 
@@ -49,7 +62,8 @@ enum RoomMechanic: string
      * far as their material exists: shapes from B4 (`content/rooms/
      * shapes.json`); words wait for B6's word list (`content/rooms/
      * words.json`). A `recall_cells` level names none: its items are the
-     * cells of its grid.
+     * cells of its grid; nor does a logic level: `next_in_sequence` shows
+     * numbers, and `odd_one_out` what its `source` says.
      *
      * @return list<RoomItemKind>
      */
@@ -57,7 +71,7 @@ enum RoomMechanic: string
     {
         return match ($this) {
             self::RecallOrder => [RoomItemKind::Digit, RoomItemKind::Letter, RoomItemKind::Shape],
-            self::RecallCells => [],
+            self::RecallCells, self::NextInSequence, self::OddOneOut => [],
         };
     }
 }

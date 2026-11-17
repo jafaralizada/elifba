@@ -166,7 +166,8 @@ it('asks for exactly the lit cells', function (RoomLevelData $level): void {
             $payload = $round->payload();
 
             expect(array_keys($payload))->toBe(['study', 'ask'])
-                ->and(array_keys($payload['ask']))->toBe(['shape', 'pick', 'layout', 'grid', 'items']);
+                ->and(array_keys($payload['ask']))->toBe(['shape', 'pick', 'layout', 'grid', 'shown', 'items'])
+                ->and($payload['ask']['shown'])->toBe([]);
         }
     }
 })->with(recallCellsLevels());

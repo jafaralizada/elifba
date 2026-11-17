@@ -61,6 +61,7 @@
             "pick": 5,
             "layout": "row",
             "grid": null,
+            "shown": [],
             "items": [
                 {
                     "id": "h2v6pc9m",

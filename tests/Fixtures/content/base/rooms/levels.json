@@ -64,6 +64,74 @@
             "answer_ms": 30000,
             "grid": { "cols": 4, "rows": 5 },
             "lit": { "min": 5, "max": 6 }
+        },
+        {
+            "mechanic": "next_in_sequence",
+            "difficulty": 1,
+            "study_ms": 0,
+            "answer_ms": 5000,
+            "rules": ["arithmetic"],
+            "terms": 4,
+            "range": { "min": 1, "max": 50 }
+        },
+        {
+            "mechanic": "next_in_sequence",
+            "difficulty": 2,
+            "study_ms": 0,
+            "answer_ms": 10000,
+            "rules": ["geometric", "squares"],
+            "terms": 5,
+            "range": { "min": 1, "max": 300 }
+        },
+        {
+            "mechanic": "next_in_sequence",
+            "difficulty": 3,
+            "study_ms": 0,
+            "answer_ms": 20000,
+            "rules": ["alternating", "fibonacci"],
+            "terms": 5,
+            "range": { "min": 1, "max": 500 }
+        },
+        {
+            "mechanic": "next_in_sequence",
+            "difficulty": 4,
+            "study_ms": 0,
+            "answer_ms": 60000,
+            "rules": ["interleaved"],
+            "terms": 7,
+            "range": { "min": 1, "max": 999 }
+        },
+        {
+            "mechanic": "odd_one_out",
+            "difficulty": 1,
+            "study_ms": 0,
+            "answer_ms": 5000,
+            "source": "words",
+            "options": 4
+        },
+        {
+            "mechanic": "odd_one_out",
+            "difficulty": 2,
+            "study_ms": 0,
+            "answer_ms": 10000,
+            "source": "numbers",
+            "options": 4
+        },
+        {
+            "mechanic": "odd_one_out",
+            "difficulty": 3,
+            "study_ms": 0,
+            "answer_ms": 20000,
+            "source": "words",
+            "options": 5
+        },
+        {
+            "mechanic": "odd_one_out",
+            "difficulty": 4,
+            "study_ms": 0,
+            "answer_ms": 30000,
+            "source": "numbers",
+            "options": 5
         }
     ]
 }

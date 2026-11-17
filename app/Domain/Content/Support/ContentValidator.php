@@ -14,6 +14,8 @@ use App\Domain\Content\Enums\License;
 use App\Domain\Content\Enums\Mechanic;
 use App\Domain\Content\Enums\RoomItemKind;
 use App\Domain\Content\Enums\RoomMechanic;
+use App\Domain\Content\Enums\RoomSequenceRule;
+use App\Domain\Content\Enums\RoomSource;
 use App\Domain\Content\Enums\SlotStyle;
 use App\Domain\Content\Enums\Sound;
 use App\Domain\Content\Enums\Unit;
@@ -32,7 +34,7 @@ use SplFileInfo;
  * Checks a content root (docs/architecture.md §3, §8): `alphabet.json`,
  * `avatars.json`, `sounds.json`, `levels.json`, `prompts.json`, `names.json`,
  * `voice.json` with `voice-clips.json`, `credits.json`, `packs/*.json`,
- * `rooms/levels.json` and `rooms/shapes.json` (§12 "Room content"),
+ * `rooms/levels.json`, `rooms/shapes.json` and `rooms/categories.json` (§12 "Room content"),
  * `tests/syllables.json` and every file under `assets/`, `voice-names/`
  * and `resources/fonts/` (credits; SVG files are also checked for anything
  * that could run or load). `validate()` lists every problem, one line each;
@@ -179,6 +181,31 @@ final class ContentValidator
      */
     public const string ROOM_SHAPES_FOLDER = 'rooms/';
 
+    /**
+     * A `next_in_sequence` row shows at most seven terms, and every number
+     * of a round is 1–999 — three digits, short enough for seven terms and
+     * the «?» to fit one row of a 375px phone (§12 "Room games", B5).
+     */
+    public const int MAX_ROOM_TERMS = 7;
+
+    public const int MAX_ROOM_NUMBER = 999;
+
+    /**
+     * An `odd_one_out` round offers 4 or 5 options (§12 "Room games").
+     */
+    public const int MIN_ROOM_OPTIONS = 4;
+
+    public const int MAX_ROOM_OPTIONS = 5;
+
+    /**
+     * `categories.json` (B5): at least four groups of at least eight words,
+     * so a round has a group to take all but one from and others to take
+     * the odd one from, and rounds do not repeat at once.
+     */
+    public const int MIN_ROOM_CATEGORIES = 4;
+
+    public const int MIN_ROOM_CATEGORY_WORDS = 8;
+
     private const string KEY = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/';
 
     /**
@@ -264,6 +291,7 @@ final class ContentValidator
         $this->prompts($levels);
         $this->roomLevels($this->roomShapes());
         $this->names();
+        $this->roomCategories();
         $this->voice();
         $credits = $this->credits();
 
@@ -745,6 +773,13 @@ final class ContentValidator
      * - `recall_cells`: `grid`, `cols` and `rows` 2–6; `lit`, from 1 and
      *   `min` ≤ `max`, fewer than the grid's cells, so a dark cell is always
      *   left to tell from a lit one.
+     * - `next_in_sequence` (B5): `rules`, distinct rules of
+     *   `RoomSequenceRule`; `terms`, at least what every rule named needs
+     *   to be told from the others (`RoomSequenceRule::minTerms()`) and at
+     *   most seven; `range`, 1–999 with `min` below `max`. Whether a rule
+     *   fits its range is the builder's arithmetic, which the validator may
+     *   not reach: `RoomPlayableTest` builds every level.
+     * - `odd_one_out` (B5): `source`, numbers or words; `options`, 4 or 5.
      *
      * @param  int|null  $shapes  how many shapes `shapes.json` holds; null when it has a problem
      */
@@ -814,6 +849,8 @@ final class ContentValidator
             match ($mechanic) {
                 RoomMechanic::RecallOrder => $this->recallOrderLevel($mechanic, $level, $file, $where, $shapes),
                 RoomMechanic::RecallCells => $this->recallCellsLevel($level, $file, $where),
+                RoomMechanic::NextInSequence => $this->nextInSequenceLevel($level, $file, $where),
+                RoomMechanic::OddOneOut => $this->oddOneOutLevel($level, $file, $where),
                 null => null,
             };
         }
@@ -837,7 +874,48 @@ final class ContentValidator
         return match ($mechanic) {
             RoomMechanic::RecallOrder => ['kinds', 'length'],
             RoomMechanic::RecallCells => ['grid', 'lit'],
+            RoomMechanic::NextInSequence => ['rules', 'terms', 'range'],
+            RoomMechanic::OddOneOut => ['source', 'options'],
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $level
+     */
+    private function nextInSequenceLevel(array $level, string $file, string $where): void
+    {
+        $rules = $this->enums(RoomSequenceRule::class, $level['rules'], $file, "{$where}.rules") ?? [];
+        $terms = $level['terms'];
+
+        if (! is_int($terms) || $terms < 1 || $terms > self::MAX_ROOM_TERMS) {
+            $this->problem($file, "{$where}.terms must be a whole number from 1 to ".self::MAX_ROOM_TERMS);
+        } else {
+            foreach ($rules as $rule) {
+                if ($terms < $rule->minTerms()) {
+                    $this->problem($file, "{$where}.terms: a row of {$rule->value} shows at least {$rule->minTerms()} terms, so no other rule continues it otherwise");
+                }
+            }
+        }
+
+        $this->range($level['range'], 1, self::MAX_ROOM_NUMBER, $file, "{$where}.range");
+        $range = $level['range'];
+
+        if (is_array($range) && isset($range['min'], $range['max']) && is_int($range['min']) && $range['min'] === $range['max']) {
+            $this->problem($file, "{$where}.range: a row needs more than one number");
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $level
+     */
+    private function oddOneOutLevel(array $level, string $file, string $where): void
+    {
+        $this->enum(RoomSource::class, $level['source'], $file, "{$where}.source");
+        $options = $level['options'];
+
+        if (! is_int($options) || $options < self::MIN_ROOM_OPTIONS || $options > self::MAX_ROOM_OPTIONS) {
+            $this->problem($file, "{$where}.options must be a whole number from ".self::MIN_ROOM_OPTIONS.' to '.self::MAX_ROOM_OPTIONS);
+        }
     }
 
     /**
@@ -1035,6 +1113,92 @@ final class ContentValidator
         sort($files, SORT_STRING);
 
         return $files;
+    }
+
+    // ── rooms/categories.json ───────────────────────────────────────────
+
+    /**
+     * The groups of words of `odd_one_out` (§12 "Room content", B5):
+     * `version` and at least four `groups`, each a `key` (lowercase,
+     * unique) and at least eight `words`. A word is one lowercase word of
+     * the alphabet's letters with a vowel (`WordRules`), normalized, in
+     * exactly one group — compared by `Az::lower`, so the word that does
+     * not belong is never also a word of the group — and never a first
+     * name of `names.json`, since a round may show it to a room.
+     */
+    private function roomCategories(): void
+    {
+        $file = ContentRepository::ROOM_CATEGORIES;
+        $data = $this->object($this->read($file), $file, '', ['version', 'groups']);
+
+        if ($data === null) {
+            return;
+        }
+
+        $this->normalized($data, $file);
+
+        if (! is_int($data['version']) || $data['version'] < 1) {
+            $this->problem($file, 'version must be a whole number from 1');
+        }
+
+        $groups = $this->list($data['groups'], $file, 'groups');
+
+        if ($groups === null) {
+            return;
+        }
+
+        if (count($groups) < self::MIN_ROOM_CATEGORIES) {
+            $this->problem($file, '`groups` must hold at least '.self::MIN_ROOM_CATEGORIES.' groups');
+        }
+
+        $names = array_flip(array_map(Az::lower(...), $this->names ?? []));
+        $keys = [];
+        /** @var array<string, string> $seen a word by `Az::lower` → where it is */
+        $seen = [];
+
+        foreach ($groups as $index => $group) {
+            $where = "groups[{$index}]";
+            $group = $this->object($group, $file, $where, ['key', 'words']);
+
+            if ($group === null) {
+                continue;
+            }
+
+            $key = $group['key'];
+
+            if (! is_string($key) || preg_match(self::KEY, $key) !== 1) {
+                $this->problem($file, "{$where}.key must be lowercase letters and digits joined by single hyphens");
+            } elseif (in_array($key, $keys, true)) {
+                $this->problem($file, "{$where}.key \"{$key}\" is already a group's");
+            } else {
+                $keys[] = $key;
+            }
+
+            $words = $this->strings($group['words'], $file, "{$where}.words") ?? [];
+
+            if ($words !== [] && count($words) < self::MIN_ROOM_CATEGORY_WORDS) {
+                $this->problem($file, "{$where}.words must hold at least ".self::MIN_ROOM_CATEGORY_WORDS.' words');
+            }
+
+            foreach ($words as $at => $word) {
+                $here = "{$where}.words[{$at}] \"{$word}\"";
+                $lower = Az::lower($word);
+
+                if (WordRules::problems($word) !== [] || $lower !== $word) {
+                    $this->problem($file, "{$here} must be one lowercase word of the alphabet's letters with a vowel");
+                }
+
+                if (isset($seen[$lower])) {
+                    $this->problem($file, "{$here} is already {$seen[$lower]}: a word is in one group only");
+                } else {
+                    $seen[$lower] = "{$where}.words[{$at}]";
+                }
+
+                if (isset($names[$lower])) {
+                    $this->problem($file, "{$here} is a first name of ".ContentRepository::NAMES);
+                }
+            }
+        }
     }
 
     // ── names.json ──────────────────────────────────────────────────────

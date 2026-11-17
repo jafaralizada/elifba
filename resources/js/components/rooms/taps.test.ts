@@ -13,6 +13,19 @@ function ask(shape: RoomAsk['shape'], pick: number): RoomAsk {
         pick,
         layout: shape === 'set' ? 'grid' : 'row',
         grid: shape === 'set' ? { cols: 2, rows: 2 } : null,
+        // A choice of what comes next shows a row beside its options (B5).
+        shown:
+            shape === 'choice'
+                ? [
+                      {
+                          id: 'eeeeeeee',
+                          kind: 'number',
+                          text: '5',
+                          asset: null,
+                          cell: null,
+                      },
+                  ]
+                : [],
         items: ['aaaaaaaa', 'bbbbbbbb', 'cccccccc', 'dddddddd'].map(
             (id, index) => ({
                 id,
@@ -75,6 +88,17 @@ describe('tap', () => {
         expect(tap(ask('set', 2), ['aaaaaaaa'], 'zzzzzzzz')).toEqual({
             ids: ['aaaaaaaa'],
             send: false,
+        });
+    });
+
+    it('takes no tap on an item shown with the question, which is never an answer', () => {
+        expect(tap(ask('choice', 1), [], 'eeeeeeee')).toEqual({
+            ids: [],
+            send: false,
+        });
+        expect(tap(ask('choice', 1), [], 'bbbbbbbb')).toEqual({
+            ids: ['bbbbbbbb'],
+            send: true,
         });
     });
 });

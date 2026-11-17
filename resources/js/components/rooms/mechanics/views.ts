@@ -1,4 +1,13 @@
 import type { ComponentType } from 'react';
+import { NoStudy } from '@/components/rooms/mechanics/choice';
+import {
+    NextInSequenceAsk,
+    NextInSequenceSolution,
+} from '@/components/rooms/mechanics/next-in-sequence';
+import {
+    OddOneOutAsk,
+    OddOneOutSolution,
+} from '@/components/rooms/mechanics/odd-one-out';
 import {
     RecallCellsAsk,
     RecallCellsSolution,
@@ -51,5 +60,16 @@ export const MECHANIC_VIEWS: Record<RoomMechanic, MechanicView> = {
         Study: RecallCellsStudy,
         Ask: RecallCellsAsk,
         Solution: RecallCellsSolution,
+    },
+    // B5: nothing is studied; the question opens the round.
+    next_in_sequence: {
+        Study: NoStudy,
+        Ask: NextInSequenceAsk,
+        Solution: NextInSequenceSolution,
+    },
+    odd_one_out: {
+        Study: NoStudy,
+        Ask: OddOneOutAsk,
+        Solution: OddOneOutSolution,
     },
 };

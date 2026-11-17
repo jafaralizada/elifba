@@ -67,6 +67,10 @@ describe('room fixtures', () => {
             'state.answer.cells',
             'state.reveal.cells',
             'state.study.shapes',
+            'state.answer.sequence',
+            'state.reveal.sequence',
+            'state.answer.odd',
+            'state.reveal.odd',
         ]) {
             expect(fixture(name), name).toBeDefined();
         }
@@ -262,6 +266,53 @@ describe('what a state never carries', () => {
                 round: { ...studied, answered: true, answered_count: 1 },
             }).success,
         ).toBe(false);
+    });
+
+    it('shows a logic round with its question, the row apart from the options', () => {
+        for (const name of ['state.answer.sequence', 'state.answer.odd']) {
+            const state = fixture(name) as State;
+            const asked = state.round as Extract<Round, { phase: 'answer' }>;
+
+            // Nothing is studied: the question opens with the round.
+            expect(asked.study, name).toBeNull();
+            expect(asked.answer_from_ms, name).toBe(asked.opens_ms);
+            expect(asked.ask.shape, name).toBe('choice');
+            expect(asked.ask.pick, name).toBe(1);
+
+            // A question without its shown row, or a shown item that carries more, is refused.
+            const { shown: _shown, ...withoutShown } = asked.ask;
+            expect(
+                RoomState.safeParse({
+                    ...state,
+                    round: { ...asked, ask: withoutShown },
+                }).success,
+                name,
+            ).toBe(false);
+            expect(
+                RoomState.safeParse({
+                    ...state,
+                    round: {
+                        ...asked,
+                        ask: {
+                            ...asked.ask,
+                            shown: [{ ...asked.ask.items[0], correct: true }],
+                        },
+                    },
+                }).success,
+                name,
+            ).toBe(false);
+        }
+
+        const sequence = (fixture('state.answer.sequence') as State)
+            .round as Extract<Round, { phase: 'answer' }>;
+        const odd = (fixture('state.answer.odd') as State).round as Extract<
+            Round,
+            { phase: 'answer' }
+        >;
+
+        expect(sequence.ask.shown.length).toBeGreaterThan(0);
+        expect(sequence.ask.items).toHaveLength(4);
+        expect(odd.ask.shown).toEqual([]);
     });
 
     it('holds a round only while a game is live', () => {

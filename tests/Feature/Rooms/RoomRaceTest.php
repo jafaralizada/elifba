@@ -8,6 +8,7 @@ use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Rooms\Actions\StartRoomGame;
 use App\Domain\Rooms\Data\RoomGameSetupData;
 use App\Domain\Rooms\Data\RoomStateData;
+use App\Domain\Rooms\Enums\RoomAnswerShape;
 use App\Domain\Rooms\Enums\RoomPhase;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomAnswer;
@@ -93,13 +94,21 @@ function raceIds(RoomRound $round): array
 /**
  * Nothing in `$wire` tells right from wrong or the order to tap: no
  * solution, result, own answer or seed, and the solution's ids never as a
- * list in their order.
+ * list in their order. A choice's right id is an option of the question,
+ * so it may be there only as an item's id, like every other option's.
  */
 function raceWithholds(string $wire, RoomRound $round): void
 {
+    $right = Rooms::right($round);
+
     expect($wire)->not->toMatch('/"(solution|accept|correct|mine|results|seed|picked|elapsed_ms)"/')
-        ->and($wire)->not->toContain(json_encode(Rooms::right($round)))
-        ->and($wire)->not->toContain(implode('', Rooms::right($round)));
+        ->and($wire)->not->toContain(json_encode($right));
+
+    if ($round->solutionData()->shape === RoomAnswerShape::Choice) {
+        expect(substr_count($wire, $right[0]))->toBe(substr_count($wire, '"id":"'.$right[0].'"'));
+    } else {
+        expect($wire)->not->toContain(implode('', $right));
+    }
 }
 
 function raceSnapshot(): array
@@ -603,6 +612,8 @@ it('offers the setup of a game to the host of an open room alone, as the server 
     $offered = ['mechanics' => [
         ['mechanic' => 'recall_order', 'family' => 'memory', 'difficulties' => [1, 2, 3, 4]],
         ['mechanic' => 'recall_cells', 'family' => 'memory', 'difficulties' => [1, 2, 3, 4]],
+        ['mechanic' => 'next_in_sequence', 'family' => 'logic', 'difficulties' => [1, 2, 3, 4]],
+        ['mechanic' => 'odd_one_out', 'family' => 'logic', 'difficulties' => [1, 2, 3, 4]],
     ], 'rounds' => ['min' => 5, 'max' => 20]];
     $setup = $this->actingAs($this->host)->get(route('rooms.show', $this->room))->viewData('page')['props']['setup'];
     expect([
@@ -810,4 +821,129 @@ it('plays a row of shapes and judges it by their pictures', function (): void {
         ['player_id' => $this->hostRow->id, 'correct' => false, 'points' => 0],
         ['player_id' => $this->aygunRow->id, 'correct' => true, 'points' => $state['round']['reveal']['mine']['points']],
     ]);
+});
+
+// B5: «Sıranı davam etdir» and «Artıq olanı tap» (§12 "Room games"). Nothing
+// is studied: a round opens with its question — the row to continue in
+// `ask.shown`, the options in `ask.items` — and nothing before the reveal
+// tells the right option: not its place, not its id, not a key beside it.
+it('plays a logic game to its ranking', function (string $mechanic, int $difficulty): void {
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), ['mechanic' => $mechanic, 'difficulty' => $difficulty, 'rounds' => 5])->assertNoContent();
+    $game = $this->room->refresh()->latestGame()?->load('rounds');
+    $level = app(ContentRepository::class)->roomLevel(RoomMechanic::from($mechanic), $difficulty);
+
+    expect($game?->rounds)->toHaveCount(5);
+
+    // The countdown: nothing of any round.
+    ['state' => $state, 'wire' => $wire] = raceRead($this->aygun, $this->room);
+
+    expect($state['round']['phase'])->toBe('countdown');
+
+    foreach ($game->rounds ?? [] as $round) {
+        foreach ([...$round->askData()->ids(), ...array_map(static fn ($item): string => $item->id, $round->askData()->shown)] as $id) {
+            expect($wire)->not->toContain($id);
+        }
+    }
+
+    $points = 0;
+
+    foreach (range(0, 4) as $index) {
+        $round = Rooms::round($game, $index);
+        $ask = $round->askData();
+        $shownIds = array_map(static fn ($item): string => $item->id, $ask->shown);
+
+        expect($round->study_ms)->toBe(0)
+            ->and($round->studyData())->toBeNull();
+
+        // A moment before it opens: nothing of this round.
+        $this->travelTo(Rooms::at($game, RoomPhase::Study, $index)->subMillisecond());
+        ['wire' => $wire] = raceRead($this->aygun, $this->room);
+
+        foreach ([...$ask->ids(), ...$shownIds] as $id) {
+            expect($wire)->not->toContain($id);
+        }
+
+        // It opens with its question: no study phase, the row apart from the options.
+        $this->travelTo(Rooms::at($game, RoomPhase::Study, $index));
+
+        foreach ([$this->host, $this->aygun] as $account) {
+            ['state' => $state, 'wire' => $wire] = raceRead($account, $this->room);
+            $asked = $state['round']['ask'];
+
+            expect($state['round']['phase'])->toBe('answer')
+                ->and($state['round']['study'])->toBeNull()
+                ->and($state['round']['answer_from_ms'])->toBe($state['round']['opens_ms'])
+                ->and([$asked['shape'], $asked['pick'], $asked['layout'], $asked['grid']])->toBe(['choice', 1, 'row', null])
+                ->and(array_column($asked['items'], 'id'))->toBe($ask->ids())
+                ->and(array_column($asked['shown'], 'id'))->toBe($shownIds);
+            raceWithholds($wire, $round);
+        }
+
+        if ($mechanic === 'next_in_sequence') {
+            expect($asked['shown'])->toHaveCount($level->terms ?? 0)
+                ->and($asked['items'])->toHaveCount(4)
+                ->and(array_unique(array_column([...$asked['shown'], ...$asked['items']], 'kind')))->toBe(['number']);
+
+            // A term of the row is shown, never an answer.
+            raceAnswer($this->aygun, $this->room, $round, [$shownIds[0]])->assertUnprocessable();
+        } else {
+            expect($asked['shown'])->toBe([])
+                ->and($asked['items'])->toHaveCount($level->options ?? 0)
+                ->and(array_unique(array_column($asked['items'], 'kind')))->toBe([$level->source?->kind()->value]);
+        }
+
+        // Aygün chooses the right option, Rəşad another.
+        raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertExactJson(['status' => 'accepted', 'revision' => $this->room->refresh()->revision]);
+        raceAnswer($this->host, $this->room, $round, Rooms::wrong($round))->assertOk();
+        $aygun = RoomAnswer::query()->where('room_round_id', $round->id)->where('room_player_id', $this->aygunRow->id)->sole();
+        $points += $aygun->points;
+
+        // Both answered: the round is revealed, the right option named by its id.
+        ['state' => $state] = raceRead($this->aygun, $this->room);
+
+        expect($state['round']['phase'])->toBe('reveal')
+            ->and($state['round']['reveal']['solution'])->toBe(Rooms::right($round))
+            ->and($state['round']['ask']['shown'])->toBe(array_map(static fn ($item): array => $item->toArray(), $ask->shown))
+            ->and($state['round']['reveal']['mine'])->toMatchArray(['picked' => Rooms::right($round), 'correct' => true, 'points' => $aygun->points])
+            ->and($state['round']['reveal']['results'])->toBe([
+                ['player_id' => $this->hostRow->id, 'correct' => false, 'points' => 0],
+                ['player_id' => $this->aygunRow->id, 'correct' => true, 'points' => $aygun->points],
+            ]);
+    }
+
+    // Over: Aygün first with every round's points, Rəşad after the places without one.
+    $this->travelTo(Rooms::at($game, RoomPhase::Over));
+    ['state' => $state] = raceRead($this->host, $this->room);
+
+    expect($state['game'])->toMatchArray(['mechanic' => $mechanic, 'difficulty' => $difficulty, 'phase' => 'over'])
+        ->and($points)->toBeGreaterThanOrEqual(50)
+        ->and($state['ranking'])->toBe([
+            ['player_id' => $this->aygunRow->id, 'points' => $points, 'place' => 1],
+            ['player_id' => $this->hostRow->id, 'points' => 0, 'place' => null],
+        ]);
+})->with([
+    'a row of numbers' => ['next_in_sequence', 3],
+    'the hardest rows' => ['next_in_sequence', 4],
+    'words' => ['odd_one_out', 1],
+    'numbers' => ['odd_one_out', 2],
+]);
+
+// B5 added `shown` to the question: a round stored before it reads as one
+// that shows nothing beside its items.
+it('reads a round stored before the question had shown items', function (): void {
+    $game = Rooms::playing($this->room);
+    $round = Rooms::round($game, 0);
+    $payload = DB::table('room_rounds')->where('id', $round->id)->value('payload');
+    $stored = json_decode(is_string($payload) ? $payload : '{}', true);
+    unset($stored['ask']['shown']);
+    DB::table('room_rounds')->where('id', $round->id)->update(['payload' => json_encode($stored)]);
+
+    $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    ['state' => $state] = raceRead($this->aygun, $this->room);
+
+    expect(array_key_exists('shown', $stored['ask']))->toBeFalse()
+        ->and($state['round']['ask']['shown'])->toBe([])
+        ->and(array_column($state['round']['ask']['items'], 'id'))->toBe($round->askData()->ids());
+
+    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertJsonPath('status', 'accepted');
 });
