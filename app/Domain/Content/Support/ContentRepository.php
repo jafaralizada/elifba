@@ -7,8 +7,10 @@ use App\Domain\Content\Data\LevelData;
 use App\Domain\Content\Data\NameListData;
 use App\Domain\Content\Data\PackData;
 use App\Domain\Content\Data\PromptTemplateData;
+use App\Domain\Content\Data\RoomLevelData;
 use App\Domain\Content\Data\VoiceData;
 use App\Domain\Content\Enums\Mechanic;
+use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Content\Enums\Unit;
 use InvalidArgumentException;
 use JsonException;
@@ -18,7 +20,9 @@ use RuntimeException;
  * The one reader of built-in content (docs/architecture.md §3, ADR 004):
  * levels, prompts, credits, theme packs, the voice (`voice.json` with
  * the clip list of `voice-clips.json`, §3 "Voice") and the built-in name
- * list (`names.json`, ADR 016) from a content root.
+ * list (`names.json`, ADR 016) from a content root; and the adults' room
+ * content under `rooms/` (§12 "Room content", ADR 023): from B3 the room
+ * levels (`rooms/levels.json`).
  *
  * With a compiled file (`php artisan content:cache` writes
  * `bootstrap/cache/content.php`, which OPcache keeps in memory) it reads
@@ -31,6 +35,7 @@ use RuntimeException;
  * `Language\Support\Alphabet` and `Content\Support\Avatars`.
  *
  * @phpstan-import-type VoiceArray from VoiceData
+ * @phpstan-import-type RoomLevelArray from RoomLevelData
  */
 final class ContentRepository
 {
@@ -45,7 +50,12 @@ final class ContentRepository
     public const string NAMES = 'names.json';
 
     /**
-     * @var array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed}|null
+     * The room levels (§12 "Room content").
+     */
+    public const string ROOM_LEVELS = 'rooms/levels.json';
+
+    /**
+     * @var array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed}}|null
      */
     private ?array $data = null;
 
@@ -67,6 +77,13 @@ final class ContentRepository
     private ?VoiceData $voice = null;
 
     private ?NameListData $names = null;
+
+    /**
+     * By `{mechanic}.{difficulty}`, in file order.
+     *
+     * @var array<string, RoomLevelData>|null
+     */
+    private ?array $roomLevels = null;
 
     /**
      * @param  string  $root  the content directory (`content/`, or a fixture copy)
@@ -205,10 +222,60 @@ final class ContentRepository
     }
 
     /**
+     * Every room level, in file order: one per mechanic and difficulty.
+     *
+     * @return list<RoomLevelData>
+     */
+    public function roomLevels(): array
+    {
+        return array_values($this->roomLevelsByKey());
+    }
+
+    /**
+     * @throws InvalidArgumentException when the mechanic has no level of that difficulty
+     */
+    public function roomLevel(RoomMechanic $mechanic, int $difficulty): RoomLevelData
+    {
+        return $this->roomLevelsByKey()["{$mechanic->value}.{$difficulty}"]
+            ?? throw new InvalidArgumentException("There is no room level {$mechanic->value} × {$difficulty}.");
+    }
+
+    /**
+     * The version of the room content (`rooms/levels.json`'s `version`),
+     * which a room game keeps as `content_version`.
+     */
+    public function roomVersion(): int
+    {
+        /** @var array{version: int} $data checked by `ContentValidator` */
+        $data = $this->data()['rooms']['levels'];
+
+        return $data['version'];
+    }
+
+    /**
+     * @return array<string, RoomLevelData>
+     */
+    private function roomLevelsByKey(): array
+    {
+        if ($this->roomLevels === null) {
+            /** @var array{version: int, levels: list<RoomLevelArray>} $data checked by `ContentValidator` */
+            $data = $this->data()['rooms']['levels'];
+            $this->roomLevels = [];
+
+            foreach ($data['levels'] as $level) {
+                $level = RoomLevelData::fromArray($level);
+                $this->roomLevels["{$level->mechanic->value}.{$level->difficulty}"] = $level;
+            }
+        }
+
+        return $this->roomLevels;
+    }
+
+    /**
      * The content as the JSON files hold it now, ignoring any compiled file:
      * what `content:cache` compiles.
      *
-     * @return array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed}
+     * @return array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed}}
      *
      * @throws RuntimeException when a file is missing or not valid JSON
      */
@@ -227,6 +294,9 @@ final class ContentRepository
             'packs' => $packs,
             'voice' => self::voiceIn($this->root),
             'names' => self::decode($this->root.'/'.self::NAMES),
+            'rooms' => [
+                'levels' => self::decode($this->root.'/'.self::ROOM_LEVELS),
+            ],
         ];
     }
 
@@ -267,12 +337,12 @@ final class ContentRepository
     }
 
     /**
-     * @return array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed}
+     * @return array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed}}
      */
     private function data(): array
     {
         if ($this->data === null) {
-            /** @var array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed} $compiled */
+            /** @var array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed}} $compiled */
             $compiled = $this->readsCompiled() ? require $this->compiled : $this->sources();
             $this->data = $compiled;
         }

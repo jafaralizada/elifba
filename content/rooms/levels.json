@@ -1,0 +1,37 @@
+{
+    "version": 1,
+    "levels": [
+        {
+            "mechanic": "recall_order",
+            "difficulty": 1,
+            "study_ms": 3000,
+            "answer_ms": 10000,
+            "kinds": ["digit"],
+            "length": { "min": 3, "max": 4 }
+        },
+        {
+            "mechanic": "recall_order",
+            "difficulty": 2,
+            "study_ms": 4500,
+            "answer_ms": 15000,
+            "kinds": ["digit", "letter"],
+            "length": { "min": 5, "max": 6 }
+        },
+        {
+            "mechanic": "recall_order",
+            "difficulty": 3,
+            "study_ms": 6000,
+            "answer_ms": 20000,
+            "kinds": ["digit", "letter"],
+            "length": { "min": 7, "max": 8 }
+        },
+        {
+            "mechanic": "recall_order",
+            "difficulty": 4,
+            "study_ms": 7000,
+            "answer_ms": 25000,
+            "kinds": ["digit", "letter"],
+            "length": { "min": 9, "max": 10 }
+        }
+    ]
+}

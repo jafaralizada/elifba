@@ -2,11 +2,15 @@
 
 use App\Domain\Content\Data\LevelData;
 use App\Domain\Content\Data\PackData;
+use App\Domain\Content\Data\RoomLevelData;
 use App\Domain\Content\Data\WordData;
 use App\Domain\Content\Enums\Effect;
 use App\Domain\Content\Enums\ItemStyle;
 use App\Domain\Content\Enums\License;
 use App\Domain\Content\Enums\Mechanic;
+use App\Domain\Content\Enums\RoomFamily;
+use App\Domain\Content\Enums\RoomItemKind;
+use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Content\Enums\SlotStyle;
 use App\Domain\Content\Enums\Unit;
 use App\Domain\Content\Support\ContentRepository;
@@ -243,6 +247,42 @@ it('credits the Inter font files', function (): void {
         ->and($inter[0]->license)->toBe(License::Ofl)
         ->and($inter[0]->covers('resources/fonts/inter/OFL.txt'))->toBeTrue()
         ->and($inter[0]->covers('resources/fonts/other/X.woff2'))->toBeFalse();
+});
+
+it('reads the room levels', function (): void {
+    $content = app(ContentRepository::class);
+    $levels = $content->roomLevels();
+
+    // B3: «Ardıcıllığı yadda saxla» at the four difficulties, digits first, then digits and letters.
+    expect($content->roomVersion())->toBeGreaterThanOrEqual(1)
+        ->and(array_map(static fn (RoomLevelData $level): array => [$level->mechanic, $level->difficulty], $levels))->toBe([
+            [RoomMechanic::RecallOrder, 1],
+            [RoomMechanic::RecallOrder, 2],
+            [RoomMechanic::RecallOrder, 3],
+            [RoomMechanic::RecallOrder, 4],
+        ])
+        ->and($levels[0]->kinds)->toBe([RoomItemKind::Digit])
+        ->and($levels[3]->kinds)->toBe([RoomItemKind::Digit, RoomItemKind::Letter])
+        ->and(RoomMechanic::RecallOrder->family())->toBe(RoomFamily::Memory)
+        ->and(RoomMechanic::RecallOrder->studies())->toBeTrue();
+
+    // Harder is longer, studied longer and answered in more time.
+    foreach (array_slice($levels, 1, null, true) as $index => $level) {
+        $easier = $levels[$index - 1];
+
+        expect($level->length?->min)->toBeGreaterThan($easier->length->max ?? 0)
+            ->and($level->studyMs)->toBeGreaterThan($easier->studyMs)
+            ->and($level->answerMs)->toBeGreaterThan($easier->answerMs);
+    }
+
+    expect($content->roomLevel(RoomMechanic::RecallOrder, 2))->toBe($levels[1])
+        ->and(fn () => $content->roomLevel(RoomMechanic::RecallOrder, 5))->toThrow(InvalidArgumentException::class);
+
+    // A fixture root reads its own.
+    $fixture = new ContentRepository(ContentFixture::make());
+
+    expect(array_map(static fn (RoomLevelData $level): ?int => $level->length?->max, $fixture->roomLevels()))->toBe([3, 5, 8, 12])
+        ->and($fixture->roomLevel(RoomMechanic::RecallOrder, 4)->studyMs)->toBe(60_000);
 });
 
 it('says which pack, level or prompt does not exist', function (Closure $read): void {

@@ -8,10 +8,12 @@ use Database\Factories\RoomPlayerFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * An account in a room (docs/architecture.md §1 `room_players`, §12 "Rooms
@@ -35,6 +37,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable $updated_at
  * @property-read Room $room
  * @property-read User|null $user
+ * @property-read Collection<int, RoomAnswer> $answers
  */
 #[UseFactory(RoomPlayerFactory::class)]
 class RoomPlayer extends Model
@@ -61,6 +64,16 @@ class RoomPlayer extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * The player's answers, one per round at most (B3).
+     *
+     * @return HasMany<RoomAnswer, $this>
+     */
+    public function answers(): HasMany
+    {
+        return $this->hasMany(RoomAnswer::class);
     }
 
     /**

@@ -1100,5 +1100,110 @@
         "file": "voice-clips.json",
         "set": { "names.nihat": "[excited] Nihat!" },
         "problem": "voice-clips.json: names.nihat must be a hash of 16 lowercase hex digits"
+    },
+    "rooms levels: no file": {
+        "file": "rooms/levels.json",
+        "delete": ["rooms/levels.json"],
+        "problem": "rooms/levels.json: is missing"
+    },
+    "rooms levels: no version": {
+        "file": "rooms/levels.json",
+        "unset": ["version"],
+        "problem": "rooms/levels.json: the file needs `version`"
+    },
+    "rooms levels: a version below 1": {
+        "file": "rooms/levels.json",
+        "set": { "version": 0 },
+        "problem": "rooms/levels.json: version must be a whole number from 1"
+    },
+    "rooms levels: an unknown mechanic": {
+        "file": "rooms/levels.json",
+        "set": { "levels.0.mechanic": "find" },
+        "problem": "rooms/levels.json: levels[0].mechanic must be one of recall_order"
+    },
+    "rooms levels: a difficulty outside 1–4": {
+        "file": "rooms/levels.json",
+        "set": { "levels.3.difficulty": 5 },
+        "problem": "rooms/levels.json: levels[3].difficulty must be a whole number from 1 to 4"
+    },
+    "rooms levels: a second level of one difficulty": {
+        "file": "rooms/levels.json",
+        "set": { "levels.3.difficulty": 3 },
+        "problem": "rooms/levels.json: levels[3]: recall_order has a second level of difficulty 3"
+    },
+    "rooms levels: a mechanic without all four difficulties": {
+        "file": "rooms/levels.json",
+        "keep": { "levels": 3 },
+        "problem": "rooms/levels.json: recall_order has no level of difficulty 4: a room game has all four or none"
+    },
+    "rooms levels: too little time to answer": {
+        "file": "rooms/levels.json",
+        "set": { "levels.0.answer_ms": 4999 },
+        "problem": "rooms/levels.json: levels[0].answer_ms must be a whole number from 5000 to 60000"
+    },
+    "rooms levels: too much time to answer": {
+        "file": "rooms/levels.json",
+        "set": { "levels.3.answer_ms": 60001 },
+        "problem": "rooms/levels.json: levels[3].answer_ms must be a whole number from 5000 to 60000"
+    },
+    "rooms levels: a memory game with nothing to study": {
+        "file": "rooms/levels.json",
+        "set": { "levels.1.study_ms": 0 },
+        "problem": "rooms/levels.json: levels[1].study_ms must be a whole number from 1 to 60000 for a memory game"
+    },
+    "rooms levels: a memory game studied too long": {
+        "file": "rooms/levels.json",
+        "set": { "levels.3.study_ms": 60001 },
+        "problem": "rooms/levels.json: levels[3].study_ms must be a whole number from 1 to 60000 for a memory game"
+    },
+    "rooms levels: a key of no mechanic": {
+        "file": "rooms/levels.json",
+        "set": { "levels.0.grid": { "cols": 4, "rows": 4 } },
+        "problem": "rooms/levels.json: levels[0] has an unknown key `grid`"
+    },
+    "rooms levels: a row without its length": {
+        "file": "rooms/levels.json",
+        "unset": ["levels.2.length"],
+        "problem": "rooms/levels.json: levels[2] needs `length`"
+    },
+    "rooms levels: a row of nothing": {
+        "file": "rooms/levels.json",
+        "set": { "levels.0.kinds": [] },
+        "problem": "rooms/levels.json: levels[0].kinds must be a non-empty list of non-empty strings"
+    },
+    "rooms levels: an unknown kind": {
+        "file": "rooms/levels.json",
+        "set": { "levels.2.kinds": ["digit", "emoji"] },
+        "problem": "rooms/levels.json: levels[2].kinds[1] must be one of digit, letter, word, number, shape, cell"
+    },
+    "rooms levels: a kind twice": {
+        "file": "rooms/levels.json",
+        "set": { "levels.2.kinds": ["letter", "letter"] },
+        "problem": "rooms/levels.json: levels[2].kinds lists a value twice"
+    },
+    "rooms levels: words before the word list": {
+        "file": "rooms/levels.json",
+        "set": { "levels.1.kinds": ["letter", "word"] },
+        "problem": "rooms/levels.json: levels[1].kinds: recall_order can show digit, letter, not word"
+    },
+    "rooms levels: shapes before the shapes": {
+        "file": "rooms/levels.json",
+        "set": { "levels.0.kinds": ["shape"] },
+        "problem": "rooms/levels.json: levels[0].kinds: recall_order can show digit, letter, not shape"
+    },
+    "rooms levels: a row that cannot be shuffled": {
+        "file": "rooms/levels.json",
+        "set": { "levels.0.length": { "min": 1, "max": 3 } },
+        "problem": "rooms/levels.json: levels[0].length needs whole numbers from 2 to 12, min ≤ max"
+    },
+    "rooms levels: a row longer than twelve": {
+        "file": "rooms/levels.json",
+        "set": { "levels.3.length": { "min": 12, "max": 13 } },
+        "problem": "rooms/levels.json: levels[3].length needs whole numbers from 2 to 12, min ≤ max"
+    },
+    "rooms levels: a length upside down": {
+        "file": "rooms/levels.json",
+        "set": { "levels.2.length": { "min": 8, "max": 6 } },
+        "problem": "rooms/levels.json: levels[2].length needs whole numbers from 2 to 12, min ≤ max"
     }
 }

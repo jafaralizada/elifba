@@ -43,6 +43,7 @@ use Illuminate\Support\Facades\Config;
  * @property CarbonImmutable $updated_at
  * @property-read User $host
  * @property-read Collection<int, RoomPlayer> $players
+ * @property-read Collection<int, RoomGame> $games by position
  */
 #[UseFactory(RoomFactory::class)]
 #[UsePolicy(RoomPolicy::class)]
@@ -125,6 +126,16 @@ class Room extends Model
     public function players(): HasMany
     {
         return $this->hasMany(RoomPlayer::class);
+    }
+
+    /**
+     * The games played in the room, one at a time, in order (B3).
+     *
+     * @return HasMany<RoomGame, $this>
+     */
+    public function games(): HasMany
+    {
+        return $this->hasMany(RoomGame::class)->orderBy('position');
     }
 
     /**

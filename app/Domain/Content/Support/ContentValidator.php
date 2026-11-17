@@ -12,6 +12,8 @@ use App\Domain\Content\Enums\Effect;
 use App\Domain\Content\Enums\ItemStyle;
 use App\Domain\Content\Enums\License;
 use App\Domain\Content\Enums\Mechanic;
+use App\Domain\Content\Enums\RoomItemKind;
+use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Content\Enums\SlotStyle;
 use App\Domain\Content\Enums\Sound;
 use App\Domain\Content\Enums\Unit;
@@ -30,6 +32,7 @@ use SplFileInfo;
  * Checks a content root (docs/architecture.md §3, §8): `alphabet.json`,
  * `avatars.json`, `sounds.json`, `levels.json`, `prompts.json`, `names.json`,
  * `voice.json` with `voice-clips.json`, `credits.json`, `packs/*.json`,
+ * `rooms/levels.json` (§12 "Room content"),
  * `tests/syllables.json` and every file under `assets/`, `voice-names/`
  * and `resources/fonts/` (credits; SVG files are also checked for anything
  * that could run or load). `validate()` lists every problem, one line each;
@@ -137,6 +140,29 @@ final class ContentValidator
 
     public const int MAX_NAME_LETTERS = 24;
 
+    /**
+     * A room mechanic has a level for each difficulty 1–4 («Asan», «Orta»,
+     * «Çətin», «Çox çətin»), or none (§12 "Room content").
+     */
+    public const int ROOM_DIFFICULTIES = 4;
+
+    /**
+     * A room round's time to answer, and the most it may be studied.
+     */
+    public const int MIN_ROOM_ANSWER_MS = 5_000;
+
+    public const int MAX_ROOM_ANSWER_MS = 60_000;
+
+    public const int MAX_ROOM_STUDY_MS = 60_000;
+
+    /**
+     * Items in a `recall_order` row: at least two, so the question can
+     * always show them in another order than the row; at most twelve.
+     */
+    public const int MIN_ROOM_ROW = 2;
+
+    public const int MAX_ROOM_ROW = 12;
+
     private const string KEY = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/';
 
     /**
@@ -220,6 +246,7 @@ final class ContentValidator
         $this->sounds();
         $levels = $this->levels();
         $this->prompts($levels);
+        $this->roomLevels();
         $this->names();
         $this->voice();
         $credits = $this->credits();
@@ -678,6 +705,129 @@ final class ContentValidator
         if (! in_array(mb_substr($text, -1), self::FINAL_MARKS, true)) {
             $this->problem($file, "{$where} \"{$text}\" must end with . ! or ?");
         }
+    }
+
+    // ── rooms/levels.json ───────────────────────────────────────────────
+
+    /**
+     * The room levels (§12 "Room content", ADR 023): `version` and `levels`,
+     * each with a known mechanic, a difficulty 1–4 and no second level of
+     * the same pair; a mechanic with any level has all four, so whatever
+     * `Rooms\Support\RoomPlayable` lists can be played at every difficulty
+     * (`RoomPlayableTest` checks that each mechanic it lists has levels).
+     * `answer_ms` is 5 000–60 000; `study_ms` is above 0 (at most 60 000)
+     * for a memory mechanic and 0 for any other. A level holds the keys of
+     * its own mechanic and no other, with the numbers its builder can
+     * build:
+     *
+     * - `recall_order`: `kinds`, distinct kinds of `RoomMechanic::kinds()`
+     *   (digits and letters until the shapes and the word list exist);
+     *   `length`, 2–12 items, `min` ≤ `max`.
+     */
+    private function roomLevels(): void
+    {
+        $file = ContentRepository::ROOM_LEVELS;
+        $data = $this->object($this->read($file), $file, '', ['version', 'levels']);
+
+        if ($data === null) {
+            return;
+        }
+
+        if (! is_int($data['version']) || $data['version'] < 1) {
+            $this->problem($file, 'version must be a whole number from 1');
+        }
+
+        $levels = $this->list($data['levels'], $file, 'levels');
+
+        if ($levels === null) {
+            return;
+        }
+
+        /** @var array<string, list<int>> $difficulties */
+        $difficulties = [];
+
+        foreach ($levels as $index => $level) {
+            $where = "levels[{$index}]";
+            $mechanic = is_array($level) && is_string($level['mechanic'] ?? null) ? RoomMechanic::tryFrom($level['mechanic']) : null;
+            $every = ['mechanic', 'difficulty', 'study_ms', 'answer_ms'];
+
+            // An unknown mechanic is reported once, not with each of its keys.
+            $level = $mechanic === null
+                ? $this->object($level, $file, $where, $every, is_array($level) ? array_map(strval(...), array_keys($level)) : [])
+                : $this->object($level, $file, $where, [...$every, ...self::roomLevelKeys($mechanic)]);
+
+            if ($level === null) {
+                continue;
+            }
+
+            $this->enum(RoomMechanic::class, $level['mechanic'], $file, "{$where}.mechanic");
+            $difficulty = $level['difficulty'];
+
+            if (! is_int($difficulty) || $difficulty < 1 || $difficulty > self::ROOM_DIFFICULTIES) {
+                $this->problem($file, "{$where}.difficulty must be a whole number from 1 to ".self::ROOM_DIFFICULTIES);
+            } elseif ($mechanic !== null) {
+                if (in_array($difficulty, $difficulties[$mechanic->value] ?? [], true)) {
+                    $this->problem($file, "{$where}: {$mechanic->value} has a second level of difficulty {$difficulty}");
+                }
+
+                $difficulties[$mechanic->value][] = $difficulty;
+            }
+
+            $answer = $level['answer_ms'];
+
+            if (! is_int($answer) || $answer < self::MIN_ROOM_ANSWER_MS || $answer > self::MAX_ROOM_ANSWER_MS) {
+                $this->problem($file, "{$where}.answer_ms must be a whole number from ".self::MIN_ROOM_ANSWER_MS.' to '.self::MAX_ROOM_ANSWER_MS);
+            }
+
+            $study = $level['study_ms'];
+
+            if ($mechanic?->studies() === true && (! is_int($study) || $study < 1 || $study > self::MAX_ROOM_STUDY_MS)) {
+                $this->problem($file, "{$where}.study_ms must be a whole number from 1 to ".self::MAX_ROOM_STUDY_MS.' for a memory game');
+            } elseif ($mechanic?->studies() === false && $study !== 0) {
+                $this->problem($file, "{$where}.study_ms must be 0: only a memory game is studied");
+            }
+
+            if ($mechanic === RoomMechanic::RecallOrder) {
+                $this->recallOrderLevel($mechanic, $level, $file, $where);
+            }
+        }
+
+        foreach ($difficulties as $mechanic => $given) {
+            foreach (range(1, self::ROOM_DIFFICULTIES) as $difficulty) {
+                if (! in_array($difficulty, $given, true)) {
+                    $this->problem($file, "{$mechanic} has no level of difficulty {$difficulty}: a room game has all four or none");
+                }
+            }
+        }
+    }
+
+    /**
+     * The keys of a room level besides the four every level has.
+     *
+     * @return list<string>
+     */
+    private static function roomLevelKeys(RoomMechanic $mechanic): array
+    {
+        return match ($mechanic) {
+            RoomMechanic::RecallOrder => ['kinds', 'length'],
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $level
+     */
+    private function recallOrderLevel(RoomMechanic $mechanic, array $level, string $file, string $where): void
+    {
+        $kinds = $this->enums(RoomItemKind::class, $level['kinds'], $file, "{$where}.kinds") ?? [];
+        $shown = array_map(static fn (RoomItemKind $kind): string => $kind->value, $mechanic->kinds());
+
+        foreach ($kinds as $kind) {
+            if (! in_array($kind, $mechanic->kinds(), true)) {
+                $this->problem($file, "{$where}.kinds: {$mechanic->value} can show ".implode(', ', $shown).", not {$kind->value}");
+            }
+        }
+
+        $this->range($level['length'], self::MIN_ROOM_ROW, self::MAX_ROOM_ROW, $file, "{$where}.length");
     }
 
     // ── names.json ──────────────────────────────────────────────────────

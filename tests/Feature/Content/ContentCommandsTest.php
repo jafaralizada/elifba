@@ -53,7 +53,9 @@ it('compiles the content, then reads only the compiled file, until it is cleared
         ->and($cached->packs())->toEqual($files->packs())
         ->and($cached->levels())->toEqual($files->levels())
         ->and($cached->prompts())->toEqual($files->prompts())
-        ->and($cached->credits())->toEqual($files->credits());
+        ->and($cached->credits())->toEqual($files->credits())
+        ->and($cached->roomLevels())->toEqual($files->roomLevels())
+        ->and($cached->roomVersion())->toBe($files->roomVersion());
 
     $this->artisan('content:clear')->expectsOutputToContain('Content cache cleared successfully.')->assertSuccessful();
 

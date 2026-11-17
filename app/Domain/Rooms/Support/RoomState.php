@@ -9,7 +9,6 @@ use App\Domain\Rooms\Data\RoomViewerData;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomPlayer;
 use App\Models\User;
-use Carbon\CarbonImmutable;
 
 /**
  * A room's state as one account sees it (docs/architecture.md §12 "The
@@ -34,7 +33,7 @@ final class RoomState
 
         return new RoomStateData(
             revision: $room->revision,
-            server_ms: (int) CarbonImmutable::now()->getTimestampMs(),
+            server_ms: RoomClock::nowMs(),
             room: RoomSummaryData::of($room),
             me: new RoomViewerData($mine?->id, $room->isHostedBy($viewer)),
             players: array_values($rows->map(static fn (RoomPlayer $row): RoomPlayerData => new RoomPlayerData(

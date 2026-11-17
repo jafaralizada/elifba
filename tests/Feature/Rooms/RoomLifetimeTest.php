@@ -1,7 +1,10 @@
 <?php
 
 use App\Domain\Rooms\Models\Room;
+use App\Domain\Rooms\Models\RoomAnswer;
+use App\Domain\Rooms\Models\RoomGame;
 use App\Domain\Rooms\Models\RoomPlayer;
+use App\Domain\Rooms\Models\RoomRound;
 use App\Domain\Rooms\Support\RoomCode;
 use App\Models\User;
 use Illuminate\Console\Scheduling\Event;
@@ -15,9 +18,45 @@ use Tests\Support\Rooms;
  * and joining", "Scoring and what is kept", ADR 020 decision 7, ADR 022
  * decisions 6–7): an idle room counts as closed at once and is closed
  * within the hour; rooms go after the retention period with everything
- * under them; an account takes the rooms it hosted with it and leaves its
- * rows in other rooms without a name.
+ * under them — its games, their rounds and the answers; an account takes
+ * the rooms it hosted with it and leaves its rows in other rooms, with
+ * their answers, without a name.
  */
+
+/**
+ * A game of two rounds in the room, every player of it having answered
+ * both (B3's tables, through their factories).
+ */
+function playedRoomGame(Room $room): RoomGame
+{
+    $game = RoomGame::factory()->for($room)->withRounds(2)->create();
+
+    foreach ($game->rounds as $round) {
+        foreach ($room->players as $row) {
+            RoomAnswer::factory()->for($round, 'round')->by($row)->create();
+        }
+    }
+
+    return $game;
+}
+
+/**
+ * How many rows of each game table belong to the room, read with the query
+ * builder, so what the database cascaded is what is counted.
+ *
+ * @return array{games: int, rounds: int, answers: int}
+ */
+function roomGameRows(Room $room): array
+{
+    $games = DB::table('room_games')->where('room_id', $room->id)->pluck('id');
+    $rounds = DB::table('room_rounds')->whereIn('room_game_id', $games)->pluck('id');
+
+    return [
+        'games' => $games->count(),
+        'rounds' => $rounds->count(),
+        'answers' => DB::table('room_answers')->whereIn('room_round_id', $rounds)->count(),
+    ];
+}
 
 beforeEach(function (): void {
     Rooms::on();
@@ -106,9 +145,15 @@ it('closes idle rooms', function (): void {
 it('prunes rooms past the retention period with everything under them', function (): void {
     $old = Rooms::open($this->host);
     Rooms::join($old, $this->player);
+    playedRoomGame($old);
+    playedRoomGame($old);
     $this->travel(1)->days();
     $kept = Rooms::open($this->host);
     Rooms::join($kept, $this->player);
+    playedRoomGame($kept);
+
+    expect(roomGameRows($old))->toBe(['games' => 2, 'rounds' => 4, 'answers' => 8])
+        ->and(roomGameRows($kept))->toBe(['games' => 1, 'rounds' => 2, 'answers' => 4]);
 
     $this->travelTo($old->created_at->addDays(config('elifba.retention_days'))->addSecond());
 
@@ -119,14 +164,20 @@ it('prunes rooms past the retention period with everything under them', function
     expect(Room::query()->pluck('id')->all())->toBe([$kept->id])
         ->and(RoomPlayer::query()->where('room_id', $old->id)->exists())->toBeFalse()
         ->and(RoomPlayer::query()->where('room_id', $kept->id)->count())->toBe(2)
-        ->and(User::query()->count())->toBe(2);
+        ->and(User::query()->count())->toBe(2)
+        ->and(roomGameRows($old))->toBe(['games' => 0, 'rounds' => 0, 'answers' => 0])
+        ->and(roomGameRows($kept))->toBe(['games' => 1, 'rounds' => 2, 'answers' => 4])
+        ->and([RoomGame::query()->count(), RoomRound::query()->count(), RoomAnswer::query()->count()])->toBe([1, 2, 4]);
 });
 
 it('deletes a host\'s rooms with the account and leaves a player\'s rows without an account', function (): void {
     $hosted = Rooms::open($this->host);
     Rooms::join($hosted, $this->player);
+    playedRoomGame($hosted);
     $elsewhere = Rooms::open($this->player);
     $row = Rooms::join($elsewhere, $this->host);
+    playedRoomGame($elsewhere);
+    $points = (int) $row->answers()->sum('points');
 
     $this->actingAs($this->host)
         ->delete(route('profile.destroy'), ['password' => 'password'])
@@ -135,9 +186,15 @@ it('deletes a host\'s rooms with the account and leaves a player\'s rows without
     expect(User::query()->find($this->host->id))->toBeNull()
         ->and(Room::query()->find($hosted->id))->toBeNull()
         ->and(RoomPlayer::query()->where('room_id', $hosted->id)->exists())->toBeFalse()
+        ->and(roomGameRows($hosted))->toBe(['games' => 0, 'rounds' => 0, 'answers' => 0])
         ->and($row->refresh()->user_id)->toBeNull()
         ->and(Room::query()->find($elsewhere->id))->not->toBeNull()
         ->and(DB::table('room_players')->where('user_id', $this->host->id)->exists())->toBeFalse();
+
+    // The other room's game keeps the row's answers and points, without a name.
+    expect(roomGameRows($elsewhere))->toBe(['games' => 1, 'rounds' => 2, 'answers' => 4])
+        ->and($row->answers()->count())->toBe(2)
+        ->and((int) $row->answers()->sum('points'))->toBe($points)->toBeGreaterThan(0);
 
     // The other room shows the row without a name.
     $this->actingAs($this->player)->getJson(route('rooms.state', $elsewhere))

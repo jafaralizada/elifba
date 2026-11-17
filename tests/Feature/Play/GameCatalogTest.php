@@ -6,6 +6,7 @@ use App\Domain\Content\Actions\HideWord;
 use App\Domain\Content\Data\CustomWordData;
 use App\Domain\Content\Data\HiddenWordData;
 use App\Domain\Content\Enums\Mechanic;
+use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Family\Models\Child;
 use App\Domain\Play\Actions\ReplayGame;
@@ -452,9 +453,10 @@ describe('«Sözlərim»', function (): void {
 // Adults' games are not children's games (§12 "Room games", ADR 019, ADR
 // 023): with the rooms area on and the account playing in a room, «Yeni
 // oyun» for a class and for a child offers exactly the games it offered
-// before, and no room mechanic is a mechanic of the catalog. Until B3 adds
-// `Content\Enums\RoomMechanic`, the room mechanics are the names §12
-// gives them; B3 reads them from the enum and drops the list.
+// before, no game or card of it is a room mechanic, and no room mechanic
+// is a mechanic of the catalog. The room mechanics are read from
+// `Content\Enums\RoomMechanic`, which grows with each step that builds
+// one (B3–B6), so the guard covers each as it comes.
 it('lists no room game', function (): void {
     Rooms::on();
     $this->teacher->forceFill(['player_agreed_at' => now()])->save();
@@ -474,14 +476,13 @@ it('lists no room game', function (): void {
         $this->get($url)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('games', fn ($games): bool => collect($games)->map(fn ($game): string => "{$game['unit']}_{$game['mechanic']}")->all() === $pinned)
-                ->where('cards', fn ($cards): bool => collect($cards)->every(fn ($card): bool => Mechanic::tryFrom($card['mechanic']) !== null)));
+                ->where('games', fn ($games): bool => collect($games)->map(fn ($game): string => "{$game['unit']}_{$game['mechanic']}")->all() === $pinned
+                    && collect($games)->every(fn ($game): bool => RoomMechanic::tryFrom($game['mechanic']) === null))
+                ->where('cards', fn ($cards): bool => collect($cards)->every(fn ($card): bool => Mechanic::tryFrom($card['mechanic']) !== null
+                    && RoomMechanic::tryFrom($card['mechanic']) === null)));
     }
 
-    $roomMechanic = 'App\\Domain\\Content\\Enums\\RoomMechanic';
-    $roomMechanics = enum_exists($roomMechanic)
-        ? array_map(static fn (BackedEnum $case): string|int => $case->value, $roomMechanic::cases())
-        : ['recall_order', 'recall_cells', 'next_in_sequence', 'odd_one_out', 'anagram', 'spelling'];
+    $roomMechanics = array_map(static fn (RoomMechanic $mechanic): string => $mechanic->value, RoomMechanic::cases());
 
     expect($roomMechanics)->not->toBeEmpty()
         ->and(array_intersect(array_map(static fn (Mechanic $mechanic): string => $mechanic->value, Mechanic::cases()), $roomMechanics))->toBe([]);

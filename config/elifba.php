@@ -74,6 +74,18 @@ return [
         // counts as closed at once (`Room::isOpen()`), and `rooms:close-idle`
         // writes it within the hour.
         'idle_hours' => 3,
+
+        // A room game's rounds (§12 "The race", ADR 021): how many the host
+        // may choose; the countdown before round 0 opens; how long the
+        // solution, the round's results and the ranking stay on screen
+        // after a round closes. A game copies `reveal_ms` when it starts
+        // (`room_games.reveal_ms`), so a change never moves a live game.
+        'rounds' => [
+            'min' => 5,
+            'max' => 20,
+        ],
+        'countdown_ms' => 3_000,
+        'reveal_ms' => 5_000,
     ],
 
     // Who runs this instance; shown on /privacy (§7).

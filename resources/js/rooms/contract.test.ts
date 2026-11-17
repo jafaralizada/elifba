@@ -25,6 +25,12 @@ function schemaOf(path: string): z.ZodType | undefined {
 
 const lobby = fixtures['../../../tests/Fixtures/rooms/state.lobby.json'];
 
+// judge.json holds the cases of the server's judge (RoomJudgeTest), not a
+// payload a device receives.
+const payloads = Object.entries(fixtures).filter(
+    ([path]) => !path.endsWith('/judge.json'),
+);
+
 describe('room fixtures', () => {
     it('accepts the lobby fixture', () => {
         const result = RoomState.safeParse(lobby);
@@ -33,7 +39,7 @@ describe('room fixtures', () => {
         expect(result.data).toEqual(lobby);
     });
 
-    it.each(Object.entries(fixtures))('%s parses strictly', (path, fixture) => {
+    it.each(payloads)('%s parses strictly', (path, fixture) => {
         const result = schemaOf(path)?.safeParse(fixture);
 
         expect(result?.error).toBeUndefined();

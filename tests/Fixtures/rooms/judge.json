@@ -1,0 +1,727 @@
+{
+    "cases": [
+        {
+            "name": "choice: the solution's item",
+            "items": [
+                {
+                    "id": "q7m2x9ka",
+                    "kind": "number",
+                    "text": "12",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "b4tn0e5w",
+                    "kind": "number",
+                    "text": "15",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "h8cz3ry1",
+                    "kind": "number",
+                    "text": "18",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "v2lk6dpu",
+                    "kind": "number",
+                    "text": "21",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "choice",
+                "ids": ["h8cz3ry1"]
+            },
+            "picked": ["h8cz3ry1"],
+            "correct": true
+        },
+        {
+            "name": "choice: another item",
+            "items": [
+                {
+                    "id": "q7m2x9ka",
+                    "kind": "number",
+                    "text": "12",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "b4tn0e5w",
+                    "kind": "number",
+                    "text": "15",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "h8cz3ry1",
+                    "kind": "number",
+                    "text": "18",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "v2lk6dpu",
+                    "kind": "number",
+                    "text": "21",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "choice",
+                "ids": ["h8cz3ry1"]
+            },
+            "picked": ["b4tn0e5w"],
+            "correct": false
+        },
+        {
+            "name": "choice: two items, one of them right",
+            "items": [
+                {
+                    "id": "q7m2x9ka",
+                    "kind": "number",
+                    "text": "12",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "b4tn0e5w",
+                    "kind": "number",
+                    "text": "15",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "h8cz3ry1",
+                    "kind": "number",
+                    "text": "18",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "v2lk6dpu",
+                    "kind": "number",
+                    "text": "21",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "choice",
+                "ids": ["h8cz3ry1"]
+            },
+            "picked": ["h8cz3ry1", "b4tn0e5w"],
+            "correct": false
+        },
+        {
+            "name": "set: the solution's items in another order",
+            "items": [
+                {
+                    "id": "n3wq8c0a",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [0, 0]
+                },
+                {
+                    "id": "t6yb1mze",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [1, 0]
+                },
+                {
+                    "id": "p0ro4kxs",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [0, 1]
+                },
+                {
+                    "id": "g5dj7hvn",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [1, 1]
+                }
+            ],
+            "solution": {
+                "shape": "set",
+                "ids": ["n3wq8c0a", "t6yb1mze", "g5dj7hvn"]
+            },
+            "picked": ["g5dj7hvn", "n3wq8c0a", "t6yb1mze"],
+            "correct": true
+        },
+        {
+            "name": "set: one item too few",
+            "items": [
+                {
+                    "id": "n3wq8c0a",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [0, 0]
+                },
+                {
+                    "id": "t6yb1mze",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [1, 0]
+                },
+                {
+                    "id": "p0ro4kxs",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [0, 1]
+                },
+                {
+                    "id": "g5dj7hvn",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [1, 1]
+                }
+            ],
+            "solution": {
+                "shape": "set",
+                "ids": ["n3wq8c0a", "t6yb1mze", "g5dj7hvn"]
+            },
+            "picked": ["n3wq8c0a", "t6yb1mze"],
+            "correct": false
+        },
+        {
+            "name": "set: one item too many",
+            "items": [
+                {
+                    "id": "n3wq8c0a",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [0, 0]
+                },
+                {
+                    "id": "t6yb1mze",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [1, 0]
+                },
+                {
+                    "id": "p0ro4kxs",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [0, 1]
+                },
+                {
+                    "id": "g5dj7hvn",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [1, 1]
+                }
+            ],
+            "solution": {
+                "shape": "set",
+                "ids": ["n3wq8c0a", "t6yb1mze", "g5dj7hvn"]
+            },
+            "picked": ["n3wq8c0a", "t6yb1mze", "g5dj7hvn", "p0ro4kxs"],
+            "correct": false
+        },
+        {
+            "name": "set: another item instead of one of the solution's",
+            "items": [
+                {
+                    "id": "n3wq8c0a",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [0, 0]
+                },
+                {
+                    "id": "t6yb1mze",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [1, 0]
+                },
+                {
+                    "id": "p0ro4kxs",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [0, 1]
+                },
+                {
+                    "id": "g5dj7hvn",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [1, 1]
+                }
+            ],
+            "solution": {
+                "shape": "set",
+                "ids": ["n3wq8c0a", "t6yb1mze", "g5dj7hvn"]
+            },
+            "picked": ["n3wq8c0a", "t6yb1mze", "p0ro4kxs"],
+            "correct": false
+        },
+        {
+            "name": "set: an item twice",
+            "items": [
+                {
+                    "id": "n3wq8c0a",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [0, 0]
+                },
+                {
+                    "id": "t6yb1mze",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [1, 0]
+                },
+                {
+                    "id": "p0ro4kxs",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [0, 1]
+                },
+                {
+                    "id": "g5dj7hvn",
+                    "kind": "cell",
+                    "text": null,
+                    "asset": null,
+                    "cell": [1, 1]
+                }
+            ],
+            "solution": {
+                "shape": "set",
+                "ids": ["n3wq8c0a", "t6yb1mze", "g5dj7hvn"]
+            },
+            "picked": ["n3wq8c0a", "t6yb1mze", "t6yb1mze"],
+            "correct": false
+        },
+        {
+            "name": "sequence: the order shown",
+            "items": [
+                {
+                    "id": "k1x7r4pa",
+                    "kind": "digit",
+                    "text": "9",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "z8m3c2wo",
+                    "kind": "digit",
+                    "text": "7",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "f6e0u9tq",
+                    "kind": "digit",
+                    "text": "3",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["z8m3c2wo", "f6e0u9tq", "k1x7r4pa"],
+                "accept": [["7", "3", "9"]]
+            },
+            "picked": ["z8m3c2wo", "f6e0u9tq", "k1x7r4pa"],
+            "correct": true
+        },
+        {
+            "name": "sequence: two items swapped",
+            "items": [
+                {
+                    "id": "k1x7r4pa",
+                    "kind": "digit",
+                    "text": "9",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "z8m3c2wo",
+                    "kind": "digit",
+                    "text": "7",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "f6e0u9tq",
+                    "kind": "digit",
+                    "text": "3",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["z8m3c2wo", "f6e0u9tq", "k1x7r4pa"],
+                "accept": [["7", "3", "9"]]
+            },
+            "picked": ["f6e0u9tq", "z8m3c2wo", "k1x7r4pa"],
+            "correct": false
+        },
+        {
+            "name": "sequence: the items as the question lays them out",
+            "items": [
+                {
+                    "id": "k1x7r4pa",
+                    "kind": "digit",
+                    "text": "9",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "z8m3c2wo",
+                    "kind": "digit",
+                    "text": "7",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "f6e0u9tq",
+                    "kind": "digit",
+                    "text": "3",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["z8m3c2wo", "f6e0u9tq", "k1x7r4pa"],
+                "accept": [["7", "3", "9"]]
+            },
+            "picked": ["k1x7r4pa", "z8m3c2wo", "f6e0u9tq"],
+            "correct": false
+        },
+        {
+            "name": "sequence: one item too few",
+            "items": [
+                {
+                    "id": "k1x7r4pa",
+                    "kind": "digit",
+                    "text": "9",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "z8m3c2wo",
+                    "kind": "digit",
+                    "text": "7",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "f6e0u9tq",
+                    "kind": "digit",
+                    "text": "3",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["z8m3c2wo", "f6e0u9tq", "k1x7r4pa"],
+                "accept": [["7", "3", "9"]]
+            },
+            "picked": ["z8m3c2wo", "f6e0u9tq"],
+            "correct": false
+        },
+        {
+            "name": "sequence: two tiles that say the same, in the solution's order",
+            "items": [
+                {
+                    "id": "w3n9a5ld",
+                    "kind": "digit",
+                    "text": "5",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "e7q2o8bj",
+                    "kind": "digit",
+                    "text": "3",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "r0v6s1hc",
+                    "kind": "digit",
+                    "text": "3",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["e7q2o8bj", "w3n9a5ld", "r0v6s1hc"],
+                "accept": [["3", "5", "3"]]
+            },
+            "picked": ["e7q2o8bj", "w3n9a5ld", "r0v6s1hc"],
+            "correct": true
+        },
+        {
+            "name": "sequence: two tiles that say the same, swapped",
+            "items": [
+                {
+                    "id": "w3n9a5ld",
+                    "kind": "digit",
+                    "text": "5",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "e7q2o8bj",
+                    "kind": "digit",
+                    "text": "3",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "r0v6s1hc",
+                    "kind": "digit",
+                    "text": "3",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["e7q2o8bj", "w3n9a5ld", "r0v6s1hc"],
+                "accept": [["3", "5", "3"]]
+            },
+            "picked": ["r0v6s1hc", "w3n9a5ld", "e7q2o8bj"],
+            "correct": true
+        },
+        {
+            "name": "sequence: one tile twice for two that say the same",
+            "items": [
+                {
+                    "id": "w3n9a5ld",
+                    "kind": "digit",
+                    "text": "5",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "e7q2o8bj",
+                    "kind": "digit",
+                    "text": "3",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "r0v6s1hc",
+                    "kind": "digit",
+                    "text": "3",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["e7q2o8bj", "w3n9a5ld", "r0v6s1hc"],
+                "accept": [["3", "5", "3"]]
+            },
+            "picked": ["e7q2o8bj", "w3n9a5ld", "e7q2o8bj"],
+            "correct": false
+        },
+        {
+            "name": "sequence: one accepted reading",
+            "items": [
+                {
+                    "id": "m5a8j2ux",
+                    "kind": "letter",
+                    "text": "R",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "s9d4l7ye",
+                    "kind": "letter",
+                    "text": "Q",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "c2h6p0in",
+                    "kind": "letter",
+                    "text": "A",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["s9d4l7ye", "c2h6p0in", "m5a8j2ux"],
+                "accept": [
+                    ["Q", "A", "R"],
+                    ["A", "R", "Q"]
+                ]
+            },
+            "picked": ["s9d4l7ye", "c2h6p0in", "m5a8j2ux"],
+            "correct": true
+        },
+        {
+            "name": "sequence: another accepted reading",
+            "items": [
+                {
+                    "id": "m5a8j2ux",
+                    "kind": "letter",
+                    "text": "R",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "s9d4l7ye",
+                    "kind": "letter",
+                    "text": "Q",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "c2h6p0in",
+                    "kind": "letter",
+                    "text": "A",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["s9d4l7ye", "c2h6p0in", "m5a8j2ux"],
+                "accept": [
+                    ["Q", "A", "R"],
+                    ["A", "R", "Q"]
+                ]
+            },
+            "picked": ["c2h6p0in", "m5a8j2ux", "s9d4l7ye"],
+            "correct": true
+        },
+        {
+            "name": "sequence: a reading that is not accepted",
+            "items": [
+                {
+                    "id": "m5a8j2ux",
+                    "kind": "letter",
+                    "text": "R",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "s9d4l7ye",
+                    "kind": "letter",
+                    "text": "Q",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "c2h6p0in",
+                    "kind": "letter",
+                    "text": "A",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["s9d4l7ye", "c2h6p0in", "m5a8j2ux"],
+                "accept": [
+                    ["Q", "A", "R"],
+                    ["A", "R", "Q"]
+                ]
+            },
+            "picked": ["m5a8j2ux", "c2h6p0in", "s9d4l7ye"],
+            "correct": false
+        },
+        {
+            "name": "any shape: an item that is not the round's",
+            "items": [
+                {
+                    "id": "k1x7r4pa",
+                    "kind": "digit",
+                    "text": "9",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "z8m3c2wo",
+                    "kind": "digit",
+                    "text": "7",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "f6e0u9tq",
+                    "kind": "digit",
+                    "text": "3",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["z8m3c2wo", "f6e0u9tq", "k1x7r4pa"],
+                "accept": [["7", "3", "9"]]
+            },
+            "picked": ["z8m3c2wo", "f6e0u9tq", "x0x0x0x0"],
+            "correct": false
+        },
+        {
+            "name": "any shape: nothing picked",
+            "items": [
+                {
+                    "id": "q7m2x9ka",
+                    "kind": "number",
+                    "text": "12",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "b4tn0e5w",
+                    "kind": "number",
+                    "text": "15",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "h8cz3ry1",
+                    "kind": "number",
+                    "text": "18",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "v2lk6dpu",
+                    "kind": "number",
+                    "text": "21",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "choice",
+                "ids": ["h8cz3ry1"]
+            },
+            "picked": [],
+            "correct": false
+        }
+    ]
+}
