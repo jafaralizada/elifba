@@ -4,6 +4,8 @@ use App\Domain\Classroom\Models\SchoolClass;
 use App\Domain\Classroom\Models\Student;
 use App\Domain\Content\Models\CustomWord;
 use App\Domain\Family\Models\Child;
+use App\Domain\Rooms\Models\Room;
+use App\Domain\Rooms\Models\RoomPlayer;
 use App\Enums\Role;
 use App\Models\User;
 use Illuminate\Routing\Route as RoutingRoute;
@@ -249,7 +251,25 @@ function areaSnapshot(): array
         'custom_words' => $rows('custom_words'),
         'hidden_words' => $rows('hidden_words'),
         'children' => $rows('children'),
+        'rooms' => $rows('rooms'),
+        'room_players' => $rows('room_players'),
     ];
+}
+
+/**
+ * The values of the room routes for an account made to host a room with a
+ * player in it, so that ownership would let it through and only the role
+ * refuses.
+ *
+ * @return array<string, string>
+ */
+function roomRowsOf(User $host): array
+{
+    $room = Room::factory()->for($host, 'host')->create();
+    RoomPlayer::factory()->for($room)->for($host)->create();
+    $member = RoomPlayer::factory()->for($room)->create();
+
+    return ['room' => $room->id, 'member' => $member->id, 'code' => (string) $room->code];
 }
 
 it('puts every authenticated route in one area', function (): void {
@@ -302,9 +322,10 @@ it('places classes, rankings, teacher words and class games in the teacher area,
         expect(areaGroupsOf($routes[$name]))->toBe(['shared'], $name);
     }
 
-    foreach (['rooms.index'] as $name) {
-        expect(areaGroupsOf($routes[$name]))->toBe(['player'], $name);
-    }
+    // Every room route, and nothing else, is the player's: `/rooms…` and `/otaq…`.
+    $rooms = array_filter($routes, static fn (RoutingRoute $route): bool => preg_match('#^(rooms|otaq)(/|$)#', $route->uri()) === 1);
+    expect(array_keys($rooms))->toBe(array_keys(playerAreaRoutes()))
+        ->and(array_keys($rooms))->toContain('rooms.index', 'rooms.store', 'rooms.entrance', 'rooms.join', 'rooms.join.store', 'rooms.show', 'rooms.state', 'rooms.leave', 'rooms.update', 'rooms.members.destroy', 'rooms.close', 'rooms.destroy', 'rooms.name.destroy');
 
     foreach (['children.index', 'children.store', 'children.order', 'children.show', 'children.update', 'children.destroy', 'children.learned-letters.update', 'children.games.create', 'children.games.store'] as $name) {
         expect(areaGroupsOf($routes[$name]))->toBe(['parent'], $name);
@@ -501,12 +522,13 @@ it('shares the roles and the area with every page', function (): void {
 it('refuses an account without the player role on every room route', function (string $state, string $rolesPage): void {
     Rooms::on();
     $user = User::factory()->{$state}()->create();
+    $values = roomRowsOf($user);
     $before = areaSnapshot();
     $checked = 0;
 
     foreach (playerAreaRoutes() as $key => $route) {
         foreach (array_diff($route->methods(), ['HEAD']) as $method) {
-            $uri = Rooms::uri($route);
+            $uri = Rooms::uri($route, $values);
             $page = $this->actingAs($user)->call($method, $uri);
             $json = $this->actingAs($user)->json($method, $uri);
             $withoutRole = $state === 'withoutRole';
@@ -526,7 +548,7 @@ it('refuses an account without the player role on every room route', function (s
         }
     }
 
-    expect($checked)->toBeGreaterThanOrEqual(1)
+    expect($checked)->toBeGreaterThanOrEqual(13)
         ->and(areaSnapshot())->toBe($before);
 })->with([
     'no role yet' => ['withoutRole', 'role'],

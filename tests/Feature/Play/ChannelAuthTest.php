@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Testing\TestResponse;
 use Tests\Support\Games;
 use Tests\Support\GuestBoards;
+use Tests\Support\Rooms;
 
 /*
  * Who may join `private-game.{id}` (docs/architecture.md §4), through the
@@ -179,4 +180,29 @@ it('authorizes the owner of a home game and the board that shows it, and nobody 
     app(TransitionGameSession::class)->handle($home, GameSessionStatus::Finished);
     $this->actingAs($parent);
     joinChannel($home)->assertForbidden();
+});
+
+// A room's channel (§12 "The race", ADR 021 decision 8) takes an account's
+// session only: a guest board's bearer never reaches it, whatever game its
+// board shows and whoever its teacher is.
+it('refuses a guest board\'s bearer on a room channel', function (): void {
+    Rooms::on();
+    $host = User::factory()->teacherAndPlayer()->create();
+    $class = SchoolClass::factory()->for($host, 'teacher')->create();
+    $board = GuestBoards::showing(Games::start($class));
+    $room = Rooms::open($host);
+    $join = fn (array $headers = []): TestResponse => $this->post('/broadcasting/auth', [
+        'socket_id' => SOCKET_ID,
+        'channel_name' => 'private-room.'.$room->id,
+    ], ['Accept' => 'application/json', ...$headers]);
+
+    $join(GuestBoards::bearer($board['token']))->assertForbidden();
+    joinChannel(Games::start($class, seed: 2))->assertForbidden();
+
+    // The bearer is not read at all: with a session beside it, the session
+    // alone answers — another account's is refused, the host's is the host.
+    $this->actingAs(User::factory()->player()->create());
+    $join(GuestBoards::bearer($board['token']))->assertForbidden();
+    $this->actingAs($host);
+    $join()->assertOk()->assertExactJson(['auth' => 'elifba-test-key:'.hash_hmac('sha256', SOCKET_ID.':private-room.'.$room->id, 'elifba-test-secret')]);
 });

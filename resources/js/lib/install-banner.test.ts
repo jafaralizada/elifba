@@ -95,6 +95,8 @@ describe('bannerAllowedOn', () => {
             'pult/index',
             // The player area waits for B4's shell (architecture §12).
             'rooms/index',
+            'rooms/join',
+            'rooms/show',
         ]);
         expect(allowed).toContain('welcome');
         expect(allowed).toContain('classes/index');

@@ -5,11 +5,13 @@ use App\Domain\Family\Models\Child;
 use App\Domain\Language\Support\Alphabet;
 use App\Domain\Play\Models\GameRound;
 use App\Domain\Play\Models\GameSession;
+use App\Enums\Role;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\Games;
 use Tests\Support\NameClips;
+use Tests\Support\Rooms;
 
 /*
  * The parent's pages (docs/architecture.md §1, §5 "A child's stars", §7
@@ -241,5 +243,44 @@ it('says whether the board says a child\'s name, from the name and the list only
 
         $this->get(route('children.index'))->assertInertia(fn (Assert $page) => $page->where('children.0.has_voice', null)->where('children.1.has_voice', null));
         $this->get(route('children.show', $other))->assertInertia(fn (Assert $page) => $page->where('child.has_voice', null));
+    }
+});
+
+// The rooms area (§12 "The area and the switch", ADR 019): with it on and
+// the parent playing in a room, a page of the parent area learns nothing of
+// it — only the role list names «player», for the user menu's switch.
+it('sends nothing about rooms to a page of the parent area', function (): void {
+    Rooms::on();
+    $this->parent->forceFill(['player_agreed_at' => now()])->save();
+    $this->parent->assignRole(Role::Player);
+    $child = Child::factory()->for($this->parent, 'parent')->create(['display_name' => 'Aysel']);
+    $game = Games::start($child);
+    $room = Rooms::open($this->parent);
+    $player = Rooms::join($room, User::factory()->player()->create(['name' => 'Aygün Məmmədova']));
+
+    foreach ([
+        route('children.index'),
+        route('children.show', $child),
+        route('children.games.create', $child),
+        route('games.board', $game),
+        route('games.remote', $game),
+    ] as $url) {
+        $this->get($url)
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use ($url, $room, $player): void {
+                $props = $page->toArray()['props'];
+                $roles = $props['auth']['roles'];
+                unset($props['translations'], $props['auth']);
+                $wire = (string) json_encode($props, JSON_UNESCAPED_UNICODE);
+
+                expect($roles)->toContain('player')
+                    ->and(array_filter(parentPropKeys($props), static fn (string $key): bool => preg_match('/room|^members?$|^member_|otaq/i', $key) === 1))->toBe([], $url)
+                    ->and($wire)->not->toContain($room->id)
+                    ->and($wire)->not->toContain($player->id)
+                    ->and($wire)->not->toContain((string) $room->code)
+                    ->and($wire)->not->toContain('Aygün')
+                    ->and($wire)->not->toContain('/rooms')
+                    ->and($wire)->not->toContain('/otaq');
+            });
     }
 });

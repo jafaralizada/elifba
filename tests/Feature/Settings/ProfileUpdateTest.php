@@ -2,10 +2,13 @@
 
 namespace Tests\Feature\Settings;
 
+use App\Domain\Rooms\Models\Room;
+use App\Domain\Rooms\Models\RoomPlayer;
 use App\Enums\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\Rooms;
 use Tests\TestCase;
 
 class ProfileUpdateTest extends TestCase
@@ -99,6 +102,38 @@ class ProfileUpdateTest extends TestCase
         expect(DB::table('model_has_roles')->where('model_id', $user->id)->exists())->toBeFalse()
             ->and($other->fresh()?->roleList())->toBe([Role::Teacher])
             ->and(DB::table('roles')->count())->toBe(count(Role::cases()));
+    }
+
+    /**
+     * Docs/architecture.md §12 "Scoring and what is kept", ADR 022 decision
+     * 7: the rooms it hosted go by cascade; its rows in others' rooms stay,
+     * without an account.
+     */
+    public function test_deleting_the_account_removes_its_rooms()
+    {
+        Rooms::on();
+        $user = User::factory()->teacherAndPlayer()->create();
+        $other = User::factory()->player()->create();
+        $hosted = Rooms::open($user);
+        $guest = Rooms::join($hosted, $other);
+        $closed = Rooms::open($other);
+        $row = Rooms::join($closed, $user);
+        $this->actingAs($other)->post(route('rooms.close', $closed));
+
+        $this
+            ->actingAs($user)
+            ->delete(route('profile.destroy'), [
+                'password' => 'password',
+            ])
+            ->assertRedirect(route('home'));
+
+        $this->assertNull($user->fresh());
+        expect(Room::query()->whereKey($hosted->id)->exists())->toBeFalse()
+            ->and(RoomPlayer::query()->whereKey($guest->id)->exists())->toBeFalse()
+            ->and(Room::query()->whereKey($closed->id)->exists())->toBeTrue()
+            ->and($row->refresh()->user_id)->toBeNull()
+            ->and(DB::table('room_players')->where('user_id', $user->id)->exists())->toBeFalse()
+            ->and(DB::table('rooms')->where('user_id', $user->id)->exists())->toBeFalse();
     }
 
     public function test_an_account_without_a_role_can_still_delete_itself()

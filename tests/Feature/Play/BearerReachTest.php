@@ -7,6 +7,8 @@ use App\Domain\Play\Actions\TransitionGameSession;
 use App\Domain\Play\Enums\GameSessionStatus;
 use App\Domain\Play\Models\GameSession;
 use App\Domain\Play\Models\GuestBoard;
+use App\Domain\Rooms\Models\Room;
+use App\Domain\Rooms\Models\RoomPlayer;
 use App\Models\User;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +16,7 @@ use Illuminate\Support\Facades\Route;
 use Tests\Support\Games;
 use Tests\Support\GuestBoards;
 use Tests\Support\NameClips;
+use Tests\Support\Rooms;
 
 /*
  * A guest board's bearer reaches only the game its board shows
@@ -21,7 +24,9 @@ use Tests\Support\NameClips;
  * a player's voice, ADR 016) of that one game, its own board (poll, close) and that game's channel.
  * Every other route of the app answers the bearer exactly as it answers a
  * visitor with no credentials — or 404 where a board route does not find
- * the game. A new route is covered the day it is added.
+ * the game. A new route is covered the day it is added. With the rooms area
+ * on, the account also hosts an open room with a player in it: every room
+ * route answers the bearer as it answers a visitor (§12, ADR 020).
  */
 
 /**
@@ -44,13 +49,15 @@ const BEARER_ROUTES = [
  * guest board, a second live game, a child and the child's home game;
  * teacher B with a game of their own.
  *
- * @return array{teacher: User, class: SchoolClass, student: Student, child: Child, shown: GameSession, other: GameSession, home: GameSession, foreign: GameSession, board: GuestBoard, token: string}
+ * @return array{teacher: User, class: SchoolClass, student: Student, child: Child, shown: GameSession, other: GameSession, home: GameSession, foreign: GameSession, board: GuestBoard, token: string, room: Room, member: RoomPlayer}
  */
 function bearerWorld(): array
 {
     // The student's and the child's names have clips (ADR 016).
     NameClips::fake(['Aysel', 'Firuzə']);
-    $teacher = User::factory()->teacherAndParent()->create();
+    Rooms::on();
+    $teacher = User::factory()->teacherAndParent()->create(['player_agreed_at' => now()]);
+    $room = Rooms::open($teacher);
     $class = SchoolClass::factory()->for($teacher, 'teacher')->create();
     $child = Child::factory()->for($teacher, 'parent')->create(['display_name' => 'Firuzə']);
     $student = Student::factory()->for($class)->create(['display_name' => 'Aysel']);
@@ -68,6 +75,8 @@ function bearerWorld(): array
         'foreign' => Games::start(SchoolClass::factory()->create(), seed: 3),
         'board' => $board['board'],
         'token' => $board['token'],
+        'room' => $room,
+        'member' => Rooms::join($room),
     ];
 }
 
@@ -85,7 +94,9 @@ function bearerUri(RoutingRoute $route, array $world, GameSession $game): string
         'game' => $game->id,
         'board' => $world['board']->id,
         'player' => $world['student']->id,
-        'code' => '123456',
+        'code' => (string) $world['room']->code,
+        'room' => $world['room']->id,
+        'member' => $world['member']->id,
     ];
 
     return '/'.ltrim((string) preg_replace_callback(
@@ -113,6 +124,8 @@ function bearerSnapshot(): array
         'school_classes' => $rows('school_classes'),
         'students' => $rows('students'),
         'children' => $rows('children'),
+        'rooms' => $rows('rooms'),
+        'room_players' => $rows('room_players'),
     ];
 }
 
@@ -147,6 +160,27 @@ it('answers a bearer like a visitor on every route but its own board routes', fu
 
     expect($mismatches)->toBe([])
         ->and($checked)->toBeGreaterThan(50);
+});
+
+it('answers a bearer like a visitor on every room route and changes nothing', function (): void {
+    $world = bearerWorld();
+    $before = bearerSnapshot();
+    $checked = 0;
+
+    foreach (Rooms::routes() as $key => $route) {
+        foreach (array_diff($route->methods(), ['HEAD']) as $method) {
+            $uri = bearerUri($route, $world, $world['other']);
+            $visitor = $this->json($method, $uri, ['locked' => true]);
+            $bearer = $this->json($method, $uri, ['locked' => true], GuestBoards::bearer($world['token']));
+
+            expect($bearer->status())->toBe($visitor->status(), "{$method} {$key}")
+                ->and($bearer->status())->toBe(401, "{$method} {$key}");
+            $checked++;
+        }
+    }
+
+    expect($checked)->toBeGreaterThanOrEqual(13)
+        ->and(bearerSnapshot())->toBe($before);
 });
 
 it('lets the bearer drive the game its board shows, and nothing writes elsewhere', function (): void {

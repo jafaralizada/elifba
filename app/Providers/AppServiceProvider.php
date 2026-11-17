@@ -38,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
         $this->configureRoles();
         $this->configurePlay();
+        $this->configureRooms();
 
         // `composer dev`: no queue worker, because QUEUE_CONNECTION is `sync`
         // everywhere (docs/architecture.md §10). Reverb registers its own
@@ -104,5 +105,27 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Event::listen(GameSessionTransitioned::class, BroadcastSessionStatus::class);
+    }
+
+    /**
+     * The rooms' limiters (docs/architecture.md §12 "Rooms and joining",
+     * ADR 020 decision 6), each per account — a room route is never reached
+     * without one.
+     */
+    protected function configureRooms(): void
+    {
+        $account = static fn (Request $request): string => (string) ($request->user()?->getAuthIdentifier() ?? $request->ip());
+
+        // Opening a room: 6 a minute.
+        RateLimiter::for('rooms-open', static fn (Request $request): Limit => Limit::perMinute(6)->by($account($request)));
+
+        // `/otaq` and both `/otaq/{code}`: 10 a minute, so a code cannot be guessed by trying.
+        RateLimiter::for('room-join', static fn (Request $request): Limit => Limit::perMinute(10)->by($account($request)));
+
+        // A room page's state, asked at each moment of the timetable and every 3 s without a socket.
+        RateLimiter::for('room-state', static fn (Request $request): Limit => Limit::perMinute(120)->by($account($request)));
+
+        // A player's answers (B3).
+        RateLimiter::for('room-answers', static fn (Request $request): Limit => Limit::perMinute(30)->by($account($request)));
     }
 }

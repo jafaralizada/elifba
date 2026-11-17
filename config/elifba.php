@@ -66,6 +66,14 @@ return [
     // exist either way.
     'rooms' => [
         'enabled' => filter_var(env('ELIFBA_ROOMS', false), FILTER_VALIDATE_BOOL),
+
+        // Present players in one room at most (§12 "Rooms and joining").
+        'max_players' => 20,
+
+        // A room with no join, game or answer for this long is closed: it
+        // counts as closed at once (`Room::isOpen()`), and `rooms:close-idle`
+        // writes it within the hour.
+        'idle_hours' => 3,
     ],
 
     // Who runs this instance; shown on /privacy (§7).

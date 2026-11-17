@@ -1,0 +1,193 @@
+<?php
+
+use App\Domain\Rooms\Models\Room;
+use App\Domain\Rooms\Models\RoomPlayer;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\Rooms;
+
+/*
+ * The host's tools (docs/architecture.md §12 "Rooms and joining", ADR 020
+ * decision 8): «Kilidlə», «Çıxar», closing — the host's alone
+ * (`RoomPolicy::host`), each raising the revision and signalling the room.
+ */
+
+beforeEach(function (): void {
+    Rooms::on();
+    $this->host = User::factory()->player()->create(['name' => 'Rəşad Quliyev']);
+    $this->room = Rooms::open($this->host);
+    $this->hostRow = RoomPlayer::query()->where('user_id', $this->host->id)->sole();
+    $this->player = User::factory()->player()->create(['name' => 'Aygün Məmmədova']);
+    $this->row = Rooms::join($this->room, $this->player);
+    $this->reverb->sent = [];
+});
+
+/**
+ * @return array<string, list<array<string, mixed>>>
+ */
+function hostSnapshot(): array
+{
+    $rows = static fn (string $table): array => DB::table($table)->orderBy('id')->get()
+        ->map(static fn (object $row): array => (array) $row)->all();
+
+    return ['rooms' => $rows('rooms'), 'room_players' => $rows('room_players')];
+}
+
+/**
+ * The revisions the room signalled, in order.
+ *
+ * @return list<int>
+ */
+function signalledRevisions(array $sent): array
+{
+    return array_map(static fn (array $message): int => $message['data']['revision'], $sent);
+}
+
+it('locks and unlocks', function (): void {
+    $this->actingAs($this->host);
+
+    $this->from(route('rooms.show', $this->room))
+        ->patch(route('rooms.update', $this->room), ['locked' => true])
+        ->assertRedirect(route('rooms.show', $this->room));
+    expect($this->room->refresh()->locked_at)->not->toBeNull()
+        ->and($this->room->revision)->toBe(2);
+    $this->getJson(route('rooms.state', $this->room))->assertJsonPath('room.locked', true);
+
+    // Locking a locked room changes nothing and says nothing.
+    $this->patch(route('rooms.update', $this->room), ['locked' => '1']);
+    expect($this->room->refresh()->revision)->toBe(2);
+
+    $this->patch(route('rooms.update', $this->room), ['locked' => false]);
+    expect($this->room->refresh()->locked_at)->toBeNull()
+        ->and($this->room->revision)->toBe(3)
+        ->and(signalledRevisions($this->reverb->sent))->toBe([2, 3]);
+
+    $this->patch(route('rooms.update', $this->room), ['locked' => 'perhaps'])->assertSessionHasErrors('locked');
+    $this->patch(route('rooms.update', $this->room), [])->assertSessionHasErrors('locked');
+});
+
+it('removes a player for good', function (): void {
+    $this->actingAs($this->host)
+        ->from(route('rooms.show', $this->room))
+        ->delete(route('rooms.members.destroy', [$this->room, $this->row]))
+        ->assertRedirect(route('rooms.show', $this->room));
+
+    expect($this->row->refresh()->removed_at)->not->toBeNull()
+        ->and($this->room->refresh()->revision)->toBe(2)
+        ->and(signalledRevisions($this->reverb->sent))->toBe([2]);
+
+    // Gone from the lobby.
+    $this->getJson(route('rooms.state', $this->room))
+        ->assertJsonPath('players', [['id' => $this->hostRow->id, 'name' => 'Rəşad Quliyev', 'present' => true, 'host' => true]]);
+
+    // The removed account finds the room nowhere and cannot come back.
+    $before = hostSnapshot();
+    $this->actingAs($this->player);
+    $this->get(route('rooms.show', $this->room))->assertNotFound();
+    $this->getJson(route('rooms.state', $this->room))->assertNotFound();
+    $this->post(route('rooms.leave', $this->room))->assertNotFound();
+    $this->get(route('rooms.join', (string) $this->room->code))->assertNotFound();
+    $this->post(route('rooms.join.store', (string) $this->room->code))->assertNotFound();
+    $this->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('open', [])->where('past', []));
+    expect(hostSnapshot())->toBe($before);
+
+    // Removing again changes nothing.
+    $this->actingAs($this->host)->delete(route('rooms.members.destroy', [$this->room, $this->row]))->assertRedirect();
+    expect(hostSnapshot())->toBe($before);
+});
+
+it('cannot remove the host\'s own row', function (): void {
+    $before = hostSnapshot();
+
+    $this->actingAs($this->host)
+        ->delete(route('rooms.members.destroy', [$this->room, $this->hostRow]))
+        ->assertForbidden();
+
+    expect(hostSnapshot())->toBe($before)
+        ->and($this->reverb->sent)->toBe([]);
+});
+
+it('finds no row of another room under this one', function (): void {
+    $other = Rooms::open();
+    $otherRow = Rooms::join($other, User::factory()->player()->create());
+    $before = hostSnapshot();
+
+    $this->actingAs($this->host)
+        ->delete(route('rooms.members.destroy', [$this->room, $otherRow]))
+        ->assertNotFound();
+
+    expect(hostSnapshot())->toBe($before);
+});
+
+it('closes the room and clears its code', function (): void {
+    $code = (string) $this->room->code;
+
+    $this->actingAs($this->host)
+        ->post(route('rooms.close', $this->room))
+        ->assertRedirect(route('rooms.show', $this->room));
+
+    $this->room->refresh();
+    expect($this->room->closed_at)->not->toBeNull()
+        ->and($this->room->code)->toBeNull()
+        ->and($this->room->isOpen())->toBeFalse()
+        ->and($this->room->revision)->toBe(2)
+        ->and(signalledRevisions($this->reverb->sent))->toBe([2]);
+
+    // A closed room is its results: everyone who was in it sees who.
+    foreach ([$this->host, $this->player] as $account) {
+        $this->actingAs($account)->get(route('rooms.show', $this->room))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('room.status', 'closed')
+                ->where('state.room', ['id' => $this->room->id, 'status' => 'closed', 'locked' => false, 'code' => null])
+                ->where('state.players.0.name', 'Rəşad Quliyev')
+                ->where('state.players.1.name', 'Aygün Məmmədova')
+                ->where('can.leave', false)
+                ->where('can.forget', true));
+    }
+
+    // Its code opens nothing, and nothing in it changes any more.
+    $this->actingAs($this->player)->get(route('rooms.join', $code))->assertNotFound();
+    $this->getJson(route('rooms.state', $this->room))->assertForbidden();
+    $this->post(route('rooms.leave', $this->room))->assertForbidden();
+
+    $before = hostSnapshot();
+    $this->actingAs($this->host);
+    $this->post(route('rooms.close', $this->room))->assertRedirect();
+    $this->patch(route('rooms.update', $this->room), ['locked' => true])->assertRedirect();
+    $this->delete(route('rooms.members.destroy', [$this->room, $this->row]))->assertRedirect();
+    expect(hostSnapshot())->toBe($before);
+});
+
+it('deletes a closed room for everyone, and never an open one', function (): void {
+    $this->actingAs($this->host)->delete(route('rooms.destroy', $this->room))->assertForbidden();
+    expect($this->room->refresh()->exists)->toBeTrue();
+
+    $this->post(route('rooms.close', $this->room));
+    $this->delete(route('rooms.destroy', $this->room))->assertRedirect(route('rooms.index'));
+
+    expect(Room::query()->whereKey($this->room->id)->exists())->toBeFalse()
+        ->and(RoomPlayer::query()->where('room_id', $this->room->id)->exists())->toBeFalse()
+        ->and(User::query()->whereKey([$this->host->id, $this->player->id])->count())->toBe(2);
+
+    $this->actingAs($this->player)->get(route('rooms.show', $this->room))->assertNotFound();
+    $this->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('open', [])->where('past', []));
+});
+
+it('lets only the host do any of it', function (): void {
+    $before = hostSnapshot();
+    $this->actingAs($this->player);
+
+    $this->patch(route('rooms.update', $this->room), ['locked' => true])->assertForbidden();
+    $this->delete(route('rooms.members.destroy', [$this->room, $this->hostRow]))->assertForbidden();
+    $this->delete(route('rooms.members.destroy', [$this->room, $this->row]))->assertForbidden();
+    $this->post(route('rooms.close', $this->room))->assertForbidden();
+    $this->delete(route('rooms.destroy', $this->room))->assertForbidden();
+
+    $this->get(route('rooms.show', $this->room))->assertInertia(fn (Assert $page) => $page
+        ->where('can', ['host' => false, 'leave' => true, 'delete' => false, 'forget' => false]));
+
+    expect(hostSnapshot())->toBe($before)
+        ->and($this->reverb->sent)->toBe([]);
+});

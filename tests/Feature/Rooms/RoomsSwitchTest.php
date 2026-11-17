@@ -1,5 +1,7 @@
 <?php
 
+use App\Domain\Rooms\Models\Room;
+use App\Domain\Rooms\Models\RoomPlayer;
 use App\Enums\Role;
 use App\Http\Middleware\EnsureRoomsAreEnabled;
 use App\Models\User;
@@ -21,13 +23,19 @@ use Tests\Support\Rooms;
  */
 
 /**
- * The values the room routes take; the next step of B2 fills it.
+ * The values the room routes take: a room `$host` hosts, with `$member`
+ * in it, and its code — so that, the switch aside, the routes would let
+ * them through.
  *
  * @return array<string, int|string>
  */
-function roomsSwitchValues(): array
+function roomsSwitchValues(User $host, User $member): array
 {
-    return [];
+    $room = Room::factory()->for($host, 'host')->create();
+    RoomPlayer::factory()->for($room)->for($host)->create();
+    $row = RoomPlayer::factory()->for($room)->for($member)->create();
+
+    return ['room' => $room->id, 'member' => $row->id, 'code' => (string) $room->code];
 }
 
 /**
@@ -44,6 +52,8 @@ function roomsSwitchSnapshot(): array
         'users' => $rows('users', 'id'),
         'model_has_roles' => $rows('model_has_roles', 'model_id'),
         'roles' => $rows('roles', 'id'),
+        'rooms' => $rows('rooms', 'id'),
+        'room_players' => $rows('room_players', 'id'),
     ];
 }
 
@@ -56,17 +66,19 @@ it('answers 404 on every room route while the switch is off', function (): void 
         'no role yet' => User::factory()->withoutRole()->create(),
         'unconfirmed' => User::factory()->player()->unverified()->create(),
     ];
+    $values = roomsSwitchValues($accounts['a player'], $accounts['a teacher who plays']);
     $before = roomsSwitchSnapshot();
     $checked = 0;
 
     expect($routes)->not->toBeEmpty();
 
     foreach ($routes as $key => $route) {
-        $uri = Rooms::uri($route, roomsSwitchValues());
+        $uri = Rooms::uri($route, $values);
 
         foreach (array_diff($route->methods(), ['HEAD']) as $method) {
             // A visitor first: not even the login says that the route exists.
-            auth()->logout();
+            // Forgotten, not logged out: a logout would rotate the last account's remember token.
+            $this->app['auth']->guard('web')->forgetUser();
             expect($this->call($method, $uri)->status())->toBe(404, "{$method} {$key}, a visitor")
                 ->and($this->json($method, $uri)->status())->toBe(404, "{$method} {$key}, a visitor (JSON)");
 
@@ -87,6 +99,8 @@ it('answers 404 on every room route while the switch is off', function (): void 
     auth()->logout();
     $this->get(route('rooms.index'))->assertRedirect(route('login'));
     $this->actingAs($accounts['a player'])->get(route('rooms.index'))->assertOk();
+    $this->get(route('rooms.show', $values['room']))->assertOk();
+    $this->getJson(route('rooms.state', $values['room']))->assertOk();
 });
 
 it('runs the switch before anything else of a room route', function (): void {
@@ -222,4 +236,20 @@ it('reads the switch only through RoomsArea', function (): void {
     }
 
     expect($readers)->toBe(['app/Support/RoomsArea.php']);
+});
+
+it('refuses the room channel while the switch is off', function (): void {
+    $host = User::factory()->player()->create();
+    $values = roomsSwitchValues($host, User::factory()->teacherAndPlayer()->create());
+    $join = fn () => $this->post('/broadcasting/auth', [
+        'socket_id' => '1234.5678',
+        'channel_name' => 'private-room.'.$values['room'],
+    ], ['Accept' => 'application/json']);
+
+    $this->actingAs($host);
+    $join()->assertForbidden();
+
+    // The switch, and nothing else, closed it.
+    Rooms::on();
+    $join()->assertOk()->assertJsonStructure(['auth']);
 });

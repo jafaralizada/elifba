@@ -5,16 +5,19 @@ use App\Domain\Content\Actions\AddCustomWord;
 use App\Domain\Content\Actions\HideWord;
 use App\Domain\Content\Data\CustomWordData;
 use App\Domain\Content\Data\HiddenWordData;
+use App\Domain\Content\Enums\Mechanic;
 use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Family\Models\Child;
 use App\Domain\Play\Actions\ReplayGame;
 use App\Domain\Play\Enums\SetupMode;
 use App\Domain\Play\Models\SetupChoice;
 use App\Domain\Play\Support\SetupMemory;
+use App\Enums\Role;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\Games;
 use Tests\Support\GuestBoards;
+use Tests\Support\Rooms;
 
 /*
  * «Yeni oyun» as a catalog of ready games (docs/frontend.md rule 13,
@@ -444,4 +447,42 @@ describe('«Sözlərim»', function (): void {
             ->and(array_column($props['myWords']['words'], 'text'))->toBe(['Aysel', 'kələm', 'Tural'])
             ->and($props['myWords']['limits']['count'])->toBe(3);
     });
+});
+
+// Adults' games are not children's games (§12 "Room games", ADR 019, ADR
+// 023): with the rooms area on and the account playing in a room, «Yeni
+// oyun» for a class and for a child offers exactly the games it offered
+// before, and no room mechanic is a mechanic of the catalog. Until B3 adds
+// `Content\Enums\RoomMechanic`, the room mechanics are the names §12
+// gives them; B3 reads them from the enum and drops the list.
+it('lists no room game', function (): void {
+    Rooms::on();
+    $this->teacher->forceFill(['player_agreed_at' => now()])->save();
+    $this->teacher->assignRole(Role::Player);
+    Rooms::open($this->teacher);
+
+    $pinned = [
+        'letter_pop', 'letter_find', 'letter_first_letter',
+        'syllable_pop', 'syllable_find', 'syllable_build_syllable',
+        'word_pop', 'word_find', 'word_build_word', 'word_read_word',
+        'sentence_build_sentence',
+        'picture_pop', 'picture_find',
+        'number_pop', 'number_find', 'number_count',
+    ];
+
+    foreach ([route('classes.games.create', $this->class), route('children.games.create', $this->child)] as $url) {
+        $this->get($url)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('games', fn ($games): bool => collect($games)->map(fn ($game): string => "{$game['unit']}_{$game['mechanic']}")->all() === $pinned)
+                ->where('cards', fn ($cards): bool => collect($cards)->every(fn ($card): bool => Mechanic::tryFrom($card['mechanic']) !== null)));
+    }
+
+    $roomMechanic = 'App\\Domain\\Content\\Enums\\RoomMechanic';
+    $roomMechanics = enum_exists($roomMechanic)
+        ? array_map(static fn (BackedEnum $case): string|int => $case->value, $roomMechanic::cases())
+        : ['recall_order', 'recall_cells', 'next_in_sequence', 'odd_one_out', 'anagram', 'spelling'];
+
+    expect($roomMechanics)->not->toBeEmpty()
+        ->and(array_intersect(array_map(static fn (Mechanic $mechanic): string => $mechanic->value, Mechanic::cases()), $roomMechanics))->toBe([]);
 });

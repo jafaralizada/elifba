@@ -6,6 +6,10 @@ use App\Domain\Content\Models\CustomWord;
 use App\Domain\Content\Support\Avatars;
 use App\Domain\Family\Models\Child;
 use App\Domain\Play\Models\GameSession;
+use App\Domain\Rooms\Actions\CloseRoom;
+use App\Domain\Rooms\Actions\RemoveRoomPlayer;
+use App\Domain\Rooms\Models\Room;
+use App\Domain\Rooms\Models\RoomPlayer;
 use App\Models\User;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\DB;
@@ -14,12 +18,13 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Testing\TestResponse;
 use Tests\Support\Games;
 use Tests\Support\NameClips;
+use Tests\Support\Rooms;
 
 /*
- * Isolation (docs/architecture.md §7). Every route with a `{class}`,
- * `{student}`, `{game}`, `{word}` or `{child}` parameter must have a case
- * below; the first test fails when one is missing, so a new route cannot
- * skip this file.
+ * Isolation (docs/architecture.md §7, §12 "Rooms and joining"). Every route
+ * with a `{class}`, `{student}`, `{game}`, `{word}`, `{child}`, `{room}` or
+ * `{member}` parameter must have a case below; the first test fails when
+ * one is missing, so a new route cannot skip this file.
  *
  * Each case is a request account A may make on A's own data. The tests make
  * it as account B and as accounts with other roles or none (404 or 403,
@@ -29,7 +34,7 @@ use Tests\Support\NameClips;
  * (ADR 010), so only ownership tells them apart.
  */
 
-const ISOLATED_PARAMETERS = ['class', 'student', 'game', 'word', 'child'];
+const ISOLATED_PARAMETERS = ['class', 'student', 'game', 'word', 'child', 'room', 'member'];
 
 /**
  * Account A owns 1A (two active students, an archived one and a live
@@ -37,16 +42,26 @@ const ISOLATED_PARAMETERS = ['class', 'student', 'game', 'word', 'child'];
  * children of their own — Aysel, who shares a name with the student and is
  * still another record (ADR 011), and Tural — with a home game; account B
  * owns their own 1A with one student and a game, a word, and a child with a
- * home game.
+ * home game. Both play too, with the rooms area on: A hosts an open room
+ * where A and Aysel Quliyeva play, and a closed one with both; B has a room
+ * of their own.
  *
- * @return array{a: User, b: User, classA: SchoolClass, otherClassA: SchoolClass, archivedClassA: SchoolClass, studentA: Student, secondStudentA: Student, archivedStudentA: Student, otherStudentA: Student, gameA: GameSession, classB: SchoolClass, studentB: Student, gameB: GameSession, wordA: CustomWord, wordB: CustomWord, childA: Child, secondChildA: Child, homeGameA: GameSession, childB: Child, homeGameB: GameSession}
+ * @return array{a: User, b: User, classA: SchoolClass, otherClassA: SchoolClass, archivedClassA: SchoolClass, studentA: Student, secondStudentA: Student, archivedStudentA: Student, otherStudentA: Student, gameA: GameSession, classB: SchoolClass, studentB: Student, gameB: GameSession, wordA: CustomWord, wordB: CustomWord, childA: Child, secondChildA: Child, homeGameA: GameSession, childB: Child, homeGameB: GameSession, roomA: Room, memberA: RoomPlayer, closedRoomA: Room, roomB: Room, memberB: RoomPlayer}
  */
 function isolationWorld(): array
 {
     // A's student Aysel and child Aysel have a name the board says (ADR 016).
     NameClips::fake(['Aysel']);
-    $a = User::factory()->teacherAndParent()->create();
-    $b = User::factory()->teacherAndParent()->create();
+    Rooms::on();
+    $a = User::factory()->teacherAndParent()->create(['player_agreed_at' => now()]);
+    $b = User::factory()->teacherAndParent()->create(['player_agreed_at' => now()]);
+    // A player's name is shown in the room, like a child's on the board.
+    $guest = User::factory()->player()->create(['name' => 'Aysel Quliyeva']);
+    $closedRoomA = Rooms::open($a);
+    Rooms::join($closedRoomA, $guest);
+    app(CloseRoom::class)->handle($closedRoomA);
+    $roomA = Rooms::open($a);
+    $roomB = Rooms::open($b);
     $childA = Child::factory()->for($a, 'parent')->create(['display_name' => 'Aysel']);
     $childB = Child::factory()->for($b, 'parent')->create(['display_name' => 'Nigar']);
 
@@ -78,6 +93,11 @@ function isolationWorld(): array
         'homeGameA' => Games::start($childA, seed: 3),
         'childB' => $childB,
         'homeGameB' => Games::start($childB, seed: 4),
+        'roomA' => $roomA,
+        'memberA' => Rooms::join($roomA, $guest),
+        'closedRoomA' => $closedRoomA->refresh(),
+        'roomB' => $roomB,
+        'memberB' => Rooms::join($roomB),
     ];
 }
 
@@ -94,6 +114,8 @@ function isolationCases(): array
     $gameA = static fn (array $w): array => ['game' => $w['gameA']->id];
     $wordA = static fn (array $w): array => ['word' => $w['wordA']->id];
     $childA = static fn (array $w): array => ['child' => $w['childA']->id];
+    $roomA = static fn (array $w): array => ['room' => $w['roomA']->id];
+    $closedRoomA = static fn (array $w): array => ['room' => $w['closedRoomA']->id];
 
     return [
         'GET classes/{class}' => ['classes.show', $classA, $none],
@@ -137,6 +159,15 @@ function isolationCases(): array
         'GET children/{child}/games/create' => ['children.games.create', $childA, $none],
         'POST children/{child}/games' => ['children.games.store', $childA, static fn (array $w): array => ['mechanic' => 'find', 'pack' => 'balloons', 'level' => 'letters', 'rounds' => 5]],
         'PUT children/{child}/games/mode' => ['children.games.mode', $childA, static fn (array $w): array => ['mode' => 'normal']],
+        'GET rooms/{room}' => ['rooms.show', $roomA, $none],
+        'GET rooms/{room}/state' => ['rooms.state', $roomA, $none],
+        'POST rooms/{room}/leave' => ['rooms.leave', $roomA, $none],
+        'PATCH rooms/{room}' => ['rooms.update', $roomA, static fn (array $w): array => ['locked' => true]],
+        'DELETE rooms/{room}/members/{member}' => ['rooms.members.destroy', static fn (array $w): array => ['room' => $w['roomA']->id, 'member' => $w['memberA']->id], $none],
+        'POST rooms/{room}/close' => ['rooms.close', $roomA, $none],
+        // A closed room: the host deletes it, a player takes their name out.
+        'DELETE rooms/{room}' => ['rooms.destroy', $closedRoomA, $none],
+        'DELETE rooms/{room}/name' => ['rooms.name.destroy', $closedRoomA, $none],
     ];
 }
 
@@ -184,6 +215,8 @@ function isolationSnapshot(): array
         'hidden_words' => $rows('hidden_words'),
         'children' => $rows('children'),
         'setup_choices' => $rows('setup_choices'),
+        'rooms' => $rows('rooms'),
+        'room_players' => $rows('room_players'),
     ];
 }
 
@@ -202,7 +235,7 @@ function isolationRequest(string $case, array $world): TestResponse
 
 $caseNames = static fn (): array => array_combine(array_keys(isolationCases()), array_keys(isolationCases()));
 
-it('has an isolation case for every route with {class}, {student}, {game}, {word} or {child}', function (): void {
+it('has an isolation case for every route with {class}, {student}, {game}, {word}, {child}, {room} or {member}', function (): void {
     $routes = array_keys(isolatedRoutes());
     $cases = array_keys(isolationCases());
 
@@ -215,7 +248,7 @@ it('has an isolation case for every route with {class}, {student}, {game}, {word
     }
 });
 
-it('binds {student} only inside its {class} and checks a policy on every isolated route', function (): void {
+it('binds {student} only inside its {class}, {member} only inside its {room}, and checks a policy on every isolated route', function (): void {
     foreach (isolatedRoutes() as $key => $route) {
         $parameters = $route->parameterNames();
         $policies = array_filter($route->gatherMiddleware(), static fn (mixed $middleware): bool => is_string($middleware) && str_starts_with($middleware, 'can:'));
@@ -227,6 +260,11 @@ it('binds {student} only inside its {class} and checks a policy on every isolate
 
         if (in_array('student', $parameters, true)) {
             expect($parameters)->toContain('class')
+                ->and($route->enforcesScopedBindings())->toBeTrue("{$key} must use scopeBindings().");
+        }
+
+        if (in_array('member', $parameters, true)) {
+            expect($parameters)->toContain('room')
                 ->and($route->enforcesScopedBindings())->toBeTrue("{$key} must use scopeBindings().");
         }
     }
@@ -371,6 +409,20 @@ it('lets the policies refuse another teacher on their own', function (): void {
         expect(Gate::forUser($world['a'])->allows($ability, $world['homeGameA']))->toBeTrue()
             ->and(Gate::forUser($world['b'])->allows($ability, $world['homeGameA']))->toBeFalse();
     }
+
+    foreach (['view', 'play', 'host', 'watch'] as $ability) {
+        expect(Gate::forUser($world['a'])->allows($ability, $world['roomA']))->toBeTrue()
+            ->and(Gate::forUser($world['b'])->allows($ability, $world['roomA']))->toBeFalse();
+    }
+
+    expect(Gate::forUser($world['a'])->allows('remove', [$world['roomA'], $world['memberA']]))->toBeTrue()
+        ->and(Gate::forUser($world['b'])->allows('remove', [$world['roomA'], $world['memberA']]))->toBeFalse()
+        ->and(Gate::forUser($world['b'])->allows('remove', [$world['roomB'], $world['memberA']]))->toBeFalse();
+
+    foreach (['delete', 'forget'] as $ability) {
+        expect(Gate::forUser($world['a'])->allows($ability, $world['closedRoomA']))->toBeTrue()
+            ->and(Gate::forUser($world['b'])->allows($ability, $world['closedRoomA']))->toBeFalse();
+    }
 });
 
 // A parent's home game goes through the same {game} routes as a class's:
@@ -439,8 +491,47 @@ it('binds nothing for a malformed or unknown id', function (string $id): void {
     $this->actingAs($world['a'])->get('/games/'.rawurlencode($id).'/board')->assertNotFound();
     $this->actingAs($world['a'])->get('/children/'.rawurlencode($id))->assertNotFound();
     $this->actingAs($world['a'])->get('/children/'.rawurlencode($id).'/games/create')->assertNotFound();
+    $this->actingAs($world['a'])->get('/rooms/'.rawurlencode($id))->assertNotFound();
+    $this->actingAs($world['a'])->getJson('/rooms/'.rawurlencode($id).'/state')->assertNotFound();
+    $this->actingAs($world['a'])->delete('/rooms/'.$world['roomA']->id.'/members/'.rawurlencode($id))->assertNotFound();
 })->with([
     'not a ulid' => ['1'],
     'unknown ulid' => ['01JZ0000000000000000000000'],
     'sql-ish' => ["x' OR '1'='1"],
 ]);
+
+// A room's own refusals (§12 "Rooms and joining", ADR 020 decision 5): a
+// player the host removed is any other account, on every room route.
+it('refuses a removed player on every room route and changes nothing', function (string $case): void {
+    $world = isolationWorld();
+    $removed = User::query()->findOrFail($world['memberA']->user_id);
+    app(RemoveRoomPlayer::class)->handle($world['roomA'], $world['memberA']);
+    // Removed from the closed room as well, as if before it closed.
+    RoomPlayer::query()->where('room_id', $world['closedRoomA']->id)->where('user_id', $removed->id)->update(['removed_at' => now()]);
+    $before = isolationSnapshot();
+
+    $this->actingAs($removed)->from(route('rooms.index'));
+    $response = isolationRequest($case, $world);
+
+    expect($response->status())->toBe(404)
+        ->and($response->getContent())->not->toContain('Aysel')
+        ->and(isolationSnapshot())->toBe($before);
+})->with(fn (): array => array_filter(
+    array_combine(array_keys(isolationCases()), array_keys(isolationCases())),
+    static fn (string $case): bool => str_contains($case, '{room}'),
+));
+
+it('binds a {member} only inside its {room}', function (): void {
+    $world = isolationWorld();
+    $before = isolationSnapshot();
+
+    // A's room with B's room's player, and B's room with A's.
+    $this->actingAs($world['a'])
+        ->delete(route('rooms.members.destroy', ['room' => $world['roomA']->id, 'member' => $world['memberB']->id]))
+        ->assertNotFound();
+    $this->actingAs($world['b'])
+        ->delete(route('rooms.members.destroy', ['room' => $world['roomB']->id, 'member' => $world['memberA']->id]))
+        ->assertNotFound();
+
+    expect(isolationSnapshot())->toBe($before);
+});

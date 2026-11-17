@@ -1,0 +1,44 @@
+{
+    "v": 1,
+    "revision": 3,
+    "server_ms": 1795534200000,
+    "room": {
+        "id": "01kaqrx1zd7w4n5v6b8c9defgh",
+        "status": "open",
+        "locked": false,
+        "code": "482913"
+    },
+    "me": {
+        "player_id": "01kaqrx3mn4p5q6r7s8t9vwxyz",
+        "host": false
+    },
+    "players": [
+        {
+            "id": "01kaqrx2ab3c4d5e6f7g8h9jkm",
+            "name": "Rəşad Quliyev",
+            "present": true,
+            "host": true
+        },
+        {
+            "id": "01kaqrx3mn4p5q6r7s8t9vwxyz",
+            "name": "Aygün Məmmədova",
+            "present": true,
+            "host": false
+        },
+        {
+            "id": "01kaqrx4bc5d6e7f8g9h0jkmnp",
+            "name": "Tural Əliyev",
+            "present": false,
+            "host": false
+        },
+        {
+            "id": "01kaqrx5cd6e7f8g9h0jkmnpqr",
+            "name": null,
+            "present": false,
+            "host": false
+        }
+    ],
+    "game": null,
+    "round": null,
+    "ranking": []
+}

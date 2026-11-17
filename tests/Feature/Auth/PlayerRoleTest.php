@@ -192,6 +192,41 @@ it('sends an account without the role through the role and on to the rooms', fun
     'a teacher and a parent' => ['teacherAndParent', 'roles.edit'],
 ]);
 
+it('sends an invited account through the role and on to the room', function (string $state, string $rolesPage): void {
+    $room = Rooms::open(User::factory()->player()->create(['name' => 'Rəşad Quliyev']));
+    $code = (string) $room->code;
+    $user = User::factory()->{$state}()->create(['name' => 'Aygün Məmmədova']);
+
+    // The code from a friend, opened before signing in.
+    $this->get(route('rooms.join', $code))->assertRedirect(route('login'));
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password'])
+        ->assertRedirect(route('rooms.join', $code));
+
+    // No player role yet: take it, «Oyunçu» preselected, and come back to the code.
+    $this->get(route('rooms.join', $code))->assertRedirect(route($rolesPage, ['role' => 'player']));
+    $this->get(route($rolesPage, ['role' => 'player']))->assertInertia(fn (Assert $page) => $page->where('chosen', 'player'));
+    $this->post(route($rolesPage === 'role' ? 'role.store' : 'roles.store'), ['role' => 'player', 'agreement' => '1'])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('rooms.join', $code));
+
+    $this->get(route('rooms.join', $code))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('rooms/join')->where('code', $code)->where('name', 'Aygün Məmmədova'));
+    $this->post(route('rooms.join.store', $code))->assertRedirect(route('rooms.show', $room));
+
+    $this->get(route('rooms.show', $room))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('state.players.0.name', 'Rəşad Quliyev')
+            ->where('state.players.1.name', 'Aygün Məmmədova'));
+    expect($user->refresh()->hasRole(Role::Player))->toBeTrue()
+        ->and(session('url.intended'))->toBeNull();
+})->with([
+    'no role yet' => ['withoutRole', 'role'],
+    'a teacher' => ['configure', 'roles.edit'],
+    'a parent' => ['parent', 'roles.edit'],
+]);
+
 it('brings a visitor through the login and the role back to the rooms', function (): void {
     $teacher = User::factory()->create();
 
