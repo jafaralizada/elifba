@@ -1,0 +1,8 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- hekayə: an open storybook with a sparkling star rising from its pages. Elifba own art, MIT. -->
+<path d="M4.5 9.5C8.5 8.5 12.5 9.5 16 11.5C19.5 9.5 23.5 8.5 27.5 9.5V24.5C23.5 23.5 19.5 24.5 16 26.5C12.5 24.5 8.5 23.5 4.5 24.5V9.5Z" fill="url(#hek_book)"/>
+<circle cx="16" cy="6.5" r="2.8" fill="#FFD845"/>
+<defs>
+<radialGradient id="hek_book" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#C8D2E8"/></radialGradient>
+</defs>
+</svg>

@@ -1,0 +1,12 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- kitabxana: a wooden bookshelf filled with colorful books. Elifba own art, MIT. -->
+<rect x="3.5" y="4.5" width="25" height="23" rx="2.5" fill="url(#kit_shelf)"/>
+<rect x="6.5" y="7.5" width="4.2" height="8" rx="0.8" fill="#E84C3D"/>
+<rect x="11.5" y="7.5" width="4.2" height="8" rx="0.8" fill="#3B8CE8"/>
+<rect x="16.5" y="7.5" width="4.2" height="8" rx="0.8" fill="#52B858"/>
+<rect x="6.5" y="17.5" width="4.2" height="7.5" rx="0.8" fill="#F6C445"/>
+<rect x="11.5" y="17.5" width="4.2" height="7.5" rx="0.8" fill="#9B5DE5"/>
+<defs>
+<radialGradient id="kit_shelf" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#D99862"/><stop offset="1" stop-color="#7A4624"/></radialGradient>
+</defs>
+</svg>

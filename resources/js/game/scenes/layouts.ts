@@ -17,7 +17,10 @@ export type BuildLayout = { slots: Band; tiles: Band };
  * is false): no slots, drawn by the find scene (`count` by its own, which
  * adds the question band).
  */
-export type HitMechanic = Extract<Mechanic, 'find' | 'pop' | 'count'>;
+export type HitMechanic = Extract<
+    Mechanic,
+    'find' | 'pop' | 'count' | 'first_letter' | 'read_word'
+>;
 
 export type BuildMechanic = Exclude<Mechanic, HitMechanic>;
 

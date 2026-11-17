@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- işıqfor: a traffic light showing red, yellow and green signals. Elifba own art, MIT. -->
+<rect x="9.5" y="2.5" width="13" height="24" rx="4.5" fill="url(#isiqfor_box)"/>
+<rect x="14.2" y="26.5" width="3.6" height="4" fill="#4A4458"/>
+<circle cx="16" cy="7.8" r="2.8" fill="#FF5252"/>
+<circle cx="16" cy="14.5" r="2.8" fill="#FFD740"/>
+<circle cx="16" cy="21.2" r="2.8" fill="#52E06B"/>
+<defs>
+<radialGradient id="isiqfor_box" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#5E586E"/><stop offset="1" stop-color="#282336"/></radialGradient>
+</defs>
+</svg>

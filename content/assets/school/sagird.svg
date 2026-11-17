@@ -1,0 +1,10 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- şagird: a smiling schoolchild with a blue collar. Elifba own art, MIT. -->
+<path d="M7.5 28.5C8.2 23.2 11.5 21.0 16 21.0C20.5 21.0 23.8 23.2 24.5 28.5H7.5Z" fill="url(#sag_shirt)"/>
+<circle cx="16" cy="13.5" r="6.8" fill="url(#sag_face)"/>
+<path d="M9.2 12.2C9.8 7.5 12.5 5.8 16 5.8C19.5 5.8 22.2 7.5 22.8 12.2C20.2 10.5 11.8 10.5 9.2 12.2Z" fill="#593828"/>
+<defs>
+<radialGradient id="sag_shirt" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#6EC4FF"/><stop offset="1" stop-color="#2468C4"/></radialGradient>
+<radialGradient id="sag_face" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FFE2C6"/><stop offset="1" stop-color="#D4946A"/></radialGradient>
+</defs>
+</svg>

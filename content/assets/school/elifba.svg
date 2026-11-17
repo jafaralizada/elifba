@@ -1,0 +1,9 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- əlifba: a colorful primer book cover with building blocks. Elifba own art, MIT. -->
+<rect x="5.5" y="4.5" width="21" height="23" rx="3" fill="url(#elif_book)"/>
+<circle cx="16" cy="14.5" r="5.2" fill="#FFF285"/>
+<rect x="11.5" y="21.5" width="9" height="2.4" rx="1.2" fill="#FFFFFF" fill-opacity="0.8"/>
+<defs>
+<radialGradient id="elif_book" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#68D488"/><stop offset="0.6" stop-color="#2E9E58"/><stop offset="1" stop-color="#196638"/></radialGradient>
+</defs>
+</svg>

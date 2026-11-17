@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- astronavt: an astronaut helmet with a reflective blue visor. Elifba own art, MIT. -->
+<rect x="6.5" y="21.5" width="19" height="7.5" rx="3.5" fill="url(#astro_suit)"/>
+<circle cx="16" cy="14" r="9.5" fill="url(#astro_suit)"/>
+<rect x="9.5" y="9.2" width="13" height="9.2" rx="4.6" fill="url(#astro_visor)"/>
+<ellipse cx="13.2" cy="12.0" rx="2.4" ry="1.0" transform="rotate(-20 13.2 12.0)" fill="#FFFFFF" fill-opacity="0.75"/>
+<defs>
+<radialGradient id="astro_suit" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FFFFFF"/><stop offset="0.65" stop-color="#E2DCF0"/><stop offset="1" stop-color="#B0A6C9"/></radialGradient>
+<radialGradient id="astro_visor" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#6EE2FF"/><stop offset="0.55" stop-color="#297CE0"/><stop offset="1" stop-color="#16357A"/></radialGradient>
+</defs>
+</svg>

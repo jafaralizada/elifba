@@ -1,0 +1,9 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- alov: a bright orange and yellow flame. Elifba own art, MIT. -->
+<path d="M16.5 2.8C19.8 7.2 25.2 12.2 25.2 19.0C25.2 24.6 20.9 29.0 16.0 29.0C11.1 29.0 6.8 24.6 6.8 19.0C6.8 14.5 9.5 10.8 11.6 8.6C11.4 11.0 12.5 12.4 13.4 12.8C12.8 8.8 14.4 5.2 16.5 2.8Z" fill="url(#alov_outer)"/>
+<path d="M16.2 11.2C18.2 14.0 21.0 16.8 21.0 20.8C21.0 24.2 18.8 26.8 16.0 26.8C13.2 26.8 11.0 24.2 11.0 20.8C11.0 17.5 13.4 14.5 16.2 11.2Z" fill="url(#alov_inner)"/>
+<defs>
+<radialGradient id="alov_outer" cx="0.5" cy="0.75" r="0.75"><stop stop-color="#FFAE36"/><stop offset="0.55" stop-color="#FF622E"/><stop offset="1" stop-color="#C9223B"/></radialGradient>
+<radialGradient id="alov_inner" cx="0.5" cy="0.8" r="0.65"><stop stop-color="#FFF9A6"/><stop offset="0.55" stop-color="#FFE042"/><stop offset="1" stop-color="#FF8C24"/></radialGradient>
+</defs>
+</svg>

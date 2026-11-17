@@ -44,6 +44,8 @@ export type Avatar = {
 export type Letter = {
     lower: string;
     upper: string;
+    /** On a child's page: whether the child has hit this letter correctly in a solved round. */
+    practiced?: boolean;
 };
 
 /** The paste flow's limits (`AddStudentsData::limits()`): the class page's and the teacher board's. */

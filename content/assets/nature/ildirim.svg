@@ -1,0 +1,7 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- ildırım: a bright yellow lightning bolt. Elifba own art, MIT. -->
+<path d="M18.5 2.5L7.5 17.2H15.2L12.5 29.5L24.5 14.2H16.5L18.5 2.5Z" fill="url(#ild_bolt)"/>
+<defs>
+<radialGradient id="ild_bolt" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FFF999"/><stop offset="0.55" stop-color="#FFD038"/><stop offset="1" stop-color="#E07C19"/></radialGradient>
+</defs>
+</svg>

@@ -1,0 +1,10 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- işıq: a glowing four-pointed light burst. Elifba own art, MIT. -->
+<circle cx="16" cy="16" r="11" fill="url(#isiq_halo)"/>
+<path d="M16 2.5L18.8 13.2L29.5 16L18.8 18.8L16 29.5L13.2 18.8L2.5 16L13.2 13.2L16 2.5Z" fill="url(#isiq_star)"/>
+<circle cx="16" cy="16" r="3.6" fill="#FFFFFF"/>
+<defs>
+<radialGradient id="isiq_halo" cx="0.5" cy="0.5" r="0.5"><stop stop-color="#FFF59E" stop-opacity="0.75"/><stop offset="1" stop-color="#FFF59E" stop-opacity="0"/></radialGradient>
+<radialGradient id="isiq_star" cx="0.4" cy="0.35" r="0.75"><stop stop-color="#FFFFFF"/><stop offset="0.5" stop-color="#FFE45E"/><stop offset="1" stop-color="#F09819"/></radialGradient>
+</defs>
+</svg>

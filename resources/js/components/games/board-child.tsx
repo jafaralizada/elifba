@@ -8,6 +8,8 @@ type Props = {
     child: BoardChildProps;
     /** The pack's accent on the board; none on the phone, which uses the tokens. */
     accent?: string;
+    /** The round on the board was just solved: the avatar hops for joy. */
+    celebrating?: boolean;
     className?: string;
 };
 
@@ -16,7 +18,12 @@ type Props = {
  * always, in place of the class's grid and «Növbəti». Nothing to choose,
  * so it is not a button.
  */
-export function BoardChild({ child, accent, className }: Props) {
+export function BoardChild({
+    child,
+    accent,
+    celebrating = false,
+    className,
+}: Props) {
     const { t } = useTranslation();
 
     return (
@@ -33,7 +40,10 @@ export function BoardChild({ child, accent, className }: Props) {
                 avatar={child.avatar.key}
                 avatars={studentAvatars([child])}
                 initial={child.display_name.slice(0, 1)}
-                className="size-14 text-xl max-lg:size-10 max-lg:text-base"
+                className={cn(
+                    'size-14 text-xl max-lg:size-10 max-lg:text-base',
+                    celebrating && 'motion-safe:animate-bounce',
+                )}
             />
             <span className="min-w-0">
                 <span

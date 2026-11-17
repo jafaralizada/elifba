@@ -1,0 +1,12 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- yasəmən: a fragrant purple lilac flower cluster with green leaves. Elifba own art, MIT. -->
+<path d="M9.5 24.5C9.5 19.5 13.5 16.5 18.5 16.5" stroke="#3E9E45" stroke-width="2.4" stroke-linecap="round"/>
+<circle cx="15" cy="10" r="3.5" fill="url(#yas_fl)"/>
+<circle cx="19.5" cy="12" r="3.5" fill="url(#yas_fl)"/>
+<circle cx="12.5" cy="14.5" r="3.5" fill="url(#yas_fl)"/>
+<circle cx="17.5" cy="16.5" r="3.5" fill="url(#yas_fl)"/>
+<circle cx="15.5" cy="6.8" r="3.0" fill="url(#yas_fl)"/>
+<defs>
+<radialGradient id="yas_fl" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#E2A8FF"/><stop offset="0.6" stop-color="#A652E0"/><stop offset="1" stop-color="#68249E"/></radialGradient>
+</defs>
+</svg>

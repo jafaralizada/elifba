@@ -1,5 +1,5 @@
 import { Form, Link } from '@inertiajs/react';
-import { LogOut, Plus, RotateCcw, Star } from 'lucide-react';
+import { LogOut, Plus, RotateCcw, Sparkles, Star } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { studentAvatars } from '@/components/games/student-grid';
 import { StudentAvatar } from '@/components/students/student-avatar';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import type { Tally } from '@/game/engine';
 import { useTranslation } from '@/hooks/use-translation';
+import { newlyUnlockedStickers } from '@/lib/child-stickers';
 import { playersHome, playersNewGame } from '@/lib/game-players';
 import type { GamePlayers } from '@/lib/game-players';
 import { cn } from '@/lib/utils';
@@ -102,6 +103,20 @@ export function BoardResult({
                     })}
                 </p>
             )}
+
+            {child !== null &&
+                newlyUnlockedStickers(child.stars, points) > 0 && (
+                    <p
+                        className="inline-flex items-center gap-2 rounded-2xl border-2 border-amber-400 bg-amber-50 px-4 py-2 text-lg font-bold text-amber-900 max-lg:px-3 max-lg:py-1 max-lg:text-sm"
+                        data-test="sticker-unlocked"
+                    >
+                        <Sparkles
+                            className="size-5 shrink-0 text-amber-600"
+                            aria-hidden
+                        />
+                        {t('games.board.result.sticker_unlocked')}
+                    </p>
+                )}
 
             {tally !== null && (
                 <dl className="grid w-full grid-cols-3 gap-3 text-center">

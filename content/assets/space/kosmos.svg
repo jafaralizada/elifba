@@ -1,0 +1,13 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- kosmos: a cosmic nebula with stars and a ringed planet. Elifba own art, MIT. -->
+<rect x="2.5" y="2.5" width="27" height="27" rx="7.5" fill="url(#kosmos_bg)"/>
+<circle cx="15.5" cy="16.5" r="6.2" fill="url(#kosmos_planet)"/>
+<ellipse cx="15.5" cy="16.5" rx="10.8" ry="3.2" transform="rotate(-18 15.5 16.5)" stroke="#FFD86B" stroke-width="1.8"/>
+<circle cx="8.2" cy="8.5" r="1.2" fill="#FFF599"/>
+<circle cx="24.2" cy="8.8" r="1.0" fill="#FFFFFF"/>
+<circle cx="23.5" cy="23.8" r="1.2" fill="#FFF599"/>
+<defs>
+<radialGradient id="kosmos_bg" cx="0.3" cy="0.25" r="0.9"><stop stop-color="#5C3A9E"/><stop offset="0.55" stop-color="#2D1E66"/><stop offset="1" stop-color="#140D36"/></radialGradient>
+<radialGradient id="kosmos_planet" cx="0.32" cy="0.28" r="0.8"><stop stop-color="#FF9C6B"/><stop offset="0.6" stop-color="#E05348"/><stop offset="1" stop-color="#8F243E"/></radialGradient>
+</defs>
+</svg>

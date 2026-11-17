@@ -1,0 +1,9 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- pozan: a pink and blue school eraser. Elifba own art, MIT. -->
+<rect x="5.5" y="10.5" width="13" height="11" rx="2.2" fill="url(#poz_pink)"/>
+<rect x="16.5" y="10.5" width="10" height="11" rx="2.2" fill="url(#poz_blue)"/>
+<defs>
+<radialGradient id="poz_pink" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FFA8C8"/><stop offset="1" stop-color="#D4487E"/></radialGradient>
+<radialGradient id="poz_blue" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#78C8FF"/><stop offset="1" stop-color="#2868C4"/></radialGradient>
+</defs>
+</svg>

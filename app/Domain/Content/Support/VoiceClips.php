@@ -263,7 +263,7 @@ final readonly class VoiceClips
             return [];
         }
 
-        if ($template->unit === Unit::Letter) {
+        if ($template->unit === Unit::Letter && $template->mechanic !== Mechanic::FirstLetter) {
             return array_map(static fn (string $letter): array => ["letter:{$letter}", null], Alphabet::letters());
         }
 
@@ -274,7 +274,7 @@ final readonly class VoiceClips
                 continue;
             }
 
-            if ($template->mechanic === Mechanic::Count) {
+            if (in_array($template->mechanic, [Mechanic::Count, Mechanic::FirstLetter], true)) {
                 foreach ($pack->pictured() as $word) {
                     $targets[] = [$word->key(), $pack];
                 }

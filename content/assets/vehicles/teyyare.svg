@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- təyyarə: a passenger airplane soaring through the sky. Elifba own art, MIT. -->
+<path d="M14.2 14.5L7.5 6.5H11.2L19.5 14.5H14.2Z" fill="url(#plane_wing)"/>
+<rect x="3.5" y="12.5" width="25" height="7" rx="3.5" fill="url(#plane_body)"/>
+<path d="M5.5 12.5L3.2 7.5H6.8L9.5 12.5H5.5Z" fill="url(#plane_wing)"/>
+<path d="M14.2 17.5L8.5 25.5H12.2L19.5 17.5H14.2Z" fill="url(#plane_wing)"/>
+<defs>
+<radialGradient id="plane_body" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FFFFFF"/><stop offset="0.65" stop-color="#E2DCF2"/><stop offset="1" stop-color="#A89EC4"/></radialGradient>
+<radialGradient id="plane_wing" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#6EC4FF"/><stop offset="0.6" stop-color="#2D7CE0"/><stop offset="1" stop-color="#1B4694"/></radialGradient>
+</defs>
+</svg>

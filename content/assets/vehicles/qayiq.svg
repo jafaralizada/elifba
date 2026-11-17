@@ -1,0 +1,12 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- qayıq: a sailboat with a yellow and blue sail on the water. Elifba own art, MIT. -->
+<path d="M16 4.5V21.5" stroke="#8C5E3C" stroke-width="2" stroke-linecap="round"/>
+<path d="M16 5.2L25.5 19.5H16V5.2Z" fill="url(#qayiq_sail1)"/>
+<path d="M15 7.5L7.2 19.5H15V7.5Z" fill="url(#qayiq_sail2)"/>
+<path d="M4.5 21.0H27.5L24.2 26.8H7.8L4.5 21.0Z" fill="url(#qayiq_hull)"/>
+<defs>
+<radialGradient id="qayiq_sail1" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FFF078"/><stop offset="1" stop-color="#E09424"/></radialGradient>
+<radialGradient id="qayiq_sail2" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#78D4FF"/><stop offset="1" stop-color="#286CE0"/></radialGradient>
+<radialGradient id="qayiq_hull" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#D98B5F"/><stop offset="1" stop-color="#7A4228"/></radialGradient>
+</defs>
+</svg>

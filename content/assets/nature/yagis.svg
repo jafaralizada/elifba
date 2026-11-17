@@ -1,0 +1,8 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- yağış: a rain cloud with blue raindrops falling. Elifba own art, MIT. -->
+<path d="M8.5 18.5C6.2 18.5 4.5 16.8 4.5 14.6C4.5 12.6 6.0 11.0 8.0 10.8C9.0 8.0 11.6 6.2 14.8 6.2C18.5 6.2 21.6 8.9 22.0 12.5C23.8 12.8 25.2 14.3 25.2 16.1C25.2 17.5 24.0 18.5 22.5 18.5H8.5Z" fill="url(#yagis_cloud)"/>
+<path d="M10.5 21.5L9.0 26.5M16.0 21.5L14.5 26.5M21.5 21.5L20.0 26.5" stroke="#3898FF" stroke-width="2.2" stroke-linecap="round"/>
+<defs>
+<radialGradient id="yagis_cloud" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#E6EEFA"/><stop offset="1" stop-color="#94A8C9"/></radialGradient>
+</defs>
+</svg>

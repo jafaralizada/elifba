@@ -1,0 +1,9 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- Yupiter: the planet Jupiter with warm orange and cream bands. Elifba own art, MIT. -->
+<circle cx="16" cy="16" r="12.5" fill="url(#yup_base)"/>
+<path d="M4.2 12.0H27.8M3.6 16.5H28.4M4.8 20.8H27.2" stroke="#FFF0D6" stroke-width="2.4" stroke-linecap="round" stroke-opacity="0.65"/>
+<ellipse cx="20.2" cy="19.5" rx="2.8" ry="1.8" fill="#D94B38"/>
+<defs>
+<radialGradient id="yup_base" cx="0.32" cy="0.26" r="0.85"><stop stop-color="#FFCA85"/><stop offset="0.55" stop-color="#E08445"/><stop offset="1" stop-color="#9E4229"/></radialGradient>
+</defs>
+</svg>

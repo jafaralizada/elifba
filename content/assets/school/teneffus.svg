@@ -1,0 +1,9 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- tənəffüs: a schoolyard recess scene with a sunny sky and slide. Elifba own art, MIT. -->
+<circle cx="9.5" cy="9.5" r="4.2" fill="url(#ten_sun)"/>
+<path d="M8.5 26.5V16.5H14.5L24.5 26.5" stroke="url(#ten_slide)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+<defs>
+<radialGradient id="ten_sun" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FFF278"/><stop offset="1" stop-color="#E08C20"/></radialGradient>
+<linearGradient id="ten_slide" x1="8" y1="16" x2="25" y2="27" gradientUnits="userSpaceOnUse"><stop stop-color="#5CAEFF"/><stop offset="1" stop-color="#2462B8"/></linearGradient>
+</defs>
+</svg>

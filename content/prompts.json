@@ -49,6 +49,16 @@
             "unit": "number",
             "text": "Hər rəqəmi de və vur!"
         },
-        { "mechanic": "count", "unit": "number", "text": "Neçə «{x}» var?" }
+        { "mechanic": "count", "unit": "number", "text": "Neçə «{x}» var?" },
+        {
+            "mechanic": "first_letter",
+            "unit": "letter",
+            "text": "«{x}» hansı hərflə başlayır?"
+        },
+        {
+            "mechanic": "read_word",
+            "unit": "word",
+            "text": "Sözü oxu və şəklini tap!"
+        }
     ]
 }

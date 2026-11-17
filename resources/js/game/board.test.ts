@@ -970,6 +970,21 @@ describe('who is at the board', () => {
         expect(storage.data.has(boardStorageKey(GAME, 'student'))).toBe(false);
     });
 
+    it('picks a random student without repeating anyone until everyone has had a turn', () => {
+        const { controller } = setup();
+
+        controller.setStudent('s1');
+        controller.randomStudent(() => 0);
+        expect(controller.getView().studentId).toBe('s2');
+
+        controller.randomStudent(() => 0);
+        expect(controller.getView().studentId).toBe('s3');
+
+        // Everyone has played once: the pool resets, excluding the current student (s3).
+        controller.randomStudent(() => 0);
+        expect(controller.getView().studentId).toBe('s1');
+    });
+
     it('forgets a stored student who is no longer in the class', () => {
         const storage = memoryStorage();
 

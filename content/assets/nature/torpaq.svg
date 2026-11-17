@@ -1,0 +1,8 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- torpaq: rich brown soil with a small green sprout. Elifba own art, MIT. -->
+<path d="M3.5 24.5C5.5 18.5 10.2 15.5 16 15.5C21.8 15.5 26.5 18.5 28.5 24.5H3.5Z" fill="url(#torpaq_mound)"/>
+<path d="M16 15.5V8.5M16 10.5C12.5 10.5 10.5 8.2 10.5 5.5C13.5 5.5 16 7.5 16 10.5ZM16 10.5C19.5 10.5 21.5 8.2 21.5 5.5C18.5 5.5 16 7.5 16 10.5Z" stroke="#4EB84E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<defs>
+<radialGradient id="torpaq_mound" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#B87E56"/><stop offset="0.6" stop-color="#8C5638"/><stop offset="1" stop-color="#59321F"/></radialGradient>
+</defs>
+</svg>

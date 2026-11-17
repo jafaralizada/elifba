@@ -247,7 +247,7 @@ it('answers with reasons, never an error, when a teacher hides every word of a p
     $startable = array_values(array_filter($fruit, static fn (array $option): bool => $option['startable']));
 
     // A number level takes nothing from the pack; a picture or count round takes its pictures.
-    expect($fruit)->toHaveCount(15 + 10)
+    expect($fruit)->toHaveCount(18 + 10)
         ->and(array_map(static fn (array $option): string => "{$option['mechanic']} × {$option['level']}", $startable))->toBe([
             'pop × letters', 'find × letters', 'build_sentence × sentences',
             'pop × numbers-5', 'find × numbers-5', 'pop × numbers-10', 'find × numbers-10',

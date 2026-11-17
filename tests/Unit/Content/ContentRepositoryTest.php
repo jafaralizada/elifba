@@ -42,10 +42,10 @@ it('reads the fruit pack with its look, words and sentences', function (): void 
         ->and(count($fruit->sentences))->toBeGreaterThanOrEqual(10);
 });
 
-it('ships exactly the nine built-in packs, each reading pack with at least 20 words and 10 sentences', function (): void {
+it('ships the thirteen built-in packs, each reading pack with at least 20 words and 10 sentences', function (): void {
     $packs = app(ContentRepository::class)->packs();
 
-    expect(array_keys($packs))->toBe(['animals', 'balloons', 'cities', 'colors', 'dinosaurs', 'fruit', 'numbers', 'symbols', 'train']);
+    expect(array_keys($packs))->toBe(['animals', 'balloons', 'cities', 'colors', 'dinosaurs', 'fruit', 'nature', 'numbers', 'school', 'space', 'symbols', 'train', 'vehicles']);
 
     foreach ($packs as $key => $pack) {
         expect($pack->key)->toBe($key);
@@ -146,6 +146,10 @@ it('gives each pack the default look of the glossary', function (string $key, It
     'symbols' => ['symbols', ItemStyle::Card, SlotStyle::Frame],
     'colors' => ['colors', ItemStyle::Picture, SlotStyle::Frame],
     'numbers' => ['numbers', ItemStyle::Bubble, SlotStyle::Frame],
+    'space' => ['space', ItemStyle::Bubble, SlotStyle::Frame],
+    'vehicles' => ['vehicles', ItemStyle::Card, SlotStyle::Frame],
+    'nature' => ['nature', ItemStyle::Bubble, SlotStyle::Frame],
+    'school' => ['school', ItemStyle::Card, SlotStyle::Frame],
 ]);
 
 it('gives the symbols pack the sparkle effect only', function (): void {
@@ -181,11 +185,11 @@ it('lists the ten levels of §2 in order', function (): void {
         ->toBe([Unit::Letter, Unit::Syllable, Unit::Syllable, Unit::Word, Unit::Word, Unit::Sentence, Unit::Picture, Unit::Picture, Unit::Number, Unit::Number])
         ->and($levels['letters']->allows(Mechanic::Find))->toBeTrue()
         ->and(array_map(static fn (LevelData $level): array => $level->mechanics, $levels))->toBe([
-            'letters' => [Mechanic::Pop, Mechanic::Find],
+            'letters' => [Mechanic::Pop, Mechanic::Find, Mechanic::FirstLetter],
             'syllables-open' => [Mechanic::Pop, Mechanic::Find, Mechanic::BuildSyllable],
             'syllables-closed' => [Mechanic::Pop, Mechanic::Find, Mechanic::BuildSyllable],
-            'words-short' => [Mechanic::Pop, Mechanic::Find, Mechanic::BuildWord],
-            'words-long' => [Mechanic::Pop, Mechanic::Find, Mechanic::BuildWord],
+            'words-short' => [Mechanic::Pop, Mechanic::Find, Mechanic::BuildWord, Mechanic::ReadWord],
+            'words-long' => [Mechanic::Pop, Mechanic::Find, Mechanic::BuildWord, Mechanic::ReadWord],
             'sentences' => [Mechanic::BuildSentence],
             'pictures-easy' => [Mechanic::Pop, Mechanic::Find],
             'pictures' => [Mechanic::Pop, Mechanic::Find],
@@ -266,19 +270,23 @@ it('reads the files once per instance, so an edit shows on the next request', fu
 it('pairs every mechanic with the units of §2', function (): void {
     expect(Mechanic::Find->units())->toBe([Unit::Letter, Unit::Syllable, Unit::Word, Unit::Picture, Unit::Number])
         ->and(Mechanic::Pop->units())->toBe([Unit::Letter, Unit::Syllable, Unit::Word, Unit::Picture, Unit::Number])
+        ->and(Mechanic::FirstLetter->units())->toBe([Unit::Letter])
         ->and(Mechanic::BuildSyllable->units())->toBe([Unit::Syllable])
         ->and(Mechanic::BuildWord->units())->toBe([Unit::Word])
+        ->and(Mechanic::ReadWord->units())->toBe([Unit::Word])
         ->and(Mechanic::BuildSentence->units())->toBe([Unit::Sentence])
         ->and(Mechanic::Count->units())->toBe([Unit::Number])
         ->and(Mechanic::Find->builds())->toBeFalse()
         ->and(Mechanic::Pop->builds())->toBeFalse()
+        ->and(Mechanic::FirstLetter->builds())->toBeFalse()
+        ->and(Mechanic::ReadWord->builds())->toBeFalse()
         ->and(Mechanic::Count->builds())->toBeFalse()
         ->and(Mechanic::BuildSyllable->builds())->toBeTrue()
         ->and(Mechanic::BuildWord->builds())->toBeTrue()
         ->and(Mechanic::BuildSentence->builds())->toBeTrue();
 });
 
-it('lists the units each pack has content for: pictures in the animals, the dinosaurs, the fruit and the colours, numbers in the animals, the dinosaurs, the fruit and the numbers', function (): void {
+it('lists the units each pack has content for: pictures and numbers in the full packs alongside reading, and single-unit packs for colours and numbers', function (): void {
     $units = array_map(
         static fn (PackData $pack): array => array_map(static fn (Unit $unit): string => $unit->value, $pack->units),
         app(ContentRepository::class)->packs(),
@@ -292,9 +300,13 @@ it('lists the units each pack has content for: pictures in the animals, the dino
         'colors' => ['picture'],
         'dinosaurs' => [...$reading, 'picture', 'number'],
         'fruit' => [...$reading, 'picture', 'number'],
+        'nature' => [...$reading, 'picture', 'number'],
         'numbers' => ['number'],
+        'school' => [...$reading, 'picture', 'number'],
+        'space' => [...$reading, 'picture', 'number'],
         'symbols' => $reading,
         'train' => $reading,
+        'vehicles' => [...$reading, 'picture', 'number'],
     ])
         ->and(Unit::reading())->toBe([Unit::Letter, Unit::Syllable, Unit::Word, Unit::Sentence])
         ->and(Unit::Picture->reads())->toBeFalse()

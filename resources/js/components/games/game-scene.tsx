@@ -128,19 +128,30 @@ function Layout({
         );
     }
 
-    if (mechanic === 'count') {
+    if (mechanic === 'count' || mechanic === 'first_letter') {
         return (
             <>
-                <div className="absolute top-[11%] right-[9%] left-[9%] flex justify-between">
-                    {[0, 1, 2].map((index) => (
-                        <Cover
-                            key={index}
-                            src={cover}
-                            className="static"
-                            style={{ width: '26%' }}
-                        />
-                    ))}
-                </div>
+                {mechanic === 'count' ? (
+                    <div className="absolute top-[11%] right-[9%] left-[9%] flex justify-between">
+                        {[0, 1, 2].map((index) => (
+                            <Cover
+                                key={index}
+                                src={cover}
+                                className="static"
+                                style={{ width: '26%' }}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <Cover
+                        src={cover}
+                        style={
+                            wide
+                                ? { width: '32%', left: '34%', top: '8%' }
+                                : { width: '40%', left: '30%', top: '8%' }
+                        }
+                    />
+                )}
                 <div className="absolute right-[8%] bottom-[9%] left-[8%] flex justify-between">
                     {padded(sample, 3).map((text, index) => (
                         <Face
@@ -154,6 +165,39 @@ function Layout({
                         </Face>
                     ))}
                 </div>
+            </>
+        );
+    }
+
+    if (mechanic === 'read_word') {
+        return (
+            <>
+                <div className="absolute top-[9%] right-[8%] left-[8%] flex justify-center">
+                    <Face
+                        wide={wide}
+                        longest={longest(sample)}
+                        className="static"
+                    >
+                        {sample[0] ?? ''}
+                    </Face>
+                </div>
+                <Cover
+                    src={cover}
+                    style={
+                        wide
+                            ? { width: '34%', left: '33%', bottom: '10%' }
+                            : { width: '44%', left: '28%', bottom: '10%' }
+                    }
+                />
+                <Badge
+                    icon={Search}
+                    wide={wide}
+                    style={
+                        wide
+                            ? { left: '61%', bottom: '12%' }
+                            : { left: '65%', bottom: '12%' }
+                    }
+                />
             </>
         );
     }

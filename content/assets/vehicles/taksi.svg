@@ -1,0 +1,12 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- taksi: a yellow taxi cab with a checkered roof sign. Elifba own art, MIT. -->
+<rect x="12.5" y="7.2" width="7" height="3.2" rx="1.2" fill="#383247"/>
+<path d="M7.5 15.5L10.2 10.2H21.8L24.5 15.5H27.8C28.8 15.5 29.5 16.3 29.5 17.2V22.5H2.5V17.2C2.5 16.3 3.2 15.5 4.2 15.5H7.5Z" fill="url(#taksi_body)"/>
+<rect x="11.0" y="11.4" width="10.0" height="4.0" rx="1.0" fill="url(#taksi_win)"/>
+<circle cx="8.5" cy="22.8" r="3.4" fill="#2E293D"/>
+<circle cx="23.5" cy="22.8" r="3.4" fill="#2E293D"/>
+<defs>
+<radialGradient id="taksi_body" cx="0.32" cy="0.25" r="0.85"><stop stop-color="#FFF066"/><stop offset="0.55" stop-color="#F6C445"/><stop offset="1" stop-color="#C48520"/></radialGradient>
+<radialGradient id="taksi_win" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#8CE2FF"/><stop offset="1" stop-color="#2B72C9"/></radialGradient>
+</defs>
+</svg>

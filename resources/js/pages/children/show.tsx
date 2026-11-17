@@ -2,6 +2,7 @@ import { Head, Link, setLayoutProps } from '@inertiajs/react';
 import { Play, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/app/confirm-dialog';
 import { ChildStars } from '@/components/children/child-stars';
+import { ChildStickers } from '@/components/children/child-stickers';
 import { EditChildDialog } from '@/components/children/edit-child-dialog';
 import { LearnedLetters } from '@/components/classes/learned-letters';
 import Heading from '@/components/heading';
@@ -118,6 +119,10 @@ export default function ChildShow({
                 </div>
 
                 <ChildStars stars={stars} retentionDays={retentionDays} />
+
+                <Separator />
+
+                <ChildStickers totalStars={stars.total} avatars={avatars} />
 
                 <Separator />
 

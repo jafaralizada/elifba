@@ -21,6 +21,7 @@ import {
     useSyncExternalStore,
 } from 'react';
 import { BoardChild } from '@/components/games/board-child';
+import { BoardProgress } from '@/components/games/board-progress';
 import { BoardPrompt } from '@/components/games/board-prompt';
 import { BoardResult } from '@/components/games/board-result';
 import { BoardStudents } from '@/components/games/board-students';
@@ -473,12 +474,13 @@ export function BoardScreen({
 
                     <div className="flex shrink-0 flex-col items-end gap-3 max-lg:flex-row max-lg:items-center max-lg:gap-2 max-sm:flex-wrap max-sm:justify-end">
                         {playing && view.round !== null && (
-                            <p className="text-lg font-semibold tabular-nums max-lg:mr-auto max-lg:text-sm max-lg:whitespace-nowrap">
-                                {t('games.board.round', {
-                                    index: view.round.index + 1,
-                                    total: view.round.total,
-                                })}
-                            </p>
+                            <BoardProgress
+                                index={view.round.index}
+                                total={view.round.total}
+                                steps={view.steps}
+                                streak={view.streak}
+                                accent={colours.accent}
+                            />
                         )}
                         <div className="flex flex-wrap justify-end gap-2 max-lg:flex-nowrap max-lg:gap-1">
                             {guest === undefined &&
@@ -635,16 +637,26 @@ export function BoardScreen({
 
                 <footer className="flex items-center justify-between gap-4 px-6 pt-2 pb-5 max-lg:gap-2 max-lg:px-3 max-lg:pt-1 max-lg:pb-2 max-sm:flex-wrap xl:px-10 xl:pb-8">
                     {child !== null ? (
-                        <BoardChild child={child} accent={colours.accent} />
+                        <BoardChild
+                            child={child}
+                            accent={colours.accent}
+                            celebrating={
+                                playing && view.progress?.solved === true
+                            }
+                        />
                     ) : (
                         <BoardStudents
                             students={students}
                             studentId={view.studentId}
                             accent={colours.accent}
                             disabled={view.phase === 'replaced'}
+                            celebrating={
+                                playing && view.progress?.solved === true
+                            }
                             addTo={addTo}
                             onChoose={(id) => controller?.setStudent(id)}
                             onNext={() => controller?.nextStudent()}
+                            onRandom={() => controller?.randomStudent()}
                         />
                     )}
 
@@ -1169,6 +1181,8 @@ const LOADING_VIEW: BoardView = {
     round: null,
     progress: null,
     tally: null,
+    streak: 0,
+    steps: [],
     resumed: false,
     pending: 0,
     retrying: false,

@@ -1,0 +1,49 @@
+{
+    "id": "01JC8Z6V8Q4B2X5N7M9P3R6T2A",
+    "index": 0,
+    "total": 10,
+    "mechanic": "first_letter",
+    "unit": "letter",
+    "pack": "fruit",
+    "level": "letters",
+    "prompt": {
+        "text": "«alma» hansı hərflə başlayır?",
+        "show": null,
+        "image": "http://localhost/content/fluent/1F34E.svg?v=5",
+        "count": null,
+        "audio": null,
+        "tail": null
+    },
+    "items": [
+        {
+            "id": "a",
+            "text": "A",
+            "image": null,
+            "content_key": "letter:a"
+        },
+        {
+            "id": "b",
+            "text": "Ə",
+            "image": null,
+            "content_key": "letter:ə"
+        },
+        {
+            "id": "c",
+            "text": "E",
+            "image": null,
+            "content_key": "letter:e"
+        },
+        {
+            "id": "d",
+            "text": "İ",
+            "image": null,
+            "content_key": "letter:i"
+        }
+    ],
+    "slots": 0,
+    "solution": {
+        "order": "any",
+        "item_ids": ["a"]
+    },
+    "effect": "burst"
+}

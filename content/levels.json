@@ -4,7 +4,7 @@
             "key": "letters",
             "title": { "az": "Hərflər", "en": "Letters" },
             "unit": "letter",
-            "mechanics": ["pop", "find"],
+            "mechanics": ["pop", "find", "first_letter"],
             "items": 4
         },
         {
@@ -30,7 +30,7 @@
             "title": { "az": "Qısa sözlər", "en": "Short words" },
             "unit": "word",
             "syllables": { "min": 1, "max": 2 },
-            "mechanics": ["pop", "find", "build_word"],
+            "mechanics": ["pop", "find", "build_word", "read_word"],
             "items": 4,
             "decoys": 1
         },
@@ -39,7 +39,7 @@
             "title": { "az": "Uzun sözlər", "en": "Long words" },
             "unit": "word",
             "syllables": { "min": 3, "max": 4 },
-            "mechanics": ["pop", "find", "build_word"],
+            "mechanics": ["pop", "find", "build_word", "read_word"],
             "items": 4,
             "decoys": 1
         },

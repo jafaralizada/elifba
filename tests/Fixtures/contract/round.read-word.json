@@ -1,0 +1,49 @@
+{
+    "id": "01JC8Z6V8Q4B2X5N7M9P3R6T3A",
+    "index": 1,
+    "total": 10,
+    "mechanic": "read_word",
+    "unit": "word",
+    "pack": "animals",
+    "level": "words-short",
+    "prompt": {
+        "text": "Sözü oxu və şəklini tap!",
+        "show": "pişik",
+        "image": null,
+        "count": null,
+        "audio": null,
+        "tail": null
+    },
+    "items": [
+        {
+            "id": "a",
+            "text": "dovşan",
+            "image": "http://localhost/content/fluent/1F407.svg?v=5",
+            "content_key": "word:dovşan"
+        },
+        {
+            "id": "b",
+            "text": "pişik",
+            "image": "http://localhost/content/fluent/1F408.svg?v=5",
+            "content_key": "word:pişik"
+        },
+        {
+            "id": "c",
+            "text": "dəvəquşu",
+            "image": "http://localhost/content/animals/devequsu.svg?v=5",
+            "content_key": "word:dəvəquşu"
+        },
+        {
+            "id": "d",
+            "text": "it",
+            "image": "http://localhost/content/fluent/1F415.svg?v=5",
+            "content_key": "word:it"
+        }
+    ],
+    "slots": 0,
+    "solution": {
+        "order": "any",
+        "item_ids": ["b"]
+    },
+    "effect": "sparkle"
+}

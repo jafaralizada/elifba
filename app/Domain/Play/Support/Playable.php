@@ -16,7 +16,9 @@ use App\Domain\Play\Support\Mechanics\BuildSyllableRoundBuilder;
 use App\Domain\Play\Support\Mechanics\BuildWordRoundBuilder;
 use App\Domain\Play\Support\Mechanics\CountRoundBuilder;
 use App\Domain\Play\Support\Mechanics\FindRoundBuilder;
+use App\Domain\Play\Support\Mechanics\FirstLetterRoundBuilder;
 use App\Domain\Play\Support\Mechanics\PopRoundBuilder;
+use App\Domain\Play\Support\Mechanics\ReadWordRoundBuilder;
 use App\Domain\Play\Support\Mechanics\RoundBuilder;
 use App\Models\User;
 
@@ -48,7 +50,16 @@ final class Playable
      */
     public static function mechanics(): array
     {
-        return [Mechanic::Find, Mechanic::Pop, Mechanic::BuildSyllable, Mechanic::BuildWord, Mechanic::BuildSentence, Mechanic::Count];
+        return [
+            Mechanic::Find,
+            Mechanic::Pop,
+            Mechanic::BuildSyllable,
+            Mechanic::BuildWord,
+            Mechanic::BuildSentence,
+            Mechanic::Count,
+            Mechanic::FirstLetter,
+            Mechanic::ReadWord,
+        ];
     }
 
     /**
@@ -101,17 +112,21 @@ final class Playable
             Mechanic::BuildWord => app(BuildWordRoundBuilder::class),
             Mechanic::BuildSentence => app(BuildSentenceRoundBuilder::class),
             Mechanic::Count => app(CountRoundBuilder::class),
+            Mechanic::FirstLetter => app(FirstLetterRoundBuilder::class),
+            Mechanic::ReadWord => app(ReadWordRoundBuilder::class),
         };
     }
 
     /**
      * Whether a game of this mechanic and level can be played with only the
      * teacher's own words (§3 "Teacher words"): syllable and word levels,
-     * except `build_word`, whose question is a picture a teacher word lacks.
+     * except `build_word` and `read_word`, which require word pictures a
+     * teacher word lacks.
      */
     public static function takesOwnWords(Mechanic $mechanic, LevelData $level): bool
     {
-        return in_array($level->unit, [Unit::Syllable, Unit::Word], true) && $mechanic !== Mechanic::BuildWord;
+        return in_array($level->unit, [Unit::Syllable, Unit::Word], true)
+            && ! in_array($mechanic, [Mechanic::BuildWord, Mechanic::ReadWord], true);
     }
 
     /**

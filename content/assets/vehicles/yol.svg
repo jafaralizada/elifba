@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 90">
+  <!-- The vehicles pack's backdrop: a pale sky and gentle roadside hills in the bottom fifth, with no vehicles to count. Elifba own art, MIT. -->
+  <defs>
+    <linearGradient id="vyol_sky1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E5F4FA"/><stop offset="0.78" stop-color="#FBFDF8"/></linearGradient>
+    <radialGradient id="vyol_hill2" cx="0.3" cy="0.1" r="1"><stop stop-color="#EEF9DB"/><stop offset="0.55" stop-color="#DCECC6"/><stop offset="1" stop-color="#CBE0B0"/></radialGradient>
+    <radialGradient id="vyol_road3" cx="0.5" cy="0.2" r="0.9"><stop stop-color="#E4E1EC"/><stop offset="1" stop-color="#CEC9DC"/></radialGradient>
+  </defs>
+  <rect width="160" height="90" fill="url(#vyol_sky1)"/>
+  <path d="M0,74 C30,68 62,70 96,73 C124,75 142,70 160,69 L160,90 L0,90 Z" fill="url(#vyol_hill2)"/>
+  <path d="M0,82 L160,82 L160,90 L0,90 Z" fill="url(#vyol_road3)"/>
+</svg>

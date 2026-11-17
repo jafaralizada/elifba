@@ -1,0 +1,8 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- fırtına: a dark storm cloud with a golden lightning flash. Elifba own art, MIT. -->
+<path d="M8.2 18.5C5.8 18.5 4.2 16.8 4.2 14.6C4.2 12.6 5.6 11.0 7.6 10.8C8.8 8.0 11.4 6.2 14.6 6.2C18.4 6.2 21.5 8.9 21.8 12.5C23.6 12.8 25.0 14.3 25.0 16.1C25.0 17.5 23.8 18.5 22.2 18.5H8.2Z" fill="url(#firt_cloud)"/>
+<path d="M16.8 16.5L12.5 22.8H16.2L14.8 28.5L20.5 21.5H16.8L16.8 16.5Z" fill="#FFD845"/>
+<defs>
+<radialGradient id="firt_cloud" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#8A889E"/><stop offset="1" stop-color="#423E58"/></radialGradient>
+</defs>
+</svg>

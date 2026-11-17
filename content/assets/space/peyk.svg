@@ -1,0 +1,12 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- peyk: an orbital satellite with blue solar panels and a dish antenna. Elifba own art, MIT. -->
+<rect x="2.2" y="12.5" width="8.5" height="7" rx="1.2" transform="rotate(-20 2.2 12.5)" fill="url(#peyk_panel)"/>
+<rect x="21.0" y="9.5" width="8.5" height="7" rx="1.2" transform="rotate(-20 21.0 9.5)" fill="url(#peyk_panel)"/>
+<rect x="11.5" y="10.2" width="9" height="11.5" rx="2.5" transform="rotate(-20 11.5 10.2)" fill="url(#peyk_body)"/>
+<circle cx="17.8" cy="22.8" r="2.2" fill="url(#peyk_dish)"/>
+<defs>
+<radialGradient id="peyk_panel" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#66C8FF"/><stop offset="0.6" stop-color="#2B7CE0"/><stop offset="1" stop-color="#194894"/></radialGradient>
+<radialGradient id="peyk_body" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#F5F3FA"/><stop offset="0.6" stop-color="#C9C2D9"/><stop offset="1" stop-color="#8A829E"/></radialGradient>
+<radialGradient id="peyk_dish" cx="0.35" cy="0.3" r="0.8"><stop stop-color="#FFE270"/><stop offset="1" stop-color="#CC8B28"/></radialGradient>
+</defs>
+</svg>

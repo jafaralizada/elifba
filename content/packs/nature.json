@@ -1,0 +1,166 @@
+{
+    "key": "nature",
+    "version": 1,
+    "title": {
+        "az": "Təbiət",
+        "en": "Nature"
+    },
+    "with": {
+        "az": "Təbiətlə",
+        "en": "with nature"
+    },
+    "units": ["letter", "syllable", "word", "sentence", "picture", "number"],
+    "style": {
+        "item": "bubble",
+        "slot": "frame",
+        "effect": "sparkle",
+        "cover": "fluent/1F33C.svg",
+        "backdrop": "nature/daglar.svg",
+        "palette": ["#5DB075", "#3B82C4", "#F6C445", "#8D6E4C"],
+        "sounds": {
+            "hit": "sounds/chime.mp3",
+            "miss": "sounds/pluck-down.mp3",
+            "solved": "sounds/bells.mp3"
+        }
+    },
+    "words": [
+        {
+            "text": "gül",
+            "image": "fluent/1F33C.svg"
+        },
+        {
+            "text": "yarpaq",
+            "image": "numbers/yarpaq.svg"
+        },
+        {
+            "text": "göbələk",
+            "image": "fluent/1F344.svg"
+        },
+        {
+            "text": "bulud",
+            "image": "fluent/2601.svg"
+        },
+        {
+            "text": "ağac",
+            "image": "nature/agac.svg"
+        },
+        {
+            "text": "çiçək",
+            "image": "nature/cicek.svg"
+        },
+        {
+            "text": "meşə",
+            "image": "nature/mese.svg"
+        },
+        {
+            "text": "dağ",
+            "image": "nature/dag.svg"
+        },
+        {
+            "text": "dəniz",
+            "image": "nature/deniz.svg"
+        },
+        {
+            "text": "göl",
+            "image": "nature/gol.svg"
+        },
+        {
+            "text": "bulaq",
+            "image": "nature/bulaq.svg"
+        },
+        {
+            "text": "yağış",
+            "image": "nature/yagis.svg"
+        },
+        {
+            "text": "qar",
+            "image": "nature/qar.svg"
+        },
+        {
+            "text": "külək",
+            "image": "nature/kulek.svg"
+        },
+        {
+            "text": "damcı",
+            "image": "nature/damci.svg"
+        },
+        {
+            "text": "torpaq",
+            "image": "nature/torpaq.svg"
+        },
+        {
+            "text": "şəlalə",
+            "image": "nature/selale.svg"
+        },
+        {
+            "text": "ildırım",
+            "image": "nature/ildirim.svg"
+        },
+        {
+            "text": "göyqurşağı",
+            "image": "nature/goyqursagi.svg"
+        },
+        {
+            "text": "fırtına",
+            "image": "nature/firtina.svg"
+        },
+        {
+            "text": "yasəmən",
+            "image": "nature/yasemen.svg"
+        },
+        {
+            "text": "qızılgül",
+            "image": "nature/qizilgul.svg"
+        }
+    ],
+    "sentences": [
+        {
+            "id": "agac-yasildir",
+            "text": "Ağac yaşıldır."
+        },
+        {
+            "id": "yagis-yagir",
+            "text": "Yağış yağır."
+        },
+        {
+            "id": "qar-agappaqdir",
+            "text": "Qar ağappaqdır."
+        },
+        {
+            "id": "cicekler-acilir",
+            "text": "Çiçəklər açılır."
+        },
+        {
+            "id": "daglar-ucadir",
+            "text": "Dağlar ucadır."
+        },
+        {
+            "id": "deniz-mavidir",
+            "text": "Dəniz mavidir."
+        },
+        {
+            "id": "bulud-goyde-uzur",
+            "text": "Bulud göydə üzür."
+        },
+        {
+            "id": "mesede-agac-coxdur",
+            "text": "Meşədə ağac çoxdur."
+        },
+        {
+            "id": "selale-axir",
+            "text": "Şəlalə axır."
+        },
+        {
+            "id": "qizilgul-gozeldir",
+            "text": "Qızılgül gözəldir."
+        },
+        {
+            "id": "bulaq-suyu-serindir",
+            "text": "Bulaq suyu sərindir."
+        },
+        {
+            "id": "kulek-haradan-esir",
+            "text": "Külək haradan əsir?"
+        }
+    ]
+}

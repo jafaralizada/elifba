@@ -1,0 +1,13 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- avtobus: a friendly city bus with large windows. Elifba own art, MIT. -->
+<rect x="3" y="8.5" width="26" height="14.5" rx="3.2" fill="url(#bus_body)"/>
+<rect x="5.5" y="11.0" width="5.5" height="5.2" rx="1" fill="url(#bus_win)"/>
+<rect x="13.2" y="11.0" width="5.5" height="5.2" rx="1" fill="url(#bus_win)"/>
+<rect x="21.0" y="11.0" width="5.5" height="5.2" rx="1" fill="url(#bus_win)"/>
+<circle cx="9.0" cy="23.5" r="3.4" fill="#2E293D"/>
+<circle cx="23.0" cy="23.5" r="3.4" fill="#2E293D"/>
+<defs>
+<radialGradient id="bus_body" cx="0.32" cy="0.25" r="0.85"><stop stop-color="#7CE88E"/><stop offset="0.55" stop-color="#48B862"/><stop offset="1" stop-color="#247A42"/></radialGradient>
+<radialGradient id="bus_win" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#9EE8FF"/><stop offset="1" stop-color="#2E78C9"/></radialGradient>
+</defs>
+</svg>

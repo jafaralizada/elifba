@@ -1,0 +1,166 @@
+{
+    "key": "space",
+    "version": 1,
+    "title": {
+        "az": "Kosmos",
+        "en": "Space"
+    },
+    "with": {
+        "az": "Kosmosla",
+        "en": "with space"
+    },
+    "units": ["letter", "syllable", "word", "sentence", "picture", "number"],
+    "style": {
+        "item": "bubble",
+        "slot": "frame",
+        "effect": "sparkle",
+        "cover": "space/raket.svg",
+        "backdrop": "space/sema.svg",
+        "palette": ["#3B82C4", "#9B5DE5", "#F6C445", "#E85D4A"],
+        "sounds": {
+            "hit": "sounds/chime.mp3",
+            "miss": "sounds/pluck-down.mp3",
+            "solved": "sounds/bells.mp3"
+        }
+    },
+    "words": [
+        {
+            "text": "raket",
+            "image": "space/raket.svg"
+        },
+        {
+            "text": "ulduz",
+            "image": "fluent/2B50.svg"
+        },
+        {
+            "text": "ay",
+            "image": "space/ay.svg"
+        },
+        {
+            "text": "günəş",
+            "image": "space/gunes.svg"
+        },
+        {
+            "text": "bulud",
+            "image": "fluent/2601.svg"
+        },
+        {
+            "text": "dünya",
+            "image": "space/dunya.svg"
+        },
+        {
+            "text": "səma",
+            "image": "space/goy.svg"
+        },
+        {
+            "text": "gecə",
+            "image": "space/gece.svg"
+        },
+        {
+            "text": "işıq",
+            "image": "space/isiq.svg"
+        },
+        {
+            "text": "alov",
+            "image": "space/alov.svg"
+        },
+        {
+            "text": "peyk",
+            "image": "space/peyk.svg"
+        },
+        {
+            "text": "komet",
+            "image": "space/komet.svg"
+        },
+        {
+            "text": "orbit",
+            "image": "space/orbit.svg"
+        },
+        {
+            "text": "kosmos",
+            "image": "space/kosmos.svg"
+        },
+        {
+            "text": "Uran",
+            "image": "space/uran.svg"
+        },
+        {
+            "text": "teleskop",
+            "image": "space/teleskop.svg"
+        },
+        {
+            "text": "meteorit",
+            "image": "dinosaurs/meteorit.svg"
+        },
+        {
+            "text": "astronavt",
+            "image": "space/astronavt.svg"
+        },
+        {
+            "text": "qalaktika",
+            "image": "space/qalaktika.svg"
+        },
+        {
+            "text": "Yupiter",
+            "image": "space/yupiter.svg"
+        },
+        {
+            "text": "Venera",
+            "image": "space/venera.svg"
+        },
+        {
+            "text": "Merkuri",
+            "image": "space/merkuri.svg"
+        }
+    ],
+    "sentences": [
+        {
+            "id": "raket-goye-ucur",
+            "text": "Raket göyə uçur."
+        },
+        {
+            "id": "ulduzlar-parlaqdir",
+            "text": "Ulduzlar parlaqdır."
+        },
+        {
+            "id": "gunes-istidir",
+            "text": "Günəş istidir."
+        },
+        {
+            "id": "ay-gece-parlayir",
+            "text": "Ay gecə parlayır."
+        },
+        {
+            "id": "dunya-bizim-evimizdir",
+            "text": "Dünya bizim evimizdir."
+        },
+        {
+            "id": "kosmos-cox-boyukdur",
+            "text": "Kosmos çox böyükdür."
+        },
+        {
+            "id": "astronavt-kosmosa-ucur",
+            "text": "Astronavt kosmosa uçur."
+        },
+        {
+            "id": "teleskop-ulduzlari-gosterir",
+            "text": "Teleskop ulduzları göstərir."
+        },
+        {
+            "id": "semada-ulduz-coxdur",
+            "text": "Səmada ulduz çoxdur."
+        },
+        {
+            "id": "komet-suretle-ucur",
+            "text": "Komet sürətlə uçur."
+        },
+        {
+            "id": "yupiter-boyuk-planetdir",
+            "text": "Yupiter böyük planetdir."
+        },
+        {
+            "id": "raket-hara-ucur",
+            "text": "Raket hara uçur?"
+        }
+    ]
+}

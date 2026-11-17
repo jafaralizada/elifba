@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- ağac: a lush green deciduous tree with a brown trunk. Elifba own art, MIT. -->
+<rect x="13.5" y="18.5" width="5" height="10.5" rx="1.5" fill="url(#agac_trunk)"/>
+<circle cx="16" cy="11.5" r="7.5" fill="url(#agac_crown)"/>
+<circle cx="10.5" cy="15.2" r="5.5" fill="url(#agac_crown)"/>
+<circle cx="21.5" cy="15.2" r="5.5" fill="url(#agac_crown)"/>
+<defs>
+<radialGradient id="agac_trunk" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#B87E56"/><stop offset="1" stop-color="#70422A"/></radialGradient>
+<radialGradient id="agac_crown" cx="0.32" cy="0.25" r="0.85"><stop stop-color="#9BE86B"/><stop offset="0.55" stop-color="#4EB84E"/><stop offset="1" stop-color="#25753B"/></radialGradient>
+</defs>
+</svg>

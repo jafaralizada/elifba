@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- kapitan: a white captain's nautical hat with a golden anchor badge. Elifba own art, MIT. -->
+<path d="M4.5 16.5C5.2 9.5 10.0 6.2 16 6.2C22.0 6.2 26.8 9.5 27.5 16.5H4.5Z" fill="url(#kap_top)"/>
+<rect x="5.5" y="16.2" width="21" height="4.2" rx="1.8" fill="url(#kap_band)"/>
+<path d="M4.0 20.0H28.0C26.5 23.8 21.8 25.5 16 25.5C10.2 25.5 5.5 23.8 4.0 20.0Z" fill="#1E2847"/>
+<circle cx="16" cy="13.2" r="2.4" fill="#F6C445"/>
+<defs>
+<radialGradient id="kap_top" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#CFD6E8"/></radialGradient>
+<radialGradient id="kap_band" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#3B6CE0"/><stop offset="1" stop-color="#1A357A"/></radialGradient>
+</defs>
+</svg>

@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- meşə: three evergreen pine trees forming a forest. Elifba own art, MIT. -->
+<path d="M9.5 7.5L3.5 22.5H15.5L9.5 7.5Z" fill="url(#mese_pine1)"/>
+<path d="M22.5 7.5L16.5 22.5H28.5L22.5 7.5Z" fill="url(#mese_pine1)"/>
+<rect x="14.2" y="21.5" width="3.6" height="7" rx="1" fill="#8C583A"/>
+<path d="M16 4.2L8.2 23.5H23.8L16 4.2Z" fill="url(#mese_pine2)"/>
+<defs>
+<radialGradient id="mese_pine1" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#68C868"/><stop offset="1" stop-color="#246B3A"/></radialGradient>
+<radialGradient id="mese_pine2" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#8CE068"/><stop offset="0.6" stop-color="#3DA84A"/><stop offset="1" stop-color="#1E6B3A"/></radialGradient>
+</defs>
+</svg>

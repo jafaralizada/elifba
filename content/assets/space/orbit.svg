@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- orbit: a planet encircled by a tilted orbital path and a small moon. Elifba own art, MIT. -->
+<ellipse cx="16" cy="16" rx="13.8" ry="5.8" transform="rotate(-22 16 16)" stroke="url(#orbit_ring)" stroke-width="2.2"/>
+<circle cx="16" cy="16" r="6.8" fill="url(#orbit_planet)"/>
+<circle cx="26.5" cy="11.5" r="2.4" fill="url(#orbit_moon)"/>
+<defs>
+<linearGradient id="orbit_ring" x1="2" y1="16" x2="30" y2="16" gradientUnits="userSpaceOnUse"><stop stop-color="#FFD859"/><stop offset="1" stop-color="#8C65E8"/></linearGradient>
+<radialGradient id="orbit_planet" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#76C8FF"/><stop offset="0.6" stop-color="#387CE8"/><stop offset="1" stop-color="#1E4294"/></radialGradient>
+<radialGradient id="orbit_moon" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#FFF085"/><stop offset="1" stop-color="#D4942A"/></radialGradient>
+</defs>
+</svg>

@@ -1,0 +1,9 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- göl: a calm blue lake surrounded by a green shore. Elifba own art, MIT. -->
+<ellipse cx="16" cy="18" rx="13.5" ry="9.5" fill="url(#gol_shore)"/>
+<ellipse cx="16" cy="18" rx="10.2" ry="6.4" fill="url(#gol_water)"/>
+<defs>
+<radialGradient id="gol_shore" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#9BE86B"/><stop offset="1" stop-color="#368F45"/></radialGradient>
+<radialGradient id="gol_water" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#8CE8FF"/><stop offset="1" stop-color="#287CE0"/></radialGradient>
+</defs>
+</svg>

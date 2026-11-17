@@ -148,9 +148,11 @@ it('lists every clip built-in content can ask for, once, and no other', function
         // A name of the list is NameVoices', never a clip under content/assets.
         ->and($groups)->not->toHaveKey('name');
 
-    foreach (['pop.letter', 'pop.syllable', 'pop.word', 'pop.picture', 'pop.number', 'build_word.word', 'build_sentence.sentence'] as $instruction) {
+    foreach (['pop.letter', 'pop.syllable', 'pop.word', 'pop.picture', 'pop.number', 'build_word.word', 'read_word.word', 'build_sentence.sentence'] as $instruction) {
         expect($groups[$instruction])->toHaveCount(1, $instruction);
     }
+
+    expect($groups['first_letter.letter'])->not->toBeEmpty();
 
     // build_syllable builds syllables of two or more letters.
     foreach ($groups['build_syllable.syllable'] as $phrase) {

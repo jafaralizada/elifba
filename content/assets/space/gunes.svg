@@ -1,0 +1,10 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- gunes: a warm shining sun with golden rays. Elifba own art, MIT. -->
+<path d="M16 1.8L18.4 6.2L23.1 4.1L22.8 9.2L27.9 9.7L25.1 14.0L29.8 16.8L25.1 19.6L27.9 23.9L22.8 24.4L23.1 29.5L18.4 27.4L16 31.8L13.6 27.4L8.9 29.5L9.2 24.4L4.1 23.9L6.9 19.6L2.2 16.8L6.9 14.0L4.1 9.7L9.2 9.2L8.9 4.1L13.6 6.2L16 1.8Z" fill="url(#gunes_rays)"/>
+<circle cx="16" cy="16.8" r="8.8" fill="url(#gunes_core)"/>
+<ellipse cx="13.2" cy="12.8" rx="2.8" ry="1.4" transform="rotate(-28 13.2 12.8)" fill="#FFFFFF" fill-opacity="0.7"/>
+<defs>
+<radialGradient id="gunes_rays" cx="0.5" cy="0.5" r="0.6"><stop stop-color="#FFE047"/><stop offset="0.7" stop-color="#FF9E2C"/><stop offset="1" stop-color="#E8641B"/></radialGradient>
+<radialGradient id="gunes_core" cx="0.32" cy="0.28" r="0.8"><stop stop-color="#FFF99E"/><stop offset="0.55" stop-color="#FFD43B"/><stop offset="1" stop-color="#F08C19"/></radialGradient>
+</defs>
+</svg>

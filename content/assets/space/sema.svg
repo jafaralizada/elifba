@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 90">
+  <!-- The space pack's backdrop: a pale dawn sky over soft moon hills in the bottom fifth, with no stars, rockets or planets to count. Elifba own art, MIT. -->
+  <defs>
+    <linearGradient id="sema_sky1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E6E9FA"/><stop offset="0.78" stop-color="#FAF9FE"/></linearGradient>
+    <radialGradient id="sema_hill2" cx="0.3" cy="0.1" r="1"><stop stop-color="#E8E4F8"/><stop offset="0.55" stop-color="#D6CFF0"/><stop offset="1" stop-color="#C2B8E4"/></radialGradient>
+    <radialGradient id="sema_hill3" cx="0.3" cy="0.1" r="1"><stop stop-color="#DDD6F3"/><stop offset="0.55" stop-color="#C8BFE8"/><stop offset="1" stop-color="#B4A8DC"/></radialGradient>
+  </defs>
+  <rect width="160" height="90" fill="url(#sema_sky1)"/>
+  <path d="M0,74 C28,68 58,69 88,73 C118,77 138,70 160,69 L160,90 L0,90 Z" fill="url(#sema_hill2)"/>
+  <path d="M0,81 C34,78 68,80 102,82 C128,83 144,79 160,79 L160,90 L0,90 Z" fill="url(#sema_hill3)"/>
+</svg>

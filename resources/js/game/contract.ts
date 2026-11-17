@@ -27,6 +27,8 @@ export const Mechanic = z.enum([
     'build_word',
     'build_sentence',
     'count',
+    'first_letter',
+    'read_word',
 ]);
 /** What an item is (ADR 012): the four read units, then pictures and numbers (R5). */
 export const Unit = z.enum([

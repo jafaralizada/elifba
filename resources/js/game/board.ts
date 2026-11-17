@@ -40,19 +40,23 @@ import type {
     RoundProgress,
     SessionStatus,
 } from './contract';
-import type { BoardGame, Tally } from './engine';
+import type { BoardGame, RoundStep, Tally } from './engine';
 import {
     applyHit,
     applySkip,
     boardGame,
     currentRound,
+    hintItem,
     isOver,
     progressOf,
+    roundStepsOf,
+    streak,
     tally,
 } from './engine';
 import type { BoardHttp } from './http';
 import type { AnsweredEntry, OutboxState, StorageLike, Timers } from './outbox';
 import { defaultBackoff, Outbox } from './outbox';
+import { pickRandomStudent } from '../lib/random-student';
 import { ulid } from './ulid';
 
 export type BoardPhase =
@@ -86,6 +90,10 @@ export type BoardView = {
     round: Round | null;
     progress: RoundProgress | null;
     tally: Tally | null;
+    /** Consecutive rounds solved on the first try (`misses === 0`). */
+    streak: number;
+    /** Where each round of the game stands, in order, for the progress strip. */
+    steps: RoundStep[];
     /** Any round already answered (solved, skipped, hit or missed): «Davam et» rather than «Başla», and no round count. */
     resumed: boolean;
     pending: number;
@@ -188,6 +196,8 @@ export class BoardController {
     private studentId: string | null;
     /** Who may be chosen, in class order: the props' list, then `setStudents()`'s. */
     private studentIds: readonly string[];
+    /** Students who have already had a turn in this game, for fair random draws («Püşk»). */
+    private readonly playedStudents = new Set<string>();
     private points: Record<string, number>;
     private lastPoints: number | null = null;
     /** The last accepted touch per round and item, for the cross-source rule. */
@@ -332,6 +342,9 @@ export class BoardController {
         }
 
         this.phase = 'playing';
+        if (this.studentId !== null) {
+            this.playedStudents.add(this.studentId);
+        }
         // A turn starts with the game on this board; a home game's
         // greeting, before the first prompt, only when nothing is answered.
         this.options.bridge.startTurn(this.studentId, !answered(this.game));
@@ -430,12 +443,20 @@ export class BoardController {
         }
 
         const outcome = applyHit(this.game, touch.roundId, touch.itemId);
+        const nextProgress =
+            outcome.round === null
+                ? null
+                : progressOf(outcome.game, touch.roundId);
         const effect: HitEffect = {
             roundId: touch.roundId,
             itemId: touch.itemId,
             status: outcome.verdict.status,
             solved:
                 outcome.verdict.status === 'correct' && outcome.verdict.solved,
+            hintItemId:
+                outcome.round !== null && nextProgress !== null
+                    ? hintItem(outcome.round, nextProgress)
+                    : null,
         };
 
         // The wait for the next round is there before the effect starts:
@@ -506,6 +527,9 @@ export class BoardController {
             studentId !== null && this.studentIds.includes(studentId)
                 ? studentId
                 : null;
+        if (this.studentId !== null) {
+            this.playedStudents.add(this.studentId);
+        }
         this.writeStudent();
 
         // Another student at the board during play starts a new turn
@@ -540,6 +564,35 @@ export class BoardController {
         const at = this.studentId === null ? -1 : ids.indexOf(this.studentId);
 
         this.setStudent(ids[(at + 1) % ids.length]);
+    }
+
+    /**
+     * Picks a random student («Püşk»), preferring students who have not yet
+     * had a turn in this game; once everyone has played, the pool resets.
+     */
+    randomStudent(random: () => number = Math.random): void {
+        const ids = this.studentIds;
+
+        if (ids.length === 0) {
+            this.setStudent(null);
+
+            return;
+        }
+
+        const unplayed = ids.filter(
+            (id) => id !== this.studentId && !this.playedStudents.has(id),
+        );
+
+        if (unplayed.length === 0) {
+            this.playedStudents.clear();
+            if (this.studentId !== null) {
+                this.playedStudents.add(this.studentId);
+            }
+        }
+
+        this.setStudent(
+            pickRandomStudent(ids, this.studentId, this.playedStudents, random),
+        );
     }
 
     // Status.
@@ -1054,6 +1107,9 @@ export class BoardController {
                     ? progressOf(game, this.shown.id)
                     : null,
             tally: game === null ? null : tally(game),
+            streak: game === null ? 0 : streak(game),
+            steps:
+                game === null ? [] : roundStepsOf(game, this.shown?.id ?? null),
             resumed: game !== null && answered(game),
             pending: outbox.size,
             retrying: outbox.retrying,

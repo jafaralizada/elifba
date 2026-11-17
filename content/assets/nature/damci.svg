@@ -1,0 +1,8 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- damcı: a glossy blue water droplet. Elifba own art, MIT. -->
+<path d="M16 3.5C16 3.5 7.2 14.2 7.2 20.2C7.2 25.1 11.1 29.0 16.0 29.0C20.9 29.0 24.8 25.1 24.8 20.2C24.8 14.2 16 3.5 16 3.5Z" fill="url(#damci_fill)"/>
+<ellipse cx="12.5" cy="18.5" rx="1.8" ry="3.4" transform="rotate(15 12.5 18.5)" fill="#FFFFFF" fill-opacity="0.65"/>
+<defs>
+<radialGradient id="damci_fill" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#8CE8FF"/><stop offset="0.55" stop-color="#2E8CE8"/><stop offset="1" stop-color="#194CA8"/></radialGradient>
+</defs>
+</svg>

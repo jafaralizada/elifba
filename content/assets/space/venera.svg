@@ -1,0 +1,8 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- Venera: the golden-amber planet Venus with swirling clouds. Elifba own art, MIT. -->
+<circle cx="16" cy="16" r="12" fill="url(#ven_base)"/>
+<path d="M6.5 13.2C10.5 11.5 15.5 14.5 25.5 12.8M6.2 18.8C12.2 20.5 18.2 17.2 25.8 19.0" stroke="#FFF6C2" stroke-width="2.0" stroke-linecap="round" stroke-opacity="0.6"/>
+<defs>
+<radialGradient id="ven_base" cx="0.32" cy="0.26" r="0.85"><stop stop-color="#FFE885"/><stop offset="0.55" stop-color="#E8A23B"/><stop offset="1" stop-color="#A85824"/></radialGradient>
+</defs>
+</svg>

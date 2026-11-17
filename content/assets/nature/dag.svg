@@ -1,0 +1,9 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- dağ: a tall mountain peak capped with white snow. Elifba own art, MIT. -->
+<path d="M2.5 27.5L14.2 5.5C15.0 4.0 17.0 4.0 17.8 5.5L29.5 27.5H2.5Z" fill="url(#dag_rock)"/>
+<path d="M14.2 5.5C15.0 4.0 17.0 4.0 17.8 5.5L21.8 13.0L18.5 11.2L16 14.2L13.5 11.2L10.2 13.0L14.2 5.5Z" fill="url(#dag_snow)"/>
+<defs>
+<radialGradient id="dag_rock" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#9E94B8"/><stop offset="0.6" stop-color="#6E648A"/><stop offset="1" stop-color="#453D5E"/></radialGradient>
+<radialGradient id="dag_snow" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#CFE0F5"/></radialGradient>
+</defs>
+</svg>

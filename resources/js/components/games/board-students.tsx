@@ -1,4 +1,4 @@
-import { ChevronRight, Users } from 'lucide-react';
+import { ChevronRight, Dices, Users } from 'lucide-react';
 import { useState } from 'react';
 import { studentAvatars } from '@/components/games/student-grid';
 import type { StudentPickerAdd } from '@/components/games/student-picker-dialog';
@@ -6,6 +6,7 @@ import { StudentPickerDialog } from '@/components/games/student-picker-dialog';
 import { StudentAvatar } from '@/components/students/student-avatar';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
+import { cn } from '@/lib/utils';
 import type { BoardStudent } from '@/types';
 
 type Props = {
@@ -14,27 +15,32 @@ type Props = {
     studentId: string | null;
     accent: string;
     disabled: boolean;
+    /** The round on the board was just solved: the avatar hops for joy. */
+    celebrating?: boolean;
     /** Where «Şagird əlavə et» adds; null on a guest board. */
     addTo: StudentPickerAdd | null;
     onChoose: (studentId: string | null) => void;
     onNext: () => void;
+    onRandom?: () => void;
 };
 
 /**
  * Who is at the board (docs/architecture.md §4, "Board without a phone"):
  * the student credited with the rounds solved now, «Bütün sinif» (no
- * points), "next" in class order, and a grid of the class to pick from
- * (`StudentPickerDialog`, as «Kim oynayır?»). Smaller below `lg`
- * (docs/frontend.md §6).
+ * points), "next" in class order, «Püşk» (a fair random draw), and a grid
+ * of the class to pick from (`StudentPickerDialog`, as «Kim oynayır?»).
+ * Smaller below `lg` (docs/frontend.md §6).
  */
 export function BoardStudents({
     students,
     studentId,
     accent,
     disabled,
+    celebrating = false,
     addTo,
     onChoose,
     onNext,
+    onRandom,
 }: Props) {
     const { t } = useTranslation();
     const [open, setOpen] = useState(false);
@@ -78,7 +84,10 @@ export function BoardStudents({
                                 avatar={current.avatar.key}
                                 avatars={avatars}
                                 initial={current.display_name.slice(0, 1)}
-                                className="size-14 text-xl max-lg:size-10 max-lg:text-base"
+                                className={cn(
+                                    'size-14 text-xl max-lg:size-10 max-lg:text-base',
+                                    celebrating && 'motion-safe:animate-bounce',
+                                )}
                             />
                         )}
                         <span className="min-w-0">
@@ -105,6 +114,23 @@ export function BoardStudents({
                 >
                     {t('games.board.next_student')}
                     <ChevronRight />
+                </Button>
+            )}
+
+            {students.length > 1 && onRandom !== undefined && (
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    className="h-14 text-base max-lg:h-11 max-sm:px-3"
+                    disabled={disabled}
+                    onClick={onRandom}
+                    data-test="random-student"
+                >
+                    <Dices />
+                    <span className="max-sm:sr-only">
+                        {t('games.board.random_student')}
+                    </span>
                 </Button>
             )}
         </div>

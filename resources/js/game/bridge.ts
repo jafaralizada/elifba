@@ -31,6 +31,8 @@ export type HitEffect = {
     status: 'correct' | 'miss' | 'stale';
     /** This hit solved the round. */
     solved: boolean;
+    /** After two misses in the round, the item to highlight as a hint. */
+    hintItemId?: string | null;
 };
 
 /**

@@ -1,0 +1,166 @@
+{
+    "key": "vehicles",
+    "version": 1,
+    "title": {
+        "az": "Nəqliyyat",
+        "en": "Vehicles"
+    },
+    "with": {
+        "az": "Nəqliyyatla",
+        "en": "with vehicles"
+    },
+    "units": ["letter", "syllable", "word", "sentence", "picture", "number"],
+    "style": {
+        "item": "card",
+        "slot": "frame",
+        "effect": "burst",
+        "cover": "fluent/1F697.svg",
+        "backdrop": "vehicles/yol.svg",
+        "palette": ["#E85D4A", "#3B82C4", "#F6C445", "#5DB075"],
+        "sounds": {
+            "hit": "sounds/pop.mp3",
+            "miss": "sounds/pluck-down.mp3",
+            "solved": "sounds/bells.mp3"
+        }
+    },
+    "words": [
+        {
+            "text": "maşın",
+            "image": "fluent/1F697.svg"
+        },
+        {
+            "text": "qatar",
+            "image": "fluent/1F686.svg"
+        },
+        {
+            "text": "vaqon",
+            "image": "fluent/1F683.svg"
+        },
+        {
+            "text": "lokomotiv",
+            "image": "fluent/1F682.svg"
+        },
+        {
+            "text": "yol",
+            "image": "fluent/1F6E3.svg"
+        },
+        {
+            "text": "rels",
+            "image": "fluent/1F6E4.svg"
+        },
+        {
+            "text": "körpü",
+            "image": "train/korpu.svg"
+        },
+        {
+            "text": "tunel",
+            "image": "train/tunel.svg"
+        },
+        {
+            "text": "bilet",
+            "image": "fluent/1F3AB.svg"
+        },
+        {
+            "text": "gəmi",
+            "image": "vehicles/gemi.svg"
+        },
+        {
+            "text": "qayıq",
+            "image": "vehicles/qayiq.svg"
+        },
+        {
+            "text": "təkər",
+            "image": "vehicles/teker.svg"
+        },
+        {
+            "text": "sükan",
+            "image": "vehicles/sukan.svg"
+        },
+        {
+            "text": "taksi",
+            "image": "vehicles/taksi.svg"
+        },
+        {
+            "text": "metro",
+            "image": "vehicles/metro.svg"
+        },
+        {
+            "text": "avtobus",
+            "image": "vehicles/avtobus.svg"
+        },
+        {
+            "text": "təyyarə",
+            "image": "vehicles/teyyare.svg"
+        },
+        {
+            "text": "velosiped",
+            "image": "vehicles/velosiped.svg"
+        },
+        {
+            "text": "helikopter",
+            "image": "vehicles/helikopter.svg"
+        },
+        {
+            "text": "işıqfor",
+            "image": "vehicles/isiqfor.svg"
+        },
+        {
+            "text": "sürücü",
+            "image": "vehicles/surucu.svg"
+        },
+        {
+            "text": "kapitan",
+            "image": "vehicles/kapitan.svg"
+        }
+    ],
+    "sentences": [
+        {
+            "id": "masin-yolda-gedir",
+            "text": "Maşın yolda gedir."
+        },
+        {
+            "id": "teyyare-goyde-ucur",
+            "text": "Təyyarə göydə uçur."
+        },
+        {
+            "id": "gemi-denizde-uzur",
+            "text": "Gəmi dənizdə üzür."
+        },
+        {
+            "id": "avtobus-dayanir",
+            "text": "Avtobus dayanır."
+        },
+        {
+            "id": "qayiq-suda-uzur",
+            "text": "Qayıq suda üzür."
+        },
+        {
+            "id": "velosiped-suretlidir",
+            "text": "Velosiped sürətlidir."
+        },
+        {
+            "id": "isiqfor-yasil-yanir",
+            "text": "İşıqfor yaşıl yanır."
+        },
+        {
+            "id": "surucu-masin-surur",
+            "text": "Sürücü maşın sürür."
+        },
+        {
+            "id": "kapitan-gemini-surur",
+            "text": "Kapitan gəmini sürür."
+        },
+        {
+            "id": "helikopter-ucur",
+            "text": "Helikopter uçur."
+        },
+        {
+            "id": "taksi-tez-geldi",
+            "text": "Taksi tez gəldi."
+        },
+        {
+            "id": "avtobus-hara-gedir",
+            "text": "Avtobus hara gedir?"
+        }
+    ]
+}

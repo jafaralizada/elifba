@@ -1,4 +1,5 @@
 import { router } from '@inertiajs/react';
+import { Star } from 'lucide-react';
 import { useState } from 'react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
@@ -125,9 +126,15 @@ export function LearnedLetters({
                             toggle(letter.lower, pressed)
                         }
                         lang="az"
-                        className="h-11 min-w-14 text-base data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                        className="relative h-11 min-w-14 text-base data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                     >
                         {letter.upper} {letter.lower}
+                        {letter.practiced === true && (
+                            <Star
+                                aria-hidden
+                                className="size-3.5 shrink-0 fill-amber-400 text-amber-500"
+                            />
+                        )}
                     </Toggle>
                 ))}
             </div>

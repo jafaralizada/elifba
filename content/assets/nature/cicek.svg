@@ -1,0 +1,13 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- çiçək: a pink blossom with a golden center. Elifba own art, MIT. -->
+<circle cx="16" cy="8.2" r="4.8" fill="url(#cic_petal)"/>
+<circle cx="23.2" cy="13.5" r="4.8" fill="url(#cic_petal)"/>
+<circle cx="20.5" cy="22.0" r="4.8" fill="url(#cic_petal)"/>
+<circle cx="11.5" cy="22.0" r="4.8" fill="url(#cic_petal)"/>
+<circle cx="8.8" cy="13.5" r="4.8" fill="url(#cic_petal)"/>
+<circle cx="16" cy="15.5" r="4.2" fill="url(#cic_core)"/>
+<defs>
+<radialGradient id="cic_petal" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FFA8D0"/><stop offset="0.6" stop-color="#F0569C"/><stop offset="1" stop-color="#B0286E"/></radialGradient>
+<radialGradient id="cic_core" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FFF485"/><stop offset="1" stop-color="#D98C24"/></radialGradient>
+</defs>
+</svg>

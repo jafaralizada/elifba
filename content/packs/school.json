@@ -1,0 +1,174 @@
+{
+    "key": "school",
+    "version": 1,
+    "title": {
+        "az": "Məktəb",
+        "en": "School"
+    },
+    "with": {
+        "az": "Məktəblə",
+        "en": "with school"
+    },
+    "units": ["letter", "syllable", "word", "sentence", "picture", "number"],
+    "style": {
+        "item": "card",
+        "slot": "frame",
+        "effect": "sparkle",
+        "cover": "fluent/1F3EB.svg",
+        "backdrop": "school/sinif-otaq.svg",
+        "palette": ["#3B82C4", "#5DB075", "#F6C445", "#E85D4A"],
+        "sounds": {
+            "hit": "sounds/chime.mp3",
+            "miss": "sounds/pluck-down.mp3",
+            "solved": "sounds/bells.mp3"
+        }
+    },
+    "words": [
+        {
+            "text": "məktəb",
+            "image": "fluent/1F3EB.svg"
+        },
+        {
+            "text": "sinif",
+            "image": "train/sinif.svg"
+        },
+        {
+            "text": "kitab",
+            "image": "fluent/1F4D6.svg"
+        },
+        {
+            "text": "dəftər",
+            "image": "fluent/1F4D2.svg"
+        },
+        {
+            "text": "qələm",
+            "image": "fluent/270F.svg"
+        },
+        {
+            "text": "çanta",
+            "image": "fluent/1F392.svg"
+        },
+        {
+            "text": "lövhə",
+            "image": "train/lovhe.svg"
+        },
+        {
+            "text": "masa",
+            "image": "train/masa.svg"
+        },
+        {
+            "text": "müəllim",
+            "image": "fluent/1F9D1-200D-1F3EB.svg"
+        },
+        {
+            "text": "şagird",
+            "image": "school/sagird.svg"
+        },
+        {
+            "text": "dərs",
+            "image": "school/ders.svg"
+        },
+        {
+            "text": "zəng",
+            "image": "school/zeng.svg"
+        },
+        {
+            "text": "saat",
+            "image": "school/saat.svg"
+        },
+        {
+            "text": "qlobus",
+            "image": "school/qlobus.svg"
+        },
+        {
+            "text": "pozan",
+            "image": "school/pozan.svg"
+        },
+        {
+            "text": "xətkeş",
+            "image": "school/xetkes.svg"
+        },
+        {
+            "text": "qayçı",
+            "image": "school/qayci.svg"
+        },
+        {
+            "text": "fırça",
+            "image": "school/firca.svg"
+        },
+        {
+            "text": "karandaş",
+            "image": "school/karandas.svg"
+        },
+        {
+            "text": "əlifba",
+            "image": "school/elifba.svg"
+        },
+        {
+            "text": "kitabxana",
+            "image": "school/kitabxana.svg"
+        },
+        {
+            "text": "tənəffüs",
+            "image": "school/teneffus.svg"
+        },
+        {
+            "text": "xəritə",
+            "image": "school/xerite.svg"
+        },
+        {
+            "text": "hekayə",
+            "image": "school/hekaye.svg"
+        }
+    ],
+    "sentences": [
+        {
+            "id": "mektebimiz-boyukdur",
+            "text": "Məktəbimiz böyükdür."
+        },
+        {
+            "id": "zeng-calinir",
+            "text": "Zəng çalınır."
+        },
+        {
+            "id": "ders-baslayir",
+            "text": "Dərs başlayır."
+        },
+        {
+            "id": "muellim-lovhede-yazir",
+            "text": "Müəllim lövhədə yazır."
+        },
+        {
+            "id": "sagird-kitab-oxuyur",
+            "text": "Şagird kitab oxuyur."
+        },
+        {
+            "id": "qelem-cantadadir",
+            "text": "Qələm çantadadır."
+        },
+        {
+            "id": "karandas-renglidir",
+            "text": "Karandaş rənglidir."
+        },
+        {
+            "id": "biz-elifbani-oyrenirik",
+            "text": "Biz əlifbanı öyrənirik."
+        },
+        {
+            "id": "sinif-isiqlidir",
+            "text": "Sinif işıqlıdır."
+        },
+        {
+            "id": "masada-qlobus-var",
+            "text": "Masada qlobus var."
+        },
+        {
+            "id": "kitabxanada-kitab-coxdur",
+            "text": "Kitabxanada kitab çoxdur."
+        },
+        {
+            "id": "kitab-haradadir",
+            "text": "Kitab haradadır?"
+        }
+    ]
+}

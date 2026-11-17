@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 90">
+  <!-- The nature pack's backdrop: a pale morning sky over soft green valleys in the bottom fifth, with no trees or flowers to count. Elifba own art, MIT. -->
+  <defs>
+    <linearGradient id="ndag_sky1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E2F5F8"/><stop offset="0.78" stop-color="#FBFDF7"/></linearGradient>
+    <radialGradient id="ndag_hill2" cx="0.3" cy="0.1" r="1"><stop stop-color="#ECFAE0"/><stop offset="0.55" stop-color="#DAEDD0"/><stop offset="1" stop-color="#C8E0BC"/></radialGradient>
+    <radialGradient id="ndag_hill3" cx="0.3" cy="0.1" r="1"><stop stop-color="#E2F5D4"/><stop offset="0.55" stop-color="#CCE4BC"/><stop offset="1" stop-color="#B8D4A6"/></radialGradient>
+  </defs>
+  <rect width="160" height="90" fill="url(#ndag_sky1)"/>
+  <path d="M0,73 C32,67 64,69 96,73 C124,76 142,70 160,68 L160,90 L0,90 Z" fill="url(#ndag_hill2)"/>
+  <path d="M0,81 C36,78 72,80 108,82 C132,83 146,80 160,79 L160,90 L0,90 Z" fill="url(#ndag_hill3)"/>
+</svg>

@@ -18,6 +18,7 @@
 import Phaser from 'phaser';
 import type { HitEffect } from '../bridge';
 import type { Round, RoundProgress } from '../contract';
+import { hintItem } from '../engine';
 import { wholeText } from '../slots';
 import { BoardItem } from '../styles/item';
 import { effect as effectOf } from '../styles/registry';
@@ -239,6 +240,7 @@ export abstract class BuildScene extends BoardScene {
         });
         row.filled = filled.length;
         slots.progress(row.filled);
+        this.applyHint(row, hintItem(round, progress));
     }
 
     applyHit(effect: HitEffect): void {
@@ -254,6 +256,7 @@ export abstract class BuildScene extends BoardScene {
             tile?.wobble();
             this.play('miss');
             this.sayRetry(row.round.id);
+            this.applyHint(row, effect.hintItemId ?? null);
 
             return;
         }
@@ -266,6 +269,7 @@ export abstract class BuildScene extends BoardScene {
 
         row.filled += 1;
         row.slots.progress(row.filled);
+        this.applyHint(row, effect.hintItemId ?? null);
         this.fly(row, index, effect.itemId);
         this.play('hit');
 
@@ -296,6 +300,16 @@ export abstract class BuildScene extends BoardScene {
 
     protected currentRound(): Round | null {
         return this.row?.round ?? null;
+    }
+
+    private applyHint(row: Row, hintItemId: string | null): void {
+        for (const [id, tile] of row.tiles) {
+            if (id === hintItemId) {
+                tile.hint?.();
+            } else {
+                tile.unhint?.();
+            }
+        }
     }
 
     /** A still copy of a tile, sized for slot `index` and coloured like the tile. */

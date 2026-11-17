@@ -1,0 +1,12 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- səma: a deep blue sky dome with soft clouds and golden sparkles. Elifba own art, MIT. -->
+<rect x="3" y="3" width="26" height="26" rx="7" fill="url(#goy_bg)"/>
+<circle cx="9.5" cy="10.2" r="1.4" fill="#FFF480"/>
+<circle cx="22.8" cy="8.8" r="1.1" fill="#FFF480"/>
+<circle cx="17.2" cy="12.5" r="0.9" fill="#FFFFFF"/>
+<path d="M8.5 23.5C6.8 23.5 5.5 22.2 5.5 20.6C5.5 19.1 6.7 17.9 8.1 17.8C8.9 15.6 11.0 14.2 13.4 14.2C16.3 14.2 18.7 16.3 19.0 19.0C20.3 19.2 21.2 20.3 21.2 21.6C21.2 22.7 20.3 23.5 19.1 23.5H8.5Z" fill="url(#goy_cloud)"/>
+<defs>
+<radialGradient id="goy_bg" cx="0.3" cy="0.2" r="0.95"><stop stop-color="#5CAEFF"/><stop offset="0.55" stop-color="#2D6CDF"/><stop offset="1" stop-color="#1A398A"/></radialGradient>
+<radialGradient id="goy_cloud" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FFFFFF"/><stop offset="0.7" stop-color="#E8F1FF"/><stop offset="1" stop-color="#C5D8F5"/></radialGradient>
+</defs>
+</svg>

@@ -69,6 +69,10 @@ export type ItemView = {
     enter: (delay: number) => void;
     /** A miss: the item stays. */
     wobble: () => void;
+    /** Gently pulses as a hint after two misses in the round. */
+    hint?: () => void;
+    /** Stops the hint pulse once the tile is hit in a sequence round. */
+    unhint?: () => void;
     /** Hit correctly with `burst`: swells for a moment and is gone. */
     pop: () => void;
     /** Hit correctly with `sparkle`: lifts and fades away whole, never broken. */

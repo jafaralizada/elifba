@@ -1,0 +1,11 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- qalaktika: a glowing spiral galaxy with golden core and violet arms. Elifba own art, MIT. -->
+<ellipse cx="16" cy="16" rx="13.5" ry="8.5" transform="rotate(-25 16 16)" fill="url(#qal_arms)"/>
+<ellipse cx="16" cy="16" rx="8.5" ry="5.0" transform="rotate(-25 16 16)" fill="url(#qal_inner)"/>
+<circle cx="16" cy="16" r="3.6" fill="url(#qal_core)"/>
+<defs>
+<radialGradient id="qal_arms" cx="0.5" cy="0.5" r="0.6"><stop stop-color="#B87CFF"/><stop offset="0.6" stop-color="#6A3BE0"/><stop offset="1" stop-color="#2D167A" stop-opacity="0.1"/></radialGradient>
+<radialGradient id="qal_inner" cx="0.5" cy="0.5" r="0.6"><stop stop-color="#FFE885"/><stop offset="0.6" stop-color="#E87CA6"/><stop offset="1" stop-color="#7A3BE0" stop-opacity="0"/></radialGradient>
+<radialGradient id="qal_core" cx="0.35" cy="0.3" r="0.75"><stop stop-color="#FFFFFF"/><stop offset="0.6" stop-color="#FFE670"/><stop offset="1" stop-color="#F0982B"/></radialGradient>
+</defs>
+</svg>

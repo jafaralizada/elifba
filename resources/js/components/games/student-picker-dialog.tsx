@@ -1,4 +1,4 @@
-import { UserPlus, X } from 'lucide-react';
+import { Dices, UserPlus, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useId, useState } from 'react';
 import { StudentGrid } from '@/components/games/student-grid';
@@ -14,6 +14,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { useTranslation } from '@/hooks/use-translation';
+import { pickRandomStudent } from '@/lib/random-student';
 import type { BoardStudent, PasteLimits } from '@/types';
 
 /** Where «Şagird əlavə et» adds: a teacher board's class, with the paste flow's limits. */
@@ -99,6 +100,28 @@ function Picker({
                     <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
                 <div className="-mt-2 -mr-2 flex shrink-0 items-center gap-1">
+                    {students.length > 1 && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="lg"
+                            className="max-sm:size-11 max-sm:px-0"
+                            onClick={() =>
+                                onChoose(
+                                    pickRandomStudent(
+                                        students.map((student) => student.id),
+                                        studentId,
+                                    ),
+                                )
+                            }
+                            data-test="random-student-dialog"
+                        >
+                            <Dices />
+                            <span className="max-sm:sr-only">
+                                {t('games.board.random_student')}
+                            </span>
+                        </Button>
+                    )}
                     {addTo !== null && (
                         <Button
                             type="button"

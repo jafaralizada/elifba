@@ -32,7 +32,7 @@ export function RemoteItems({
 }: Props) {
     const { t } = useTranslation();
     const sequence = round.solution.order === 'sequence';
-    const picture = round.unit === 'picture';
+    const picture = round.unit === 'picture' || round.mechanic === 'read_word';
     const answers = answerItemIds(round, hitItemIds);
     const lastTap = new Map<string, Tap>();
 

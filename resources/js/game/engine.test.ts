@@ -8,9 +8,13 @@ import {
     applySkip,
     boardGame,
     currentRound,
+    HINT_AFTER_MISSES,
+    hintItem,
     isOver,
     judge,
     progressOf,
+    roundStepsOf,
+    streak,
     tally,
 } from './engine';
 
@@ -187,5 +191,80 @@ describe('the board game', () => {
         });
 
         expect(game.rounds.map((round) => round.index)).toEqual([0, 1]);
+    });
+
+    it('highlights the next right item only after two misses in an open round', () => {
+        expect(HINT_AFTER_MISSES).toBe(2);
+
+        const anyRound = {
+            solution: { order: 'any' as const, item_ids: ['b'] },
+        };
+        const seqRound = {
+            solution: { order: 'sequence' as const, item_ids: ['a', 'c'] },
+        };
+
+        expect(
+            hintItem(anyRound, {
+                hit_item_ids: [],
+                misses: 1,
+                solved: false,
+                skipped: false,
+            }),
+        ).toBeNull();
+        expect(
+            hintItem(anyRound, {
+                hit_item_ids: [],
+                misses: 2,
+                solved: false,
+                skipped: false,
+            }),
+        ).toBe('b');
+        expect(
+            hintItem(anyRound, {
+                hit_item_ids: ['b'],
+                misses: 2,
+                solved: true,
+                skipped: false,
+            }),
+        ).toBeNull();
+        expect(
+            hintItem(seqRound, {
+                hit_item_ids: ['a'],
+                misses: 2,
+                solved: false,
+                skipped: false,
+            }),
+        ).toBe('c');
+    });
+
+    it('tracks flawless streaks and each round’s step state', () => {
+        const rounds = [
+            { ...first, id: 'r1', index: 0 },
+            { ...second, id: 'r2', index: 1 },
+            { ...first, id: 'r3', index: 2 },
+        ];
+        const fresh = boardGame({ rounds, progress: [] });
+
+        expect(streak(fresh)).toBe(0);
+        expect(roundStepsOf(fresh, 'r1')).toEqual(['current', 'open', 'open']);
+
+        const one = applyHit(fresh, 'r1', rounds[0].solution.item_ids[0]).game;
+        const two = applyHit(one, 'r2', rounds[1].solution.item_ids[0]).game;
+
+        expect(streak(two)).toBe(2);
+        expect(roundStepsOf(two, 'r3')).toEqual([
+            'flawless',
+            'flawless',
+            'current',
+        ]);
+
+        const skipped = applySkip(two, 'r3').game;
+
+        expect(streak(skipped)).toBe(0);
+        expect(roundStepsOf(skipped, null)).toEqual([
+            'flawless',
+            'flawless',
+            'skipped',
+        ]);
     });
 });

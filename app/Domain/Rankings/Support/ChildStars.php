@@ -3,7 +3,9 @@
 namespace App\Domain\Rankings\Support;
 
 use App\Domain\Family\Models\Child;
+use App\Domain\Language\Support\Alphabet;
 use App\Domain\Language\Support\DateLabel;
+use App\Domain\Play\Models\GameAnswer;
 use App\Domain\Play\Models\GameRound;
 use App\Domain\Play\Support\SchoolCalendar;
 use App\Domain\Rankings\Data\ChildStarsData;
@@ -86,6 +88,39 @@ final class ChildStars
         }
 
         return $today;
+    }
+
+    /**
+     * Lowercase letters the child has hit correctly in solved home rounds,
+     * in alphabet order.
+     *
+     * @return list<string>
+     */
+    public static function practicedLetters(Child $child): array
+    {
+        $keys = GameAnswer::query()
+            ->toBase()
+            ->join('game_rounds', 'game_rounds.id', '=', 'game_answers.game_round_id')
+            ->where('game_rounds.child_id', $child->id)
+            ->whereNotNull('game_rounds.solved_at')
+            ->where('game_answers.correct', true)
+            ->where('game_answers.content_key', 'like', 'letter:%')
+            ->distinct()
+            ->pluck('game_answers.content_key')
+            ->all();
+
+        $found = [];
+
+        foreach ($keys as $key) {
+            if (is_string($key) && str_starts_with($key, 'letter:')) {
+                $found[substr($key, 7)] = true;
+            }
+        }
+
+        return array_values(array_filter(
+            Alphabet::letters(),
+            static fn (string $letter): bool => isset($found[$letter]),
+        ));
     }
 
     /**

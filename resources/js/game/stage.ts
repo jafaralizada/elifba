@@ -25,13 +25,15 @@ import { CountScene } from './scenes/count';
 import type { Figure, Pictures } from './figures';
 import { NameVoices } from './name-voice';
 import { FindScene } from './scenes/find';
+import { FirstLetterScene } from './scenes/first-letter';
 import { builds } from './scenes/layouts';
 import { itemStyle, slotStyle, styleOfUnit } from './styles/registry';
 import type { BoardVoice, VoicePlayers } from './voice';
 
 /**
  * One Phaser scene per mechanic (architecture §4). A `pop` round is a find
- * round whose solution is every item, so the find scene draws it as is.
+ * round whose solution is every item, and `read_word` is a find round of
+ * picture tiles, so the find scene draws both.
  */
 const SCENES: Record<Mechanic, new (options: SceneOptions) => BoardScene> = {
     find: FindScene,
@@ -40,6 +42,8 @@ const SCENES: Record<Mechanic, new (options: SceneOptions) => BoardScene> = {
     build_word: BuildWordScene,
     build_sentence: BuildSentenceScene,
     count: CountScene,
+    first_letter: FirstLetterScene,
+    read_word: FindScene,
 };
 
 export type StageOptions = {

@@ -16,6 +16,7 @@
  */
 import type { HitEffect } from '../bridge';
 import type { Round, RoundProgress } from '../contract';
+import { hintItem } from '../engine';
 import { figureKey } from '../figures';
 import { effect as effectOf } from '../styles/registry';
 import type { ItemLayout, ItemStyle, ItemView } from '../styles/types';
@@ -76,6 +77,10 @@ export class FindScene extends BoardScene {
             this.play('miss');
             this.sayRetry(this.round.id);
 
+            if (effect.hintItemId != null) {
+                this.items.get(effect.hintItemId)?.hint?.();
+            }
+
             return;
         }
 
@@ -129,7 +134,9 @@ export class FindScene extends BoardScene {
         const shown = round.items.filter(
             (item) => !progress.hit_item_ids.includes(item.id),
         );
-        const style = this.options.styleOf(round.unit);
+        const style = this.options.styleOf(
+            round.mechanic === 'read_word' ? 'picture' : round.unit,
+        );
         const { width, height, spots } = this.itemLayout(style, shown.length);
         const palette = this.palette;
         // Chosen over every item, so a reload mid-round shows the same.
@@ -163,6 +170,12 @@ export class FindScene extends BoardScene {
         // One sound for the round's items coming in, however many there are.
         if (shown.length > 0 && this.isOpen(progress)) {
             this.playIn(250, 'arrive');
+        }
+
+        const hinted = hintItem(round, progress);
+
+        if (hinted !== null) {
+            this.items.get(hinted)?.hint?.();
         }
 
         // The prompt once the last item has come in most of the way.

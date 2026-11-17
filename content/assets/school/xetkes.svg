@@ -1,0 +1,8 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- xətkeş: a yellow wooden ruler with measurement ticks. Elifba own art, MIT. -->
+<rect x="3.5" y="11.5" width="25" height="9" rx="2" fill="url(#xet_wood)"/>
+<path d="M7.5 11.5V15.5M11.5 11.5V14.2M15.5 11.5V15.5M19.5 11.5V14.2M23.5 11.5V15.5" stroke="#8C5828" stroke-width="1.6" stroke-linecap="round"/>
+<defs>
+<radialGradient id="xet_wood" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FFF085"/><stop offset="1" stop-color="#D49428"/></radialGradient>
+</defs>
+</svg>

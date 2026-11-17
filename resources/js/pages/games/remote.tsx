@@ -2,6 +2,7 @@ import { Form, Head, Link, router, usePage } from '@inertiajs/react';
 import {
     ChevronLeft,
     ChevronRight,
+    Dices,
     MonitorUp,
     MonitorX,
     Pause,
@@ -41,6 +42,7 @@ import { connectEcho, gameChannel } from '@/game/socket';
 import { ulid } from '@/game/ulid';
 import { useTranslation } from '@/hooks/use-translation';
 import { useWakeLock } from '@/hooks/use-wake-lock';
+import { pickRandomStudent } from '@/lib/random-student';
 import { cn } from '@/lib/utils';
 import { pult } from '@/routes';
 import { playersHome, playersLabel } from '@/lib/game-players';
@@ -235,9 +237,11 @@ export default function Remote({
                                     {round.prompt.text}
                                 </p>
                             )}
-                            {round !== null && round.mechanic === 'count' && (
-                                <RemoteQuestion round={round} />
-                            )}
+                            {round !== null &&
+                                (round.mechanic === 'count' ||
+                                    round.mechanic === 'first_letter') && (
+                                    <RemoteQuestion round={round} />
+                                )}
                             {round !== null && round.slots > 0 && (
                                 <RemoteSlots
                                     round={round}
@@ -479,6 +483,28 @@ function RemoteStudents({
                 >
                     {t('games.board.next_student')}
                     <ChevronRight />
+                </Button>
+            )}
+
+            {students.length > 1 && (
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="size-16 shrink-0"
+                    disabled={disabled}
+                    onClick={() =>
+                        onChoose(
+                            pickRandomStudent(
+                                students.map((student) => student.id),
+                                studentId,
+                            ),
+                        )
+                    }
+                    aria-label={t('games.board.random_student')}
+                    data-test="random-student-remote"
+                >
+                    <Dices className="size-5" />
                 </Button>
             )}
         </div>

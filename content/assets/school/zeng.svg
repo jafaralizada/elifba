@@ -1,0 +1,9 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- zəng: a golden school handbell. Elifba own art, MIT. -->
+<rect x="14.2" y="3.2" width="3.6" height="6.5" rx="1.8" fill="#8C583A"/>
+<circle cx="16" cy="26.2" r="2.6" fill="#C48220"/>
+<path d="M16 8.5C11.2 8.5 8.2 12.5 7.5 21.5L5.5 24.8H26.5L24.5 21.5C23.8 12.5 20.8 8.5 16 8.5Z" fill="url(#zeng_bell)"/>
+<defs>
+<radialGradient id="zeng_bell" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FFF285"/><stop offset="0.55" stop-color="#F6C445"/><stop offset="1" stop-color="#B87A1E"/></radialGradient>
+</defs>
+</svg>

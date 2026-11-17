@@ -1,0 +1,10 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- komet: an icy blue comet with a glowing tail. Elifba own art, MIT. -->
+<path d="M29.2 3.2C26.5 9.8 21.2 19.5 13.5 25.8C9.8 28.8 5.2 27.2 4.2 23.2C3.2 19.2 5.8 14.2 10.2 10.8C17.8 5.0 25.2 3.8 29.2 3.2Z" fill="url(#komet_tail)"/>
+<circle cx="10.5" cy="20.5" r="6.2" fill="url(#komet_head)"/>
+<circle cx="8.8" cy="18.8" r="2.0" fill="#FFFFFF" fill-opacity="0.75"/>
+<defs>
+<radialGradient id="komet_tail" cx="0.25" cy="0.75" r="0.85"><stop stop-color="#9EEBFF"/><stop offset="0.55" stop-color="#48A9FF"/><stop offset="1" stop-color="#3B4CE8" stop-opacity="0.2"/></radialGradient>
+<radialGradient id="komet_head" cx="0.3" cy="0.25" r="0.85"><stop stop-color="#FFFFFF"/><stop offset="0.55" stop-color="#8CE2FF"/><stop offset="1" stop-color="#2882E0"/></radialGradient>
+</defs>
+</svg>

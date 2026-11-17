@@ -13,7 +13,9 @@ use App\Domain\Play\Support\Mechanics\BuildSyllableRoundBuilder;
 use App\Domain\Play\Support\Mechanics\BuildWordRoundBuilder;
 use App\Domain\Play\Support\Mechanics\CountRoundBuilder;
 use App\Domain\Play\Support\Mechanics\FindRoundBuilder;
+use App\Domain\Play\Support\Mechanics\FirstLetterRoundBuilder;
 use App\Domain\Play\Support\Mechanics\PopRoundBuilder;
+use App\Domain\Play\Support\Mechanics\ReadWordRoundBuilder;
 use App\Domain\Play\Support\Playable;
 use Random\Engine\Mt19937;
 use Random\Randomizer;
@@ -32,7 +34,7 @@ use Random\Randomizer;
 const PLAYABLE_FIXTURE = __DIR__.'/../../Fixtures/playable.json';
 
 it('lists what the board draws and a builder for every mechanic', function (): void {
-    expect(Playable::mechanics())->toBe([Mechanic::Find, Mechanic::Pop, Mechanic::BuildSyllable, Mechanic::BuildWord, Mechanic::BuildSentence, Mechanic::Count])
+    expect(Playable::mechanics())->toBe([Mechanic::Find, Mechanic::Pop, Mechanic::BuildSyllable, Mechanic::BuildWord, Mechanic::BuildSentence, Mechanic::Count, Mechanic::FirstLetter, Mechanic::ReadWord])
         ->and(Playable::mechanics())->toBe(Mechanic::cases())
         ->and(Playable::itemStyles())->toBe(ItemStyle::cases())
         ->and(Playable::slotStyles())->toBe([SlotStyle::Wagon, SlotStyle::Frame])
@@ -44,7 +46,9 @@ it('lists what the board draws and a builder for every mechanic', function (): v
         ->and(Playable::builder(Mechanic::BuildSyllable))->toBeInstanceOf(BuildSyllableRoundBuilder::class)
         ->and(Playable::builder(Mechanic::BuildWord))->toBeInstanceOf(BuildWordRoundBuilder::class)
         ->and(Playable::builder(Mechanic::BuildSentence))->toBeInstanceOf(BuildSentenceRoundBuilder::class)
-        ->and(Playable::builder(Mechanic::Count))->toBeInstanceOf(CountRoundBuilder::class);
+        ->and(Playable::builder(Mechanic::Count))->toBeInstanceOf(CountRoundBuilder::class)
+        ->and(Playable::builder(Mechanic::FirstLetter))->toBeInstanceOf(FirstLetterRoundBuilder::class)
+        ->and(Playable::builder(Mechanic::ReadWord))->toBeInstanceOf(ReadWordRoundBuilder::class);
 });
 
 it('answers pack_level for a level whose unit the pack does not list, before anything else', function (): void {
@@ -88,7 +92,7 @@ it('starts every build mechanic at every level that has it, in every pack, with 
     }
 
     // syllables-open, syllables-closed, words-short, words-long, sentences.
-    expect($count)->toBe(5 * 7);
+    expect($count)->toBe(5 * 11);
 });
 
 it('plays a pack only when the board draws its look, its effect and, for a build, its slots', function (): void {
@@ -108,8 +112,8 @@ it('plays a pack only when the board draws its look, its effect and, for a build
 it('draws every mechanic in every pack, the train with wagons and the rest with frames', function (): void {
     $packs = app(ContentRepository::class)->packs();
 
-    // The seven reading packs and, from R6, the colours and the numbers.
-    expect($packs)->toHaveCount(9);
+    // The eleven reading packs and, from R6, the colours and the numbers.
+    expect($packs)->toHaveCount(13);
 
     foreach ($packs as $pack) {
         expect($pack->style->slot)->toBe($pack->key === 'train' ? SlotStyle::Wagon : SlotStyle::Frame, $pack->key);
@@ -120,11 +124,11 @@ it('draws every mechanic in every pack, the train with wagons and the rest with 
     }
 });
 
-it('never bursts the national symbols, the cities, the animals or the dinosaurs', function (): void {
+it('never bursts the national symbols, the cities, the animals, the dinosaurs, the nature, the school or the space packs', function (): void {
     $content = app(ContentRepository::class);
     $sparkling = array_values(array_filter($content->packs(), static fn ($pack): bool => $pack->style->effect === Effect::Sparkle));
 
-    expect(array_map(static fn ($pack): string => $pack->key, $sparkling))->toBe(['animals', 'cities', 'dinosaurs', 'symbols']);
+    expect(array_map(static fn ($pack): string => $pack->key, $sparkling))->toBe(['animals', 'cities', 'dinosaurs', 'nature', 'school', 'space', 'symbols']);
 
     foreach ($sparkling as $pack) {
         foreach ([Mechanic::Find, Mechanic::Pop] as $mechanic) {

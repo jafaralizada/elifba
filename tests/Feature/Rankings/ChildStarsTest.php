@@ -2,6 +2,7 @@
 
 use App\Domain\Family\Actions\DeleteChild;
 use App\Domain\Family\Models\Child;
+use App\Domain\Play\Models\GameAnswer;
 use App\Domain\Play\Models\GameRound;
 use App\Domain\Play\Models\GameSession;
 use App\Domain\Rankings\Support\ChildStars;
@@ -119,4 +120,18 @@ it('counts nothing of a deleted child', function (): void {
         ->and(GameRound::query()->sum('points'))->toEqual(2)
         ->and(ChildStars::today($this->parent))->toBe([$sibling->id => 2])
         ->and(ChildStars::of($this->child)->toArray())->toMatchArray(['today' => 0, 'week' => 0, 'total' => 0]);
+});
+
+it('lists the letters a child has solved in letter rounds', function (): void {
+    $game = GameSession::factory()->forChild($this->child)->create();
+    $solved = starRound($game, 3, '2026-11-11', '2026-11-09');
+    $unsolved = GameRound::factory()->for($game, 'game')->create(['child_id' => $this->child->id]);
+
+    GameAnswer::factory()->for($solved, 'round')->create(['content_key' => 'letter:ə', 'correct' => true]);
+    GameAnswer::factory()->for($solved, 'round')->create(['content_key' => 'letter:a', 'correct' => true]);
+    GameAnswer::factory()->for($solved, 'round')->create(['content_key' => 'letter:b', 'correct' => false]);
+    GameAnswer::factory()->for($solved, 'round')->create(['content_key' => 'word:alma', 'correct' => true]);
+    GameAnswer::factory()->for($unsolved, 'round')->create(['content_key' => 'letter:c', 'correct' => true]);
+
+    expect(ChildStars::practicedLetters($this->child))->toEqualCanonicalizing(['ə', 'a']);
 });

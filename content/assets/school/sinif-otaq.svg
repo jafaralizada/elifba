@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 90">
+  <!-- The school pack's backdrop: a bright classroom wall and warm wooden floor in the bottom fifth, with no items to count. Elifba own art, MIT. -->
+  <defs>
+    <linearGradient id="ssin_wall1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EBF5FA"/><stop offset="0.78" stop-color="#FCFDF9"/></linearGradient>
+    <linearGradient id="ssin_floor2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F2E2CE"/><stop offset="1" stop-color="#E2CCB2"/></linearGradient>
+  </defs>
+  <rect width="160" height="90" fill="url(#ssin_wall1)"/>
+  <rect x="0" y="74" width="160" height="16" fill="url(#ssin_floor2)"/>
+</svg>

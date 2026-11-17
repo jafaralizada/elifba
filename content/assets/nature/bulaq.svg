@@ -1,0 +1,9 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- bulaq: a fresh water spring bubbling between grey stones. Elifba own art, MIT. -->
+<circle cx="9.5" cy="21.5" r="4.5" fill="#8A829E"/>
+<circle cx="22.5" cy="21.5" r="4.5" fill="#766E8A"/>
+<path d="M16 7.5C12.2 12.5 11.2 17.5 11.2 22.5H20.8C20.8 17.5 19.8 12.5 16 7.5Z" fill="url(#bulaq_water)"/>
+<defs>
+<radialGradient id="bulaq_water" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#B8F5FF"/><stop offset="0.55" stop-color="#45B8F0"/><stop offset="1" stop-color="#1E68C4"/></radialGradient>
+</defs>
+</svg>

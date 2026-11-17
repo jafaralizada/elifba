@@ -64,6 +64,8 @@ final class ChildController extends Controller
 
     public function show(Child $child, #[CurrentUser] User $parent, PlayerVoice $voice): Response
     {
+        $practiced = ChildStars::practicedLetters($child);
+
         return Inertia::render('children/show', [
             'child' => [
                 ...self::row($child),
@@ -73,7 +75,11 @@ final class ChildController extends Controller
             ],
             'stars' => ChildStars::of($child)->toArray(),
             'alphabet' => array_map(
-                static fn (string $letter): array => ['lower' => $letter, 'upper' => Az::upper($letter)],
+                static fn (string $letter): array => [
+                    'lower' => $letter,
+                    'upper' => Az::upper($letter),
+                    'practiced' => in_array($letter, $practiced, true),
+                ],
                 Alphabet::letters(),
             ),
             'avatars' => Avatars::all(),

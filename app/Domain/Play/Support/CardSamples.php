@@ -42,7 +42,14 @@ final class CardSamples
         $written = match ($mechanic) {
             Mechanic::Count => self::counted($level),
             Mechanic::BuildSyllable, Mechanic::BuildWord, Mechanic::BuildSentence => self::parts($mechanic, $pack, $level, $learned),
-            Mechanic::Find, Mechanic::Pop => $level->unit === Unit::Letter
+            Mechanic::ReadWord => array_map(
+                static fn (string $key): string => RoundParts::written($key, $pack),
+                array_values(array_filter(
+                    $level->keysFrom($pack, $learned),
+                    static fn (string $key): bool => $pack->word(RoundParts::value($key))?->image !== null,
+                )),
+            ),
+            Mechanic::Find, Mechanic::Pop, Mechanic::FirstLetter => $level->unit === Unit::Letter
                 ? $learned
                 : array_map(static fn (string $key): string => RoundParts::written($key, $pack), $level->keysFrom($pack, $learned)),
         };

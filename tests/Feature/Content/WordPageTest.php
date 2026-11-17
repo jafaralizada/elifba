@@ -94,12 +94,12 @@ it('shows all of the teacher\'s own words with their levels, one pack\'s hidden 
                     ['title' => 'Uzun hecalar', 'unit' => 'syllable', 'items' => ['ləm']],
                     ['title' => 'Qısa sözlər', 'unit' => 'word', 'items' => ['kələm']],
                 ], 'built_in_in' => []],
-                // The train pack has vaqon built in: there it plays with its picture.
+                // The train and vehicles packs have vaqon built in: there it plays with its picture.
                 ['id' => $vaqon->id, 'text' => 'vaqon', 'syllables' => 'va-qon', 'override' => null, 'levels' => [
                     ['title' => 'Qısa hecalar', 'unit' => 'syllable', 'items' => ['va']],
                     ['title' => 'Uzun hecalar', 'unit' => 'syllable', 'items' => ['qon']],
                     ['title' => 'Qısa sözlər', 'unit' => 'word', 'items' => ['vaqon']],
-                ], 'built_in_in' => ['Qatar']],
+                ], 'built_in_in' => ['Qatar', 'Nəqliyyat']],
             ])
             ->where('levelTotals', [
                 ['title' => 'Qısa hecalar', 'count' => 3],

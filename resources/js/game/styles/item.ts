@@ -92,6 +92,7 @@ export abstract class BoardItem implements ItemView {
     protected readonly restY: number;
     protected gone = false;
     private idles: Phaser.Tweens.Tween[] = [];
+    private hintTween: Phaser.Tweens.Tween | null = null;
 
     constructor(
         scene: Phaser.Scene,
@@ -140,6 +141,36 @@ export abstract class BoardItem implements ItemView {
             duration: 480,
             ease: 'Sine.easeInOut',
         });
+    }
+
+    /** Gently pulses as a hint after two misses in the round. */
+    hint(): void {
+        if (this.gone || this.hintTween !== null) {
+            return;
+        }
+
+        this.hintTween = this.scene.tweens.add({
+            targets: this.inner,
+            scale: { from: 1, to: 1.09 },
+            duration: 520,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+        });
+    }
+
+    /** Stops the hint pulse once the tile is hit in a sequence round. */
+    unhint(): void {
+        if (this.hintTween === null) {
+            return;
+        }
+
+        this.hintTween.stop();
+        this.hintTween = null;
+
+        if (!this.gone) {
+            this.inner.setScale(1);
+        }
     }
 
     /** The burst takes over: the item swells for a moment and is gone. */
@@ -214,6 +245,8 @@ export abstract class BoardItem implements ItemView {
     }
 
     private stopIdling(): void {
+        this.unhint();
+
         for (const tween of this.idles) {
             tween.stop();
         }

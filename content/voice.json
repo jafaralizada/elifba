@@ -23,7 +23,9 @@
         "build_syllable.syllable": "playful",
         "build_word.word": "playful",
         "build_sentence.sentence": "playful",
-        "count.number": "curious"
+        "count.number": "curious",
+        "first_letter.letter": "curious",
+        "read_word.word": "playful"
     },
     "spoken": {
         "letters": {

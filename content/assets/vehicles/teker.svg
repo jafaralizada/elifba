@@ -1,0 +1,10 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- təkər: a car wheel with a dark rubber tire and metallic rim. Elifba own art, MIT. -->
+<circle cx="16" cy="16" r="12.5" fill="url(#teker_tire)"/>
+<circle cx="16" cy="16" r="7.2" fill="url(#teker_rim)"/>
+<circle cx="16" cy="16" r="2.5" fill="#4A4458"/>
+<defs>
+<radialGradient id="teker_tire" cx="0.32" cy="0.28" r="0.85"><stop stop-color="#5E586E"/><stop offset="0.6" stop-color="#383247"/><stop offset="1" stop-color="#1F1A2B"/></radialGradient>
+<radialGradient id="teker_rim" cx="0.32" cy="0.28" r="0.85"><stop stop-color="#FFFFFF"/><stop offset="0.6" stop-color="#C9C4D8"/><stop offset="1" stop-color="#8A849E"/></radialGradient>
+</defs>
+</svg>

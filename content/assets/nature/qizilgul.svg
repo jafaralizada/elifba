@@ -1,0 +1,9 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- qızılgül: a red rose blossom on a green stem. Elifba own art, MIT. -->
+<path d="M16 17.5V28.5" stroke="#389442" stroke-width="2.6" stroke-linecap="round"/>
+<circle cx="16" cy="11.5" r="6.8" fill="url(#qiz_rose)"/>
+<path d="M12.2 10.5C14.2 8.5 17.8 8.5 19.8 10.5C18.2 13.2 13.8 13.2 12.2 10.5Z" fill="#FF8C9E"/>
+<defs>
+<radialGradient id="qiz_rose" cx="0.35" cy="0.25" r="0.85"><stop stop-color="#FF6B82"/><stop offset="0.55" stop-color="#E02848"/><stop offset="1" stop-color="#8F142C"/></radialGradient>
+</defs>
+</svg>

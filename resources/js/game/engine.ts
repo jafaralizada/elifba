@@ -111,6 +111,87 @@ export type Tally = {
     misses: number;
 };
 
+/** Misses in one round before the board gently highlights the next right item. */
+export const HINT_AFTER_MISSES = 2;
+
+export type RoundStep = 'open' | 'current' | 'solved' | 'flawless' | 'skipped';
+
+/**
+ * Which item to highlight as a hint after `HINT_AFTER_MISSES` misses in an
+ * open round: the target in an `any` round, or the next expected tile in a
+ * `sequence` round; null before two misses or once the round is over.
+ */
+export function hintItem(
+    round: Pick<Round, 'solution'>,
+    progress: Pick<
+        RoundProgress,
+        'hit_item_ids' | 'misses' | 'solved' | 'skipped'
+    >,
+): string | null {
+    if (
+        progress.solved ||
+        progress.skipped ||
+        progress.misses < HINT_AFTER_MISSES
+    ) {
+        return null;
+    }
+
+    if (round.solution.order === 'any') {
+        return (
+            round.solution.item_ids.find(
+                (itemId) => !progress.hit_item_ids.includes(itemId),
+            ) ?? null
+        );
+    }
+
+    return round.solution.item_ids[progress.hit_item_ids.length] ?? null;
+}
+
+/**
+ * Consecutive rounds solved on the first try (`misses === 0`) up to the
+ * latest answered round; a miss on a solved round or a skip resets it.
+ */
+export function streak(game: BoardGame): number {
+    let count = 0;
+
+    for (const round of game.rounds) {
+        const progress = progressOf(game, round.id);
+
+        if (progress.solved) {
+            count = progress.misses === 0 ? count + 1 : 0;
+        } else if (progress.skipped) {
+            count = 0;
+        } else {
+            break;
+        }
+    }
+
+    return count;
+}
+
+/**
+ * Where each round of the game stands, in order, for the board's progress
+ * strip.
+ */
+export function roundStepsOf(
+    game: BoardGame,
+    shownRoundId: string | null,
+): RoundStep[] {
+    return game.rounds.map((round) => {
+        const progress = progressOf(game, round.id);
+
+        if (progress.solved) {
+            return progress.misses === 0 ? 'flawless' : 'solved';
+        }
+
+        if (progress.skipped) {
+            return 'skipped';
+        }
+
+        return round.id === shownRoundId ? 'current' : 'open';
+    });
+}
+
 function emptyProgress(roundId: string): RoundProgress {
     return {
         round_id: roundId,

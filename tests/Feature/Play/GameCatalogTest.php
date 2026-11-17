@@ -51,9 +51,9 @@ describe('the catalog', function (): void {
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('games', fn ($games): bool => expect(collect($games)->map(fn ($game): string => "{$game['unit']}_{$game['mechanic']}")->all())->toBe([
-                    'letter_pop', 'letter_find',
+                    'letter_pop', 'letter_find', 'letter_first_letter',
                     'syllable_pop', 'syllable_find', 'syllable_build_syllable',
-                    'word_pop', 'word_find', 'word_build_word',
+                    'word_pop', 'word_find', 'word_build_word', 'word_read_word',
                     'sentence_build_sentence',
                     'picture_pop', 'picture_find',
                     'number_pop', 'number_find', 'number_count',
@@ -65,11 +65,11 @@ describe('the catalog', function (): void {
                     'name' => 'Hərf vur',
                     'hint' => __('games.setup.mechanic_hints.pop'),
                 ])
-                ->where('games.4.mode', 'normal')
-                ->where('games.4.name', 'Heca qur')
+                ->where('games.5.mode', 'normal')
+                ->where('games.5.name', 'Heca qur')
                 // «De və vur» where nothing is read.
-                ->where('games.9.hint', __('games.setup.mechanic_hints.pop_say'))
-                ->where('games.13', [
+                ->where('games.11.hint', __('games.setup.mechanic_hints.pop_say'))
+                ->where('games.15', [
                     'unit' => 'number',
                     'mechanic' => 'count',
                     'mode' => 'normal',
@@ -83,8 +83,8 @@ describe('the catalog', function (): void {
 
         $this->get(route('classes.games.create', $this->class))
             ->assertInertia(fn (Assert $page) => $page
-                // 7 reading packs × 9 reading games, 4 picture packs × 2, 4 number packs × 3.
-                ->has('cards', 63 + 8 + 12)
+                // 11 reading packs × 11 reading games, 8 picture packs × 2, 8 number packs × 3.
+                ->has('cards', 121 + 16 + 24)
                 ->where('cards.0', [
                     'pack' => 'animals',
                     'unit' => 'letter',
@@ -131,7 +131,7 @@ describe('the catalog', function (): void {
 
                     // Within a game, the packs' order.
                     expect(collect($cards)->where('mechanic', 'find')->where('unit', 'letter')->pluck('pack')->all())
-                        ->toBe(['animals', 'balloons', 'cities', 'dinosaurs', 'fruit', 'symbols', 'train']);
+                        ->toBe(['animals', 'balloons', 'cities', 'dinosaurs', 'fruit', 'nature', 'school', 'space', 'symbols', 'train', 'vehicles']);
 
                     return true;
                 }));
