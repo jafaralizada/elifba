@@ -4,11 +4,14 @@ namespace App\Domain\Rooms\Support;
 
 use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Content\Support\ContentRepository;
+use App\Domain\Content\Support\RoomWords;
+use App\Domain\Rooms\Support\Mechanics\AnagramBuilder;
 use App\Domain\Rooms\Support\Mechanics\NextInSequenceBuilder;
 use App\Domain\Rooms\Support\Mechanics\OddOneOutBuilder;
 use App\Domain\Rooms\Support\Mechanics\RecallCellsBuilder;
 use App\Domain\Rooms\Support\Mechanics\RecallOrderBuilder;
 use App\Domain\Rooms\Support\Mechanics\RoomRoundBuilder;
+use App\Domain\Rooms\Support\Mechanics\SpellingBuilder;
 
 /**
  * The room mechanics a room can play (docs/architecture.md §12 "Room
@@ -19,7 +22,8 @@ use App\Domain\Rooms\Support\Mechanics\RoomRoundBuilder;
  *
  * B3 lists `recall_order`, whose view B3 builds with the room page; B4
  * `recall_cells`, with its view; B5 `next_in_sequence` and `odd_one_out`,
- * with theirs.
+ * with theirs; B6 `anagram` and `spelling`, with plain views the next
+ * session designs.
  */
 final class RoomPlayable
 {
@@ -28,7 +32,7 @@ final class RoomPlayable
      */
     public static function mechanics(): array
     {
-        return [RoomMechanic::RecallOrder, RoomMechanic::RecallCells, RoomMechanic::NextInSequence, RoomMechanic::OddOneOut];
+        return [RoomMechanic::RecallOrder, RoomMechanic::RecallCells, RoomMechanic::NextInSequence, RoomMechanic::OddOneOut, RoomMechanic::Anagram, RoomMechanic::Spelling];
     }
 
     public static function plays(RoomMechanic $mechanic): bool
@@ -42,10 +46,23 @@ final class RoomPlayable
     public static function builder(RoomMechanic $mechanic): RoomRoundBuilder
     {
         return match ($mechanic) {
-            RoomMechanic::RecallOrder => new RecallOrderBuilder(app(ContentRepository::class)->roomShapes()),
+            RoomMechanic::RecallOrder => new RecallOrderBuilder(app(ContentRepository::class)->roomShapes(), self::words()->forRow()),
             RoomMechanic::RecallCells => new RecallCellsBuilder,
             RoomMechanic::NextInSequence => new NextInSequenceBuilder,
             RoomMechanic::OddOneOut => new OddOneOutBuilder(app(ContentRepository::class)->roomCategories()),
+            RoomMechanic::Anagram => new AnagramBuilder(self::words()),
+            RoomMechanic::Spelling => new SpellingBuilder(self::words()),
         };
+    }
+
+    /**
+     * The adults' word list as the games use it: a first name of the name
+     * list is never a wrong spelling either.
+     */
+    private static function words(): RoomWords
+    {
+        $content = app(ContentRepository::class);
+
+        return RoomWords::of($content->roomWords(), $content->names()->names);
     }
 }

@@ -37,7 +37,7 @@ it('has a builder for every mechanic', function (): void {
         expect(RoomPlayable::builder($mechanic))->not->toBeNull();
     }
 
-    expect(RoomPlayable::mechanics())->toBe([RoomMechanic::RecallOrder, RoomMechanic::RecallCells, RoomMechanic::NextInSequence, RoomMechanic::OddOneOut]);
+    expect(RoomPlayable::mechanics())->toBe([RoomMechanic::RecallOrder, RoomMechanic::RecallCells, RoomMechanic::NextInSequence, RoomMechanic::OddOneOut, RoomMechanic::Anagram, RoomMechanic::Spelling]);
 });
 
 // The validator may not reach a builder's arithmetic — whether a rule of

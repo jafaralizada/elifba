@@ -348,6 +348,7 @@ function ScreenRound({
                             ask={round.ask}
                             solution={round.reveal.solution}
                             mine={null}
+                            word={round.reveal.word}
                             big
                         />
                         <section className="flex min-w-0 flex-col gap-[1.6vh]">

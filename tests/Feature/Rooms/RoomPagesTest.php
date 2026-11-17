@@ -416,8 +416,8 @@ it('names the family of each game the setup offers and what each level holds', f
 
     $setup = pagesProps($this->actingAs($this->resad)->get(route('rooms.show', $room)))['setup'];
 
-    expect(array_column($setup['mechanics'], 'mechanic'))->toBe(['recall_order', 'recall_cells', 'next_in_sequence', 'odd_one_out'])
-        ->and(array_column($setup['mechanics'], 'family'))->toBe(['memory', 'memory', 'logic', 'logic']);
+    expect(array_column($setup['mechanics'], 'mechanic'))->toBe(['recall_order', 'recall_cells', 'next_in_sequence', 'odd_one_out', 'anagram', 'spelling'])
+        ->and(array_column($setup['mechanics'], 'family'))->toBe(['memory', 'memory', 'logic', 'logic', 'words', 'words']);
 
     foreach ($setup['mechanics'] as $offer) {
         $mechanic = RoomMechanic::from($offer['mechanic']);
@@ -426,7 +426,7 @@ it('names the family of each game the setup offers and what each level holds', f
             ->and(array_column($offer['levels'], 'difficulty'))->toBe($offer['difficulties']);
 
         // Each level as levels.json holds it: the times, how many items a round asks to recall, a grid;
-        // a row's rules, terms and range; an odd one's source and options.
+        // a row's rules, terms and range; an odd one's source and options; a word's letters and a spelling's swaps.
         foreach ($offer['levels'] as $described) {
             $level = $content->roomLevel($mechanic, $described['difficulty']);
             $count = $level->length ?? $level->lit;
@@ -442,6 +442,8 @@ it('names the family of each game the setup offers and what each level holds', f
                 'range' => $level->range === null ? null : ['min' => $level->range->min, 'max' => $level->range->max],
                 'source' => $level->source?->value,
                 'options' => $level->options,
+                'letters' => $level->wordLength === null ? null : ['min' => $level->wordLength->min, 'max' => $level->wordLength->max],
+                'swaps' => $level->swaps,
             ]);
         }
     }
@@ -462,6 +464,15 @@ it('names the family of each game the setup offers and what each level holds', f
         ->and($sequence['levels'][3]['rules'])->toHaveCount(6)
         ->and($odd['levels'][0])->toMatchArray(['count' => null, 'rules' => null, 'terms' => null, 'range' => null, 'source' => 'words', 'options' => 4])
         ->and(array_column($odd['levels'], 'source'))->toBe(['words', 'numbers', 'words', 'numbers']);
+    // A word game's letters, and a spelling's swaps; nothing to study and no count of items.
+    $anagram = collect($setup['mechanics'])->firstWhere('mechanic', 'anagram');
+    $spelling = collect($setup['mechanics'])->firstWhere('mechanic', 'spelling');
+    expect($anagram['family'])->toBe('words')
+        ->and($anagram['levels'][0])->toMatchArray(['study_ms' => 0, 'count' => null, 'grid' => null, 'swaps' => null])
+        ->and($anagram['levels'][0]['letters'])->toBe(['min' => $content->roomLevel(RoomMechanic::Anagram, 1)->wordLength?->min, 'max' => $content->roomLevel(RoomMechanic::Anagram, 1)->wordLength?->max])
+        ->and(array_column($spelling['levels'], 'swaps'))->toBe([2, 2, 1, 1])
+        ->and($spelling['levels'][3]['letters'])->toBe(['min' => $content->roomLevel(RoomMechanic::Spelling, 4)->wordLength?->min, 'max' => $content->roomLevel(RoomMechanic::Spelling, 4)->wordLength?->max])
+        ->and($rows['levels'][0]['letters'])->toBeNull();
 
     // Nobody else gets it: a player, and the host once the room is closed.
     $this->actingAs($this->aygun)->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('setup', null));

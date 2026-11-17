@@ -58,6 +58,9 @@ it('has every phase\'s fixture, the answer and the receipt', function (): void {
         'state.study.cells', 'state.answer.cells', 'state.reveal.cells', 'state.study.shapes',
         // B5: a row to continue and an odd one to find, asked and revealed.
         'state.answer.sequence', 'state.reveal.sequence', 'state.answer.odd', 'state.reveal.odd',
+        // B6: each word game's question, answer and reveal.
+        'state.answer.anagram', 'answer.anagram', 'state.reveal.anagram',
+        'state.answer.spelling', 'answer.spelling', 'state.reveal.spelling',
     ]);
 });
 
@@ -82,6 +85,19 @@ it('has no solution in any state before the reveal', function (): void {
         expect($wire)->not->toMatch('/"(solution|accept|correct|mine|results|picked|elapsed_ms|seed)"/', $name)
             ->and($wire)->not->toContain(json_encode($cells['round']['reveal']['solution']), $name);
     }
+
+    // A word game: the word only in the reveal; an anagram's tiles never in the order of a word they spell.
+    foreach (['anagram', 'spelling'] as $game) {
+        $revealed = roomFixture("state.reveal.{$game}")['round']['reveal'];
+        $wire = (string) json_encode(roomFixture("state.answer.{$game}"), JSON_UNESCAPED_UNICODE);
+
+        expect($revealed['word'])->not->toBeNull()
+            ->and($wire)->not->toMatch('/"(solution|accept|correct|mine|results|picked|elapsed_ms|seed|word)":/', $game)
+            ->and($wire)->not->toContain(json_encode($revealed['solution']));
+    }
+
+    expect(implode('', array_column(roomFixture('state.answer.anagram')['round']['ask']['items'], 'text')))->not->toBe('ALMA')
+        ->and(array_column(roomFixture('state.answer.spelling')['round']['ask']['items'], 'text'))->toContain('kitab');
 
     $studied = array_column(roomFixture('state.study.cells')['round']['study']['items'], 'id');
     $asked = roomFixture('state.answer.cells')['round']['ask']['items'];

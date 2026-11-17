@@ -71,9 +71,49 @@ describe('room fixtures', () => {
             'state.reveal.sequence',
             'state.answer.odd',
             'state.reveal.odd',
+            'state.answer.anagram',
+            'state.reveal.anagram',
+            'answer.anagram',
+            'state.answer.spelling',
+            'state.reveal.spelling',
+            'answer.spelling',
         ]) {
             expect(fixture(name), name).toBeDefined();
         }
+    });
+
+    it('names the word of a word game in the reveal alone', () => {
+        for (const game of ['anagram', 'spelling']) {
+            const answer = fixture(`state.answer.${game}`) as State;
+            const reveal = fixture(`state.reveal.${game}`) as State;
+            const asked = answer.round as Extract<Round, { phase: 'answer' }>;
+            const revealed = (
+                reveal.round as Extract<Round, { phase: 'reveal' }>
+            ).reveal;
+
+            expect(revealed.word, game).not.toBeNull();
+            expect(JSON.stringify(answer), game).not.toContain('"word":');
+
+            // The word in the question's own phase is refused.
+            expect(
+                RoomState.safeParse({
+                    ...answer,
+                    round: { ...asked, word: revealed.word },
+                }).success,
+            ).toBe(false);
+        }
+
+        // An anagram's tiles never spell the word; a spelling shows it among four.
+        const anagram = (fixture('state.answer.anagram') as State)
+            .round as Extract<Round, { phase: 'answer' }>;
+        const spelling = (fixture('state.answer.spelling') as State)
+            .round as Extract<Round, { phase: 'answer' }>;
+
+        expect(anagram.ask.items.map((item) => item.text).join('')).not.toBe(
+            'ALMA',
+        );
+        expect(spelling.ask.items).toHaveLength(4);
+        expect(spelling.ask.items.map((item) => item.text)).toContain('kitab');
     });
 
     it.each(payloads)('%s parses strictly', (path, data) => {

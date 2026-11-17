@@ -2,9 +2,11 @@
 
 use App\Domain\Content\Data\LevelData;
 use App\Domain\Content\Data\PackData;
+use App\Domain\Content\Data\RangeData;
 use App\Domain\Content\Data\RoomCategoryData;
 use App\Domain\Content\Data\RoomLevelData;
 use App\Domain\Content\Data\RoomShapeData;
+use App\Domain\Content\Data\RoomWordData;
 use App\Domain\Content\Data\WordData;
 use App\Domain\Content\Enums\Effect;
 use App\Domain\Content\Enums\ItemStyle;
@@ -18,7 +20,10 @@ use App\Domain\Content\Enums\RoomSource;
 use App\Domain\Content\Enums\SlotStyle;
 use App\Domain\Content\Enums\Unit;
 use App\Domain\Content\Support\ContentRepository;
+use App\Domain\Content\Support\ContentValidator;
+use App\Domain\Content\Support\RoomWords;
 use App\Domain\Language\Support\Az;
+use App\Domain\Language\Support\AzCollator;
 use App\Domain\Language\Support\Syllabifier;
 use Illuminate\Support\Facades\File;
 use Tests\Support\ContentFixture;
@@ -259,10 +264,13 @@ it('reads the room levels', function (): void {
     $levels = $content->roomLevels();
     $orders = array_values(array_filter($levels, static fn (RoomLevelData $level): bool => $level->mechanic === RoomMechanic::RecallOrder));
     $cells = array_values(array_filter($levels, static fn (RoomLevelData $level): bool => $level->mechanic === RoomMechanic::RecallCells));
+    $anagrams = array_values(array_filter($levels, static fn (RoomLevelData $level): bool => $level->mechanic === RoomMechanic::Anagram));
+    $spellings = array_values(array_filter($levels, static fn (RoomLevelData $level): bool => $level->mechanic === RoomMechanic::Spelling));
 
     // B3: «Ardıcıllığı yadda saxla» at the four difficulties, digits first,
-    // then digits, letters and (B4) shapes; B4: «Xanaları yadda saxla».
-    expect($content->roomVersion())->toBeGreaterThanOrEqual(3)
+    // then digits, letters and (B4) shapes; B4: «Xanaları yadda saxla»;
+    // B5: the two logic games; B6: «Anaqram» and «Düzgün yazılış».
+    expect($content->roomVersion())->toBeGreaterThanOrEqual(4)
         ->and(array_map(static fn (RoomLevelData $level): array => [$level->mechanic, $level->difficulty], $levels))->toBe([
             [RoomMechanic::RecallOrder, 1],
             [RoomMechanic::RecallOrder, 2],
@@ -280,6 +288,14 @@ it('reads the room levels', function (): void {
             [RoomMechanic::OddOneOut, 2],
             [RoomMechanic::OddOneOut, 3],
             [RoomMechanic::OddOneOut, 4],
+            [RoomMechanic::Anagram, 1],
+            [RoomMechanic::Anagram, 2],
+            [RoomMechanic::Anagram, 3],
+            [RoomMechanic::Anagram, 4],
+            [RoomMechanic::Spelling, 1],
+            [RoomMechanic::Spelling, 2],
+            [RoomMechanic::Spelling, 3],
+            [RoomMechanic::Spelling, 4],
         ])
         ->and($orders[0]->kinds)->toBe([RoomItemKind::Digit])
         ->and($orders[3]->kinds)->toBe([RoomItemKind::Digit, RoomItemKind::Letter, RoomItemKind::Shape])
@@ -287,7 +303,33 @@ it('reads the room levels', function (): void {
         ->and(RoomMechanic::RecallOrder->studies())->toBeTrue()
         ->and(RoomMechanic::RecallCells->family())->toBe(RoomFamily::Memory)
         ->and(RoomMechanic::RecallCells->studies())->toBeTrue()
-        ->and(RoomMechanic::RecallCells->kinds())->toBe([]);
+        ->and(RoomMechanic::RecallCells->kinds())->toBe([])
+        ->and(RoomMechanic::RecallOrder->kinds())->toContain(RoomItemKind::Word)
+        ->and(RoomMechanic::Anagram->family())->toBe(RoomFamily::Words)
+        ->and(RoomMechanic::Spelling->family())->toBe(RoomFamily::Words)
+        ->and(RoomMechanic::Anagram->studies())->toBeFalse()
+        ->and(RoomMechanic::Spelling->kinds())->toBe([]);
+
+    // No level shows a row of words yet (§12, B6 "As built"): a word needs a wider tile than the view has.
+    foreach ($orders as $level) {
+        expect($level->kinds)->not->toContain(RoomItemKind::Word);
+    }
+
+    // A word game studies nothing; a harder anagram has longer words and more time.
+    foreach ([...$anagrams, ...$spellings] as $level) {
+        expect($level->studyMs)->toBe(0)
+            ->and($level->wordLength)->not->toBeNull()
+            ->and($level->kinds)->toBe([]);
+    }
+
+    foreach (array_slice($anagrams, 1, null, true) as $index => $level) {
+        expect($level->wordLength?->max)->toBeGreaterThan($anagrams[$index - 1]->wordLength->max ?? 0)
+            ->and($level->answerMs)->toBeGreaterThan($anagrams[$index - 1]->answerMs)
+            ->and($level->swaps)->toBeNull();
+    }
+
+    // Spelling: two swaps first (any two spellings differ in two letters), then one.
+    expect(array_map(static fn (RoomLevelData $level): ?int => $level->swaps, $spellings))->toBe([2, 2, 1, 1]);
 
     // Harder is longer, studied longer and answered in more time.
     foreach (array_slice($orders, 1, null, true) as $index => $level) {
@@ -349,12 +391,57 @@ it('reads the room levels', function (): void {
     // A fixture root reads its own.
     $fixture = new ContentRepository(ContentFixture::make());
 
-    expect(array_map(static fn (RoomLevelData $level): ?int => $level->length?->max, $fixture->roomLevels()))->toBe([3, 4, 8, 12, null, null, null, null, null, null, null, null, null, null, null, null])
+    expect(array_map(static fn (RoomLevelData $level): ?int => $level->length?->max, $fixture->roomLevels()))->toBe([3, 4, 8, 12, ...array_fill(0, 20, null)])
         ->and($fixture->roomLevel(RoomMechanic::NextInSequence, 4)->terms)->toBe(7)
         ->and($fixture->roomLevel(RoomMechanic::OddOneOut, 2)->source)->toBe(RoomSource::Numbers)
+        ->and($fixture->roomLevel(RoomMechanic::Spelling, 2)->wordLength?->min)->toBe(5)
+        ->and($fixture->roomLevel(RoomMechanic::Spelling, 2)->swaps)->toBe(1)
         ->and($fixture->roomLevel(RoomMechanic::RecallOrder, 4)->studyMs)->toBe(60_000)
         ->and($fixture->roomLevel(RoomMechanic::RecallCells, 4)->grid?->toArray())->toBe(['cols' => 4, 'rows' => 5])
         ->and($fixture->roomLevel(RoomMechanic::RecallCells, 3)->lit?->max)->toBe(35);
+});
+
+it('reads the word list', function (): void {
+    $list = app(ContentRepository::class)->roomWords();
+    $words = RoomWords::of($list, app(ContentRepository::class)->names()->names);
+    $names = array_map(Az::lower(...), app(ContentRepository::class)->names()->names);
+
+    // B6: our own list, lowercase and in Azerbaijani order, starting from
+    // the packs' words (but no name and no place), with the spellings that
+    // are correct too.
+    expect($list)->toBeInstanceOf(RoomWordData::class)
+        ->and($list->version)->toBeGreaterThanOrEqual(1)
+        ->and($list->words)->toBe(AzCollator::sort($list->words))
+        ->and($list->alsoCorrect)->toBe(AzCollator::sort($list->alsoCorrect))
+        ->and($list->words)->toContain('alma', 'kitab', 'qələm', 'kələm', 'çiyələk')
+        ->and($list->words)->not->toContain('ulduz', 'bakı', 'Bakı', 'günəş')
+        ->and(array_intersect($list->words, $names))->toBe([])
+        ->and(array_intersect($list->words, $list->alsoCorrect))->toBe([])
+        ->and($list->alsoCorrect)->toContain('babam', 'səhər');
+
+    foreach ($list->words as $word) {
+        expect(Az::lower($word))->toBe($word)
+            ->and(RoomWords::letters($word))->toBeGreaterThanOrEqual(RoomWords::MIN_LETTERS)->toBeLessThanOrEqual(RoomWords::MAX_LETTERS);
+    }
+
+    // Every length a word level draws has enough words.
+    foreach ([4, 5, 6, 7, 8, 9] as $letters) {
+        expect(count($words->ofLength(new RangeData($letters, $letters))))->toBeGreaterThanOrEqual(ContentValidator::MIN_ROOM_WORDS);
+    }
+
+    // What the games make of it: an anagram's letters accept both words, a
+    // form is never a wrong spelling.
+    expect($words->accepted('alma'))->toBe(['alma', 'amal'])
+        ->and($words->accepted('operator'))->toBe(['operator', 'aeroport'])
+        ->and($words->isCorrect('babam'))->toBeTrue()
+        ->and($words->isCorrect('Aysel'))->toBeTrue()
+        ->and($words->isCorrect('qitab'))->toBeFalse();
+
+    // A fixture root reads its own.
+    $fixture = (new ContentRepository(ContentFixture::make()))->roomWords();
+
+    expect($fixture->words)->toHaveCount(65)
+        ->and($fixture->alsoCorrect)->toBe(['babam']);
 });
 
 it('reads the room shapes', function (): void {

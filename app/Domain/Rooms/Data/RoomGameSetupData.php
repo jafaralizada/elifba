@@ -67,12 +67,12 @@ final readonly class RoomGameSetupData
      * `RoomPlayable` lists with its family, the difficulties of its levels
      * and what each of them holds — the times, how many items (a row's
      * length, the lit cells) and a grid; for a logic game (B5) the rules,
-     * terms and range of a row, or the source and options — and the
-     * bounds of the rounds.
-     * The room page names them (docs/frontend.md rule 15); it never lists
-     * them itself.
+     * terms and range of a row, or the source and options; for a word game
+     * (B6) a word's letters and a spelling's swaps — and the bounds of the
+     * rounds. The room page names them (docs/frontend.md rule 15); it
+     * never lists them itself.
      *
-     * @return array{mechanics: list<array{mechanic: string, family: string, difficulties: list<int>, levels: list<array{difficulty: int, study_ms: int, answer_ms: int, count: array{min: int, max: int}|null, grid: array{cols: int, rows: int}|null, rules: list<string>|null, terms: int|null, range: array{min: int, max: int}|null, source: string|null, options: int|null}>}>, rounds: array{min: int, max: int}}
+     * @return array{mechanics: list<array{mechanic: string, family: string, difficulties: list<int>, levels: list<array{difficulty: int, study_ms: int, answer_ms: int, count: array{min: int, max: int}|null, grid: array{cols: int, rows: int}|null, rules: list<string>|null, terms: int|null, range: array{min: int, max: int}|null, source: string|null, options: int|null, letters: array{min: int, max: int}|null, swaps: int|null}>}>, rounds: array{min: int, max: int}}
      */
     public static function options(): array
     {
@@ -105,10 +105,12 @@ final readonly class RoomGameSetupData
      * asks to recall — a row's length, the lit cells — and `grid` a cell
      * game's grid; `rules`, `terms` and `range` say what a
      * `next_in_sequence` row follows, how long it is and its numbers;
-     * `source` and `options` what an `odd_one_out` round offers. A key of
-     * another mechanic is null.
+     * `source` and `options` what an `odd_one_out` round offers; `letters`
+     * a word game's word length and `swaps` a spelling's (1: two spellings
+     * may differ in one letter; 2: any two differ in two). A key of another
+     * mechanic is null.
      *
-     * @return array{difficulty: int, study_ms: int, answer_ms: int, count: array{min: int, max: int}|null, grid: array{cols: int, rows: int}|null, rules: list<string>|null, terms: int|null, range: array{min: int, max: int}|null, source: string|null, options: int|null}
+     * @return array{difficulty: int, study_ms: int, answer_ms: int, count: array{min: int, max: int}|null, grid: array{cols: int, rows: int}|null, rules: list<string>|null, terms: int|null, range: array{min: int, max: int}|null, source: string|null, options: int|null, letters: array{min: int, max: int}|null, swaps: int|null}
      */
     private static function levelOption(RoomLevelData $level): array
     {
@@ -125,6 +127,8 @@ final readonly class RoomGameSetupData
             'range' => $level->range === null ? null : ['min' => $level->range->min, 'max' => $level->range->max],
             'source' => $level->source?->value,
             'options' => $level->options,
+            'letters' => $level->wordLength === null ? null : ['min' => $level->wordLength->min, 'max' => $level->wordLength->max],
+            'swaps' => $level->swaps,
         ];
     }
 

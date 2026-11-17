@@ -21,7 +21,7 @@ import type { RoomAsk, RoomItem, RoomMine } from '@/rooms/contract';
  * marked from `reveal.solution` and the viewer's own by `mine.correct`.
  */
 
-/** Nothing is studied in a logic round; the view has no study. */
+/** Nothing is studied in a logic or a word round; the view has no study. */
 export function NoStudy() {
     return null;
 }

@@ -109,7 +109,7 @@ final class RoomState
             present_count: $present->count(),
             reveal: $revealed ? new RoomRevealData(
                 solution: $round->solutionData()->ids,
-                word: null,
+                word: $round->solutionData()->word,
                 mine: $own === null ? null : RoomMineData::of($own),
                 results: array_values($rows
                     ->filter(static fn (RoomPlayer $row): bool => $answers->has($row->id))

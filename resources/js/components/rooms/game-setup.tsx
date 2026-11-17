@@ -33,6 +33,10 @@ export type SetupLevel = {
     /** B5, `odd_one_out`: numbers or words, and how many options. */
     source: string | null;
     options: number | null;
+    /** B6, a word game: its word's letters. */
+    letters: { min: number; max: number } | null;
+    /** B6, `spelling`: 1, two spellings may differ in one letter; 2, any two differ in two. */
+    swaps: number | null;
 };
 
 export type GameSetupOptions = {
@@ -309,6 +313,23 @@ export function GameSetup({
                                     })}
                                 </p>
                             )}
+                            {level !== undefined && level.letters !== null && (
+                                <p className="text-[0.8125rem] leading-snug text-muted-foreground tabular-nums">
+                                    {t(
+                                        level.swaps === null
+                                            ? 'rooms.setup.levels.letters'
+                                            : `rooms.setup.levels.spelling_${level.swaps}`,
+                                        {
+                                            min: level.letters.min,
+                                            max: level.letters.max,
+                                            answer: seconds(
+                                                level.answer_ms,
+                                                mark,
+                                            ),
+                                        },
+                                    )}
+                                </p>
+                            )}
                             {level !== undefined && level.count !== null && (
                                 <p className="text-[0.8125rem] leading-snug text-muted-foreground tabular-nums">
                                     {level.grid !== null
@@ -430,6 +451,52 @@ function MechanicPicture({ mechanic }: { mechanic: RoomMechanic }) {
                 <span className="size-3.5 rounded-full bg-primary" />
                 <span className="size-3.5 rounded-full bg-primary" />
                 <span className="size-3.5 rotate-45 rounded-[2px] bg-amber-400" />
+            </span>
+        );
+    }
+
+    if (mechanic === 'anagram') {
+        // Tiles to order under the empty places they fill; no letter, as content is data.
+        return (
+            <span
+                aria-hidden
+                className="flex size-14 shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl bg-muted p-1.5"
+            >
+                <span className="flex gap-0.5">
+                    {[0, 1, 2, 3].map((index) => (
+                        <span
+                            key={index}
+                            className="size-2.5 rounded-[2px] border border-dashed border-primary/60"
+                        />
+                    ))}
+                </span>
+                <span className="flex gap-0.5">
+                    {[0.45, 1, 0.7, 0.45].map((opacity, index) => (
+                        <span
+                            key={index}
+                            className="size-2.5 rounded-[2px] bg-primary"
+                            style={{ opacity }}
+                        />
+                    ))}
+                </span>
+            </span>
+        );
+    }
+
+    if (mechanic === 'spelling') {
+        // Four lines to choose from, one of them right; no word, as content is data.
+        return (
+            <span
+                aria-hidden
+                className="flex size-14 shrink-0 flex-col items-stretch justify-center gap-1 rounded-xl bg-muted p-2"
+            >
+                {[1, 0.4, 0.4, 0.4].map((opacity, index) => (
+                    <span
+                        key={index}
+                        className="h-1.5 rounded-full bg-primary"
+                        style={{ opacity }}
+                    />
+                ))}
             </span>
         );
     }

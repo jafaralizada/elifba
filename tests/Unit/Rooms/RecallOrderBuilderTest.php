@@ -6,6 +6,7 @@ use App\Domain\Content\Data\RoomShapeData;
 use App\Domain\Content\Enums\RoomItemKind;
 use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Content\Support\ContentRepository;
+use App\Domain\Content\Support\RoomWords;
 use App\Domain\Language\Support\Alphabet;
 use App\Domain\Language\Support\Az;
 use App\Domain\Rooms\Data\BuiltRoomRoundData;
@@ -14,12 +15,13 @@ use App\Domain\Rooms\Enums\RoomAnswerShape;
 use App\Domain\Rooms\Enums\RoomLayout;
 use App\Domain\Rooms\Support\Mechanics\RecallOrderBuilder;
 use App\Domain\Rooms\Support\RoomJudge;
+use App\Domain\Rooms\Support\RoomPlayable;
 use Random\Engine\Mt19937;
 use Random\Randomizer;
 
 /*
  * «Ardıcıllığı yadda saxla» (docs/architecture.md §12 "Room games"): a row
- * of digits, letters or shapes to study, then the same items shuffled, to tap in
+ * of digits, letters, words or shapes to study, then the same items shuffled, to tap in
  * the order shown. The question never comes in the order shown, its ids
  * are not the row's and carry no position, and the seed alone decides
  * everything.
@@ -179,6 +181,31 @@ it('shows a shape as its picture, with no text, and judges a row of shapes by th
     }
 });
 
+it('shows a row of short words of the list, as the list writes them', function (): void {
+    // B6: words may be a kind of row; no level names them yet (§12, B6 "As built").
+    $content = app(ContentRepository::class);
+    $short = RoomWords::of($content->roomWords(), $content->names()->names)->forRow();
+    $level = new RoomLevelData(RoomMechanic::RecallOrder, 2, 4_500, 15_000, [RoomItemKind::Word], new RangeData(5, 6));
+    $rounds = RoomPlayable::builder(RoomMechanic::RecallOrder)->build($level, 20, new Randomizer(new Mt19937(11)));
+
+    foreach ($rounds as $round) {
+        $row = recallOrderReading($round->study->items ?? []);
+
+        expect(array_diff($row, $short))->toBe([])
+            ->and(array_unique($row))->toBe($row)
+            ->and(recallOrderReading($round->ask->items))->not->toBe($row)
+            ->and(RoomJudge::correct($round->solution, $round->ask->items, $round->solution->ids))->toBeTrue();
+
+        foreach ([...$round->study->items ?? [], ...$round->ask->items] as $item) {
+            expect($item->kind)->toBe(RoomItemKind::Word)
+                ->and(mb_strlen((string) $item->text))->toBeLessThanOrEqual(RoomWords::ROW_LETTERS)
+                ->and(Az::lower((string) $item->text))->toBe($item->text);
+        }
+    }
+
+    expect(RoomMechanic::RecallOrder->kinds())->toContain(RoomItemKind::Word);
+});
+
 it('builds the same rounds from the same seed', function (): void {
     $level = app(ContentRepository::class)->roomLevel(RoomMechanic::RecallOrder, 3);
     $first = recallOrderRounds($level, 482_913);
@@ -202,5 +229,6 @@ it('builds only a level of its own with rows it can shuffle', function (RoomLeve
     'more digits than there are' => [new RoomLevelData(RoomMechanic::RecallOrder, 1, 2_000, 5_000, [RoomItemKind::Digit], new RangeData(11, 11))],
     'no length' => [new RoomLevelData(RoomMechanic::RecallOrder, 1, 2_000, 5_000, [RoomItemKind::Digit])],
     'nothing to study' => [new RoomLevelData(RoomMechanic::RecallOrder, 1, 0, 5_000, [RoomItemKind::Digit], new RangeData(3, 4))],
-    'words before the word list' => [new RoomLevelData(RoomMechanic::RecallOrder, 1, 2_000, 5_000, [RoomItemKind::Word], new RangeData(3, 4))],
+    // `recallOrderRounds()` gives the builder the shapes and no words.
+    'words without the word list' => [new RoomLevelData(RoomMechanic::RecallOrder, 1, 2_000, 5_000, [RoomItemKind::Word], new RangeData(3, 4))],
 ]);

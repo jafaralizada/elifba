@@ -5,6 +5,7 @@ use App\Domain\Content\Data\RoomLevelData;
 use App\Domain\Content\Enums\RoomItemKind;
 use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Content\Support\ContentRepository;
+use App\Domain\Language\Support\Az;
 use App\Domain\Rooms\Actions\StartRoomGame;
 use App\Domain\Rooms\Data\RoomGameSetupData;
 use App\Domain\Rooms\Data\RoomStateData;
@@ -93,7 +94,7 @@ function raceIds(RoomRound $round): array
 
 /**
  * Nothing in `$wire` tells right from wrong or the order to tap: no
- * solution, result, own answer or seed, and the solution's ids never as a
+ * solution, result, own answer, seed or word, and the solution's ids never as a
  * list in their order. A choice's right id is an option of the question,
  * so it may be there only as an item's id, like every other option's.
  */
@@ -102,6 +103,7 @@ function raceWithholds(string $wire, RoomRound $round): void
     $right = Rooms::right($round);
 
     expect($wire)->not->toMatch('/"(solution|accept|correct|mine|results|seed|picked|elapsed_ms)"/')
+        ->and($wire)->not->toContain('"word":')
         ->and($wire)->not->toContain(json_encode($right));
 
     if ($round->solutionData()->shape === RoomAnswerShape::Choice) {
@@ -576,7 +578,7 @@ it('starts no second game while one is running', function (): void {
 
     // Only the host, and only with a level the room can play.
     $this->actingAs($this->aygun)->postJson(route('rooms.games.store', $this->room), $setup)->assertForbidden();
-    foreach ([['rounds' => 4], ['rounds' => 21], ['difficulty' => 5], ['mechanic' => 'anagram'], ['mechanic' => 'find']] as $wrong) {
+    foreach ([['rounds' => 4], ['rounds' => 21], ['difficulty' => 5], ['mechanic' => 'words'], ['mechanic' => 'find']] as $wrong) {
         $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), [...$setup, ...$wrong])->assertUnprocessable();
     }
 
@@ -614,6 +616,8 @@ it('offers the setup of a game to the host of an open room alone, as the server 
         ['mechanic' => 'recall_cells', 'family' => 'memory', 'difficulties' => [1, 2, 3, 4]],
         ['mechanic' => 'next_in_sequence', 'family' => 'logic', 'difficulties' => [1, 2, 3, 4]],
         ['mechanic' => 'odd_one_out', 'family' => 'logic', 'difficulties' => [1, 2, 3, 4]],
+        ['mechanic' => 'anagram', 'family' => 'words', 'difficulties' => [1, 2, 3, 4]],
+        ['mechanic' => 'spelling', 'family' => 'words', 'difficulties' => [1, 2, 3, 4]],
     ], 'rounds' => ['min' => 5, 'max' => 20]];
     $setup = $this->actingAs($this->host)->get(route('rooms.show', $this->room))->viewData('page')['props']['setup'];
     expect([
@@ -947,3 +951,149 @@ it('reads a round stored before the question had shown items', function (): void
 
     raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertJsonPath('status', 'accepted');
 });
+
+// B6: «Anaqram» and «Düzgün yazılış» (§12 "Room games"). Nothing is
+// studied; the question opens with the round. Before the reveal no state
+// holds the word or marks an option: an anagram's tiles never spell a word
+// they make, and a spelling's four options carry the same keys.
+it('plays a word game to its ranking', function (string $mechanic, int $difficulty): void {
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), ['mechanic' => $mechanic, 'difficulty' => $difficulty, 'rounds' => 5])->assertNoContent();
+    $game = $this->room->refresh()->latestGame()?->load('rounds');
+    $level = app(ContentRepository::class)->roomLevel(RoomMechanic::from($mechanic), $difficulty);
+
+    expect($game?->mechanic)->toBe(RoomMechanic::from($mechanic))
+        ->and($game?->rounds)->toHaveCount(5);
+
+    // The countdown: nothing of any round.
+    ['state' => $state, 'wire' => $wire] = raceRead($this->aygun, $this->room);
+
+    expect($state['game'])->toMatchArray(['mechanic' => $mechanic, 'difficulty' => $difficulty, 'phase' => 'live'])
+        ->and($state['round']['phase'])->toBe('countdown');
+
+    foreach ($game->rounds ?? [] as $round) {
+        foreach (raceIds($round)['ask'] as $id) {
+            expect($wire)->not->toContain($id);
+        }
+    }
+
+    $points = 0;
+
+    foreach (range(0, 4) as $index) {
+        $round = Rooms::round($game, $index);
+        $solution = $round->solutionData();
+        $word = (string) $solution->word;
+
+        // The round opens on its question: no study phase, no material.
+        $this->travelTo(Rooms::at($game, RoomPhase::Study, $index));
+
+        foreach ([$this->host, $this->aygun] as $account) {
+            ['state' => $state, 'wire' => $wire] = raceRead($account, $this->room);
+            $ask = $state['round']['ask'];
+
+            expect($state['round']['phase'])->toBe('answer')
+                ->and($state['round']['opens_ms'])->toBe($state['round']['answer_from_ms'])
+                ->and($state['round']['study'])->toBeNull();
+            raceWithholds($wire, $round);
+
+            if ($mechanic === 'anagram') {
+                // The letters in capitals, never in the order of a word they spell.
+                expect([$ask['shape'], $ask['pick'], $ask['layout']])->toBe(['sequence', mb_strlen($word), 'row'])
+                    ->and(array_unique(array_column($ask['items'], 'kind')))->toBe(['letter'])
+                    ->and(mb_str_split(implode('', array_column($ask['items'], 'text'))))->toEqualCanonicalizing(mb_str_split($word))
+                    ->and(mb_strlen($word))->toBeGreaterThanOrEqual($level->wordLength->min ?? 0)->toBeLessThanOrEqual($level->wordLength->max ?? 0);
+
+                foreach ($solution->accept as $reading) {
+                    $spelled = implode('', $reading);
+
+                    expect(implode('', array_column($ask['items'], 'text')))->not->toBe($spelled)
+                        ->and($wire)->not->toContain($spelled)
+                        ->and($wire)->not->toContain(Az::lower($spelled));
+                }
+            } else {
+                // Four spellings of one word; nothing marks the right one.
+                expect([$ask['shape'], $ask['pick'], $ask['layout']])->toBe(['choice', 1, 'row'])
+                    ->and($ask['items'])->toHaveCount(4)
+                    ->and(array_unique(array_column($ask['items'], 'kind')))->toBe(['word'])
+                    ->and(array_column($ask['items'], 'text'))->toContain($word);
+
+                foreach ($ask['items'] as $item) {
+                    expect(array_keys($item))->toBe(['id', 'kind', 'text', 'asset', 'cell']);
+                }
+            }
+        }
+
+        // Aygün is right — with another word the letters spell, when there is one — and Rəşad wrong.
+        $right = Rooms::right($round);
+
+        if ($mechanic === 'anagram' && count($solution->accept) > 1) {
+            $left = $round->askData()->items;
+            $right = [];
+
+            foreach ($solution->accept[1] as $letter) {
+                $at = array_key_first(array_filter($left, static fn ($item): bool => $item->text === $letter));
+                $right[] = $left[$at]->id;
+                unset($left[$at]);
+            }
+        }
+
+        raceAnswer($this->aygun, $this->room, $round, $right)->assertExactJson(['status' => 'accepted', 'revision' => $this->room->refresh()->revision]);
+        raceAnswer($this->host, $this->room, $round, Rooms::wrong($round))->assertOk();
+        $aygun = RoomAnswer::query()->where('room_round_id', $round->id)->where('room_player_id', $this->aygunRow->id)->sole();
+        $points += $aygun->points;
+
+        // Both answered: the reveal names the solution and the word.
+        ['state' => $state] = raceRead($this->aygun, $this->room);
+
+        expect($state['round']['phase'])->toBe('reveal')
+            ->and($state['round']['reveal']['solution'])->toBe($solution->ids)
+            ->and($state['round']['reveal']['word'])->toBe($word)
+            ->and($state['round']['reveal']['mine'])->toMatchArray(['picked' => $right, 'correct' => true, 'points' => $aygun->points])
+            ->and($state['round']['reveal']['results'])->toBe([
+                ['player_id' => $this->hostRow->id, 'correct' => false, 'points' => 0],
+                ['player_id' => $this->aygunRow->id, 'correct' => true, 'points' => $aygun->points],
+            ]);
+    }
+
+    // Over: Aygün first with every round's points, Rəşad after the places without one.
+    $this->travelTo(Rooms::at($game, RoomPhase::Over));
+    ['state' => $state] = raceRead($this->host, $this->room);
+
+    expect($state['game']['phase'])->toBe('over')
+        ->and($points)->toBeGreaterThanOrEqual(50)
+        ->and($state['ranking'])->toBe([
+            ['player_id' => $this->aygunRow->id, 'points' => $points, 'place' => 1],
+            ['player_id' => $this->hostRow->id, 'points' => 0, 'place' => null],
+        ]);
+})->with([
+    'anagram' => ['anagram', 1],
+    'spelling' => ['spelling', 3],
+]);
+
+// A player never types (ADR 023 decision 4): an answer is item ids of the
+// round, and nothing else a body carries is stored.
+it('stores no text a player wrote', function (string $mechanic): void {
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), ['mechanic' => $mechanic, 'difficulty' => 2, 'rounds' => 5])->assertNoContent();
+    $game = $this->room->refresh()->latestGame()?->load('rounds');
+    $round = Rooms::round($game, 0);
+    $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    $before = raceSnapshot();
+    $typed = 'Salam, mən Aygünəm';
+
+    // A word typed as the answer is no item of the round: refused, nothing written.
+    foreach ([[(string) $round->solutionData()->word], [Az::lower((string) $round->solutionData()->word)], ['aeroport'], [$typed]] as $picked) {
+        raceAnswer($this->aygun, $this->room, $round, $picked)->assertUnprocessable();
+    }
+
+    expect(raceSnapshot())->toBe($before);
+
+    // Text beside the item ids is never read.
+    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round), extra: ['text' => $typed, 'word' => $typed, 'answer' => $typed, 'note' => $typed])
+        ->assertJsonPath('status', 'accepted');
+
+    $answer = RoomAnswer::query()->sole();
+    $stored = json_encode(raceSnapshot(), JSON_UNESCAPED_UNICODE);
+
+    expect($answer->picked)->toBe(Rooms::right($round))
+        ->and($stored)->not->toContain('Salam')
+        ->and($stored)->not->toContain('Aygünəm');
+})->with(['anagram', 'spelling']);

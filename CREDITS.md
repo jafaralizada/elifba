@@ -88,6 +88,13 @@ The app shows the same list on its `/credits` page.
 - License: [MIT License](https://opensource.org/license/mit) (`MIT`)
 - Source: <https://github.com/nijataliyev7/elifba>
 
+### The adults' word list: everyday Azerbaijani nouns and adjectives for the word games, starting from the theme packs' words, with the spellings that are correct too; written for Elifba, copied from no dictionary or list
+
+- Files: `content/rooms/words.json`
+- Author: Elifba contributors
+- License: [MIT License](https://opensource.org/license/mit) (`MIT`)
+- Source: <https://github.com/nijataliyev7/elifba>
+
 ### Board backdrops in Fluent Emoji's manner: a meadow by a farm (animals), a prehistoric valley (dinosaurs), an orchard (fruit), a sky with clouds (colours), soft hills at dawn (numbers), moon hills (space), a roadside (vehicles), mountain valleys (nature), a classroom (school)
 
 - Files: `content/assets/animals/cemenlik.svg`, `content/assets/dinosaurs/vadi.svg`, `content/assets/fruit/bag.svg`, `content/assets/colors/goy-uzu.svg`, `content/assets/numbers/tepeler.svg`, `content/assets/space/sema.svg`, `content/assets/vehicles/yol.svg`, `content/assets/nature/daglar.svg`, `content/assets/school/sinif-otaq.svg`

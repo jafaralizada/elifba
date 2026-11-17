@@ -18,8 +18,8 @@ namespace App\Domain\Content\Enums;
 enum RoomMechanic: string
 {
     /**
-     * «Ardıcıllığı yadda saxla»: a row of digits, letters or shapes is
-     * shown, then hidden; tap them in the order shown (`sequence`).
+     * «Ardıcıllığı yadda saxla»: a row of digits, letters, words or shapes
+     * is shown, then hidden; tap them in the order shown (`sequence`).
      */
     case RecallOrder = 'recall_order';
 
@@ -41,11 +41,24 @@ enum RoomMechanic: string
      */
     case OddOneOut = 'odd_one_out';
 
+    /**
+     * «Anaqram»: the letters of a word, shuffled and never in the order of
+     * a word they spell; tap them into a word (`sequence`).
+     */
+    case Anagram = 'anagram';
+
+    /**
+     * «Düzgün yazılış»: one word written four ways, the wrong ones by
+     * swapping letters for their confusables; choose the right (`choice`).
+     */
+    case Spelling = 'spelling';
+
     public function family(): RoomFamily
     {
         return match ($this) {
             self::RecallOrder, self::RecallCells => RoomFamily::Memory,
             self::NextInSequence, self::OddOneOut => RoomFamily::Logic,
+            self::Anagram, self::Spelling => RoomFamily::Words,
         };
     }
 
@@ -60,18 +73,19 @@ enum RoomMechanic: string
     /**
      * The kinds of item a level of this mechanic may name in `kinds`, as
      * far as their material exists: shapes from B4 (`content/rooms/
-     * shapes.json`); words wait for B6's word list (`content/rooms/
-     * words.json`). A `recall_cells` level names none: its items are the
-     * cells of its grid; nor does a logic level: `next_in_sequence` shows
-     * numbers, and `odd_one_out` what its `source` says.
+     * shapes.json`), short words from B6 (`content/rooms/words.json`). A
+     * `recall_cells` level names none: its items are the cells of its
+     * grid; nor does a logic level: `next_in_sequence` shows numbers, and
+     * `odd_one_out` what its `source` says; nor a word game: its items are
+     * what its word makes.
      *
      * @return list<RoomItemKind>
      */
     public function kinds(): array
     {
         return match ($this) {
-            self::RecallOrder => [RoomItemKind::Digit, RoomItemKind::Letter, RoomItemKind::Shape],
-            self::RecallCells, self::NextInSequence, self::OddOneOut => [],
+            self::RecallOrder => [RoomItemKind::Digit, RoomItemKind::Letter, RoomItemKind::Word, RoomItemKind::Shape],
+            self::RecallCells, self::NextInSequence, self::OddOneOut, self::Anagram, self::Spelling => [],
         };
     }
 }

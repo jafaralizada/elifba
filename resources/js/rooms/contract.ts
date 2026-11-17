@@ -59,12 +59,14 @@ export const RoomPlayer = z.strictObject({
     host: z.boolean(),
 });
 
-/** The mechanics a room plays; grows with B6. */
+/** The mechanics a room plays: the six of §12 "Room games" (B3–B6). */
 export const RoomMechanic = z.enum([
     'recall_order',
     'recall_cells',
     'next_in_sequence',
     'odd_one_out',
+    'anagram',
+    'spelling',
 ]);
 
 export const RoomItem = z.strictObject({
@@ -126,7 +128,10 @@ export const RoomResult = z.strictObject({
 export const RoomReveal = z.strictObject({
     /** The canonical ids: for a sequence, the question's ids in the order to tap. */
     solution: z.array(itemId).min(1),
-    /** The word, for a word game (B6). */
+    /**
+     * The word of a word game (B6), as the round writes it: an anagram's
+     * drawn word in its tiles' capitals, a spelling's right spelling.
+     */
     word: z.string().min(1).nullable(),
     mine: RoomMine.nullable(),
     results: z.array(RoomResult),

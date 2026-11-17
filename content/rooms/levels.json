@@ -1,5 +1,5 @@
 {
-    "version": 3,
+    "version": 4,
     "levels": [
         {
             "mechanic": "recall_order",
@@ -145,6 +145,66 @@
             "answer_ms": 25000,
             "source": "numbers",
             "options": 5
+        },
+        {
+            "mechanic": "anagram",
+            "difficulty": 1,
+            "study_ms": 0,
+            "answer_ms": 20000,
+            "word_length": { "min": 4, "max": 5 }
+        },
+        {
+            "mechanic": "anagram",
+            "difficulty": 2,
+            "study_ms": 0,
+            "answer_ms": 30000,
+            "word_length": { "min": 5, "max": 6 }
+        },
+        {
+            "mechanic": "anagram",
+            "difficulty": 3,
+            "study_ms": 0,
+            "answer_ms": 40000,
+            "word_length": { "min": 6, "max": 7 }
+        },
+        {
+            "mechanic": "anagram",
+            "difficulty": 4,
+            "study_ms": 0,
+            "answer_ms": 50000,
+            "word_length": { "min": 7, "max": 8 }
+        },
+        {
+            "mechanic": "spelling",
+            "difficulty": 1,
+            "study_ms": 0,
+            "answer_ms": 15000,
+            "word_length": { "min": 5, "max": 6 },
+            "swaps": 2
+        },
+        {
+            "mechanic": "spelling",
+            "difficulty": 2,
+            "study_ms": 0,
+            "answer_ms": 15000,
+            "word_length": { "min": 7, "max": 8 },
+            "swaps": 2
+        },
+        {
+            "mechanic": "spelling",
+            "difficulty": 3,
+            "study_ms": 0,
+            "answer_ms": 12000,
+            "word_length": { "min": 5, "max": 6 },
+            "swaps": 1
+        },
+        {
+            "mechanic": "spelling",
+            "difficulty": 4,
+            "study_ms": 0,
+            "answer_ms": 12000,
+            "word_length": { "min": 7, "max": 9 },
+            "swaps": 1
         }
     ]
 }

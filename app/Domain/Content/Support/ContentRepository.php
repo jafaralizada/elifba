@@ -10,6 +10,7 @@ use App\Domain\Content\Data\PromptTemplateData;
 use App\Domain\Content\Data\RoomCategoryData;
 use App\Domain\Content\Data\RoomLevelData;
 use App\Domain\Content\Data\RoomShapeData;
+use App\Domain\Content\Data\RoomWordData;
 use App\Domain\Content\Data\VoiceData;
 use App\Domain\Content\Enums\Mechanic;
 use App\Domain\Content\Enums\RoomMechanic;
@@ -25,7 +26,8 @@ use RuntimeException;
  * list (`names.json`, ADR 016) from a content root; and the adults' room
  * content under `rooms/` (§12 "Room content", ADR 023): from B3 the room
  * levels (`rooms/levels.json`), from B4 the shapes (`rooms/shapes.json`),
- * from B5 the groups of words (`rooms/categories.json`).
+ * from B5 the groups of words (`rooms/categories.json`), from B6 the
+ * adults' word list (`rooms/words.json`).
  *
  * With a compiled file (`php artisan content:cache` writes
  * `bootstrap/cache/content.php`, which OPcache keeps in memory) it reads
@@ -39,6 +41,7 @@ use RuntimeException;
  *
  * @phpstan-import-type VoiceArray from VoiceData
  * @phpstan-import-type RoomLevelArray from RoomLevelData
+ * @phpstan-import-type RoomWordArray from RoomWordData
  */
 final class ContentRepository
 {
@@ -68,7 +71,12 @@ final class ContentRepository
     public const string ROOM_CATEGORIES = 'rooms/categories.json';
 
     /**
-     * @var array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed}}|null
+     * The adults' word list (§12 "Room content", B6).
+     */
+    public const string ROOM_WORDS = 'rooms/words.json';
+
+    /**
+     * @var array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed, words: mixed}}|null
      */
     private ?array $data = null;
 
@@ -102,6 +110,8 @@ final class ContentRepository
      * @var list<RoomShapeData>|null
      */
     private ?array $roomShapes = null;
+
+    private ?RoomWordData $roomWords = null;
 
     /**
      * @var list<RoomCategoryData>|null
@@ -308,6 +318,22 @@ final class ContentRepository
     }
 
     /**
+     * The adults' word list: what the word games draw, and the spellings
+     * that are correct too (§12 "Room content"). `Content\Support\RoomWords`
+     * is what the games make of it.
+     */
+    public function roomWords(): RoomWordData
+    {
+        if ($this->roomWords === null) {
+            /** @var RoomWordArray $data checked by `ContentValidator` */
+            $data = $this->data()['rooms']['words'];
+            $this->roomWords = RoomWordData::fromArray($data);
+        }
+
+        return $this->roomWords;
+    }
+
+    /**
      * @return array<string, RoomLevelData>
      */
     private function roomLevelsByKey(): array
@@ -330,7 +356,7 @@ final class ContentRepository
      * The content as the JSON files hold it now, ignoring any compiled file:
      * what `content:cache` compiles.
      *
-     * @return array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed}}
+     * @return array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed, words: mixed}}
      *
      * @throws RuntimeException when a file is missing or not valid JSON
      */
@@ -353,6 +379,7 @@ final class ContentRepository
                 'levels' => self::decode($this->root.'/'.self::ROOM_LEVELS),
                 'shapes' => self::decode($this->root.'/'.self::ROOM_SHAPES),
                 'categories' => self::decode($this->root.'/'.self::ROOM_CATEGORIES),
+                'words' => self::decode($this->root.'/'.self::ROOM_WORDS),
             ],
         ];
     }
@@ -394,12 +421,12 @@ final class ContentRepository
     }
 
     /**
-     * @return array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed}}
+     * @return array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed, words: mixed}}
      */
     private function data(): array
     {
         if ($this->data === null) {
-            /** @var array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed}} $compiled */
+            /** @var array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed, words: mixed}} $compiled */
             $compiled = $this->readsCompiled() ? require $this->compiled : $this->sources();
             $this->data = $compiled;
         }

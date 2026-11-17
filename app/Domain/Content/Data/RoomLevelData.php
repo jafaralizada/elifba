@@ -22,8 +22,11 @@ use App\Domain\Content\Enums\RoomSource;
  *   row shows) and `range` (every number a round shows).
  * - `odd_one_out` (B5): `source` (numbers or words) and `options` (how
  *   many to choose from, 4 or 5).
+ * - `anagram` (B6): `word_length` (`{min, max}` letters of the word).
+ * - `spelling` (B6): `word_length` and `swaps` (1 or 2: how many letters
+ *   at least tell two of the four spellings apart, `Content\Support\RoomWords`).
  *
- * @phpstan-type RoomLevelArray array{mechanic: string, difficulty: int, study_ms: int, answer_ms: int, kinds?: list<string>, length?: array{min: int, max: int}, grid?: array{cols: int, rows: int}, lit?: array{min: int, max: int}, rules?: list<string>, terms?: int, range?: array{min: int, max: int}, source?: string, options?: int}
+ * @phpstan-type RoomLevelArray array{mechanic: string, difficulty: int, study_ms: int, answer_ms: int, kinds?: list<string>, length?: array{min: int, max: int}, grid?: array{cols: int, rows: int}, lit?: array{min: int, max: int}, rules?: list<string>, terms?: int, range?: array{min: int, max: int}, source?: string, options?: int, word_length?: array{min: int, max: int}, swaps?: int}
  */
 final readonly class RoomLevelData
 {
@@ -40,6 +43,8 @@ final readonly class RoomLevelData
      * @param  RangeData|null  $range  the numbers a `next_in_sequence` round shows
      * @param  RoomSource|null  $source  what an `odd_one_out` round's options are
      * @param  int|null  $options  how many options an `odd_one_out` round offers
+     * @param  RangeData|null  $wordLength  the letters of a word game's word
+     * @param  int|null  $swaps  a `spelling` level's: 1 or 2
      */
     public function __construct(
         public RoomMechanic $mechanic,
@@ -55,6 +60,8 @@ final readonly class RoomLevelData
         public ?RangeData $range = null,
         public ?RoomSource $source = null,
         public ?int $options = null,
+        public ?RangeData $wordLength = null,
+        public ?int $swaps = null,
     ) {}
 
     /**
@@ -76,6 +83,8 @@ final readonly class RoomLevelData
             range: isset($data['range']) ? RangeData::fromArray($data['range']) : null,
             source: isset($data['source']) ? RoomSource::from($data['source']) : null,
             options: $data['options'] ?? null,
+            wordLength: isset($data['word_length']) ? RangeData::fromArray($data['word_length']) : null,
+            swaps: $data['swaps'] ?? null,
         );
     }
 }

@@ -306,6 +306,7 @@ export function LiveRound({
                             ask={round.ask}
                             solution={round.reveal.solution}
                             mine={round.reveal.mine}
+                            word={round.reveal.word}
                         />
                         <section className="flex flex-col gap-2">
                             <h3 className="text-sm font-semibold">

@@ -107,27 +107,42 @@ final class Rooms
 
     /**
      * A wrong answer of the right shape: for a sequence, the solution turned
-     * by one place, which never reads like the row, since no item stands
-     * beside its equal; for a set, one of its items swapped for an item of
-     * the question that is not in it; for a choice, another option.
+     * by one place — or by more, until it reads like none of the accepted
+     * readings, since an anagram's letters may spell two words (`QAYA`
+     * turned is `AYAQ`); for a set, one of its items swapped for an item
+     * of the question that is not in it; for a choice, another option.
      *
      * @return list<string>
      */
     public static function wrong(RoomRound $round): array
     {
-        $ids = self::right($round);
+        $solution = $round->solutionData();
+        $ids = $solution->ids;
+        $others = array_values(array_diff($round->askData()->ids(), $ids));
 
-        if ($round->solutionData()->shape === RoomAnswerShape::Choice) {
-            return [array_values(array_diff($round->askData()->ids(), $ids))[0]];
+        if ($solution->shape === RoomAnswerShape::Choice) {
+            return [$others[0]];
         }
 
-        if ($round->solutionData()->shape === RoomAnswerShape::Set) {
-            $other = array_values(array_diff($round->askData()->ids(), $ids));
-
-            return [...array_slice($ids, 1), $other[0]];
+        if ($solution->shape === RoomAnswerShape::Set) {
+            return [...array_slice($ids, 1), $others[0]];
         }
 
-        return [...array_slice($ids, 1), $ids[0]];
+        $says = [];
+
+        foreach ($round->askData()->items as $item) {
+            $says[$item->id] = $item->says();
+        }
+
+        for ($turn = 1; $turn < count($ids); $turn++) {
+            $turned = [...array_slice($ids, $turn), ...array_slice($ids, 0, $turn)];
+
+            if (! in_array(array_map(static fn (string $id): string => $says[$id], $turned), $solution->accept, true)) {
+                return $turned;
+            }
+        }
+
+        throw new RuntimeException('Every turn of the solution reads like an accepted reading.');
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Domain\Content\Data\CreditData;
 use App\Domain\Content\Data\LevelData;
 use App\Domain\Content\Data\PackData;
 use App\Domain\Content\Data\PromptTemplateData;
+use App\Domain\Content\Data\RangeData;
 use App\Domain\Content\Data\SoundChoiceData;
 use App\Domain\Content\Data\VoiceData;
 use App\Domain\Content\Enums\Effect;
@@ -34,7 +35,8 @@ use SplFileInfo;
  * Checks a content root (docs/architecture.md §3, §8): `alphabet.json`,
  * `avatars.json`, `sounds.json`, `levels.json`, `prompts.json`, `names.json`,
  * `voice.json` with `voice-clips.json`, `credits.json`, `packs/*.json`,
- * `rooms/levels.json`, `rooms/shapes.json` and `rooms/categories.json` (§12 "Room content"),
+ * `rooms/levels.json`, `rooms/shapes.json`, `rooms/categories.json` and
+ * `rooms/words.json` (§12 "Room content"),
  * `tests/syllables.json` and every file under `assets/`, `voice-names/`
  * and `resources/fonts/` (credits; SVG files are also checked for anything
  * that could run or load). `validate()` lists every problem, one line each;
@@ -206,6 +208,21 @@ final class ContentValidator
 
     public const int MIN_ROOM_CATEGORY_WORDS = 8;
 
+    /**
+     * The words a word level draws from (§12 "Room content", B6): at least
+     * this many of every length it asks for, and a spelling level as many
+     * words that make three wrong spellings with its `swaps` — so a game
+     * of 20 rounds draws no word twice and the next game other words.
+     */
+    public const int MIN_ROOM_WORDS = 60;
+
+    /**
+     * Content written as lists rather than drawn or recorded that carries a
+     * licence of its own and so a credits entry (§8): the adults' word list
+     * (ADR 023 decision 10), relative to the content root.
+     */
+    public const array CREDITED_LISTS = ['rooms/words.json'];
+
     private const string KEY = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/';
 
     /**
@@ -289,9 +306,9 @@ final class ContentValidator
         $this->sounds();
         $levels = $this->levels();
         $this->prompts($levels);
-        $this->roomLevels($this->roomShapes());
         $this->names();
         $this->roomCategories();
+        $this->roomLevels($this->roomShapes(), $this->roomWords());
         $this->voice();
         $credits = $this->credits();
 
@@ -765,11 +782,12 @@ final class ContentValidator
      * build:
      *
      * - `recall_order`: `kinds`, distinct kinds of `RoomMechanic::kinds()`
-     *   (digits, letters and shapes until the word list exists); `length`,
-     *   3–12 items, `min` ≤ `max`, and no longer than each kind has
-     *   different items (`RoomItemKind::distinct()`: 10 digits; the shapes
-     *   of `shapes.json`, counted when that file is sound), since no item
-     *   comes twice in a row.
+     *   (digits, letters, short words and shapes); `length`, 3–12 items,
+     *   `min` ≤ `max`, and no longer than each kind has different items
+     *   (`RoomItemKind::distinct()`: 10 digits; the shapes of `shapes.json`
+     *   and the short words of `words.json` (`RoomWords::forRow()`),
+     *   counted when that file is sound), since no item comes twice in a
+     *   row.
      * - `recall_cells`: `grid`, `cols` and `rows` 2–6; `lit`, from 1 and
      *   `min` ≤ `max`, fewer than the grid's cells, so a dark cell is always
      *   left to tell from a lit one.
@@ -780,10 +798,21 @@ final class ContentValidator
      *   fits its range is the builder's arithmetic, which the validator may
      *   not reach: `RoomPlayableTest` builds every level.
      * - `odd_one_out` (B5): `source`, numbers or words; `options`, 4 or 5.
+     * - `anagram` (B6): `word_length`, 3–12 letters, `min` ≤ `max`, and for
+     *   every length in it at least `MIN_ROOM_WORDS` words of `words.json`
+     *   an anagram can be drawn from (`RoomWords::forAnagram()`).
+     * - `spelling` (B6): `word_length` as an anagram's, with at least
+     *   `MIN_ROOM_WORDS` words of every length in it; `swaps`, 1 or 2; and
+     *   at least `MIN_ROOM_WORDS` words in the range that make three wrong
+     *   spellings with those swaps (`RoomWords::forSpelling()`) — counted
+     *   per level, not merely words with a confusable letter.
+     *
+     * The words are counted only when `words.json` is sound.
      *
      * @param  int|null  $shapes  how many shapes `shapes.json` holds; null when it has a problem
+     * @param  RoomWords|null  $words  the word list; null when `words.json` has a problem
      */
-    private function roomLevels(?int $shapes): void
+    private function roomLevels(?int $shapes, ?RoomWords $words): void
     {
         $file = ContentRepository::ROOM_LEVELS;
         $data = $this->object($this->read($file), $file, '', ['version', 'levels']);
@@ -847,10 +876,11 @@ final class ContentValidator
             }
 
             match ($mechanic) {
-                RoomMechanic::RecallOrder => $this->recallOrderLevel($mechanic, $level, $file, $where, $shapes),
+                RoomMechanic::RecallOrder => $this->recallOrderLevel($mechanic, $level, $file, $where, $shapes, $words === null ? null : count($words->forRow())),
                 RoomMechanic::RecallCells => $this->recallCellsLevel($level, $file, $where),
                 RoomMechanic::NextInSequence => $this->nextInSequenceLevel($level, $file, $where),
                 RoomMechanic::OddOneOut => $this->oddOneOutLevel($level, $file, $where),
+                RoomMechanic::Anagram, RoomMechanic::Spelling => $this->wordLevel($mechanic, $level, $file, $where, $words),
                 null => null,
             };
         }
@@ -876,6 +906,8 @@ final class ContentValidator
             RoomMechanic::RecallCells => ['grid', 'lit'],
             RoomMechanic::NextInSequence => ['rules', 'terms', 'range'],
             RoomMechanic::OddOneOut => ['source', 'options'],
+            RoomMechanic::Anagram => ['word_length'],
+            RoomMechanic::Spelling => ['word_length', 'swaps'],
         };
     }
 
@@ -921,8 +953,9 @@ final class ContentValidator
     /**
      * @param  array<string, mixed>  $level
      * @param  int|null  $shapes  how many shapes there are; null when `shapes.json` has a problem
+     * @param  int|null  $rowWords  how many words a row may show; null when `words.json` has a problem
      */
-    private function recallOrderLevel(RoomMechanic $mechanic, array $level, string $file, string $where, ?int $shapes): void
+    private function recallOrderLevel(RoomMechanic $mechanic, array $level, string $file, string $where, ?int $shapes, ?int $rowWords): void
     {
         $kinds = $this->enums(RoomItemKind::class, $level['kinds'], $file, "{$where}.kinds") ?? [];
         $shown = array_map(static fn (RoomItemKind $kind): string => $kind->value, $mechanic->kinds());
@@ -937,7 +970,11 @@ final class ContentValidator
         $max = is_array($level['length']) ? ($level['length']['max'] ?? null) : null;
 
         foreach ($kinds as $kind) {
-            $distinct = $kind === RoomItemKind::Shape ? $shapes : $kind->distinct();
+            $distinct = match ($kind) {
+                RoomItemKind::Shape => $shapes,
+                RoomItemKind::Word => $rowWords,
+                default => $kind->distinct(),
+            };
 
             if (is_int($max) && $distinct !== null && $max > $distinct) {
                 $this->problem($file, "{$where}.length: a row of {$kind->value}s holds at most {$distinct}, none twice");
@@ -972,6 +1009,217 @@ final class ContentValidator
 
         if ($cells !== null && is_int($max) && $max >= $cells) {
             $this->problem($file, "{$where}.lit: a grid of {$cells} cells lights at most ".($cells - 1).', so a dark cell is left');
+        }
+    }
+
+    /**
+     * A word game's level: its `word_length`, a spelling's `swaps`, and
+     * enough words for both (see `roomLevels()`).
+     *
+     * @param  array<string, mixed>  $level
+     */
+    private function wordLevel(RoomMechanic $mechanic, array $level, string $file, string $where, ?RoomWords $words): void
+    {
+        $length = $this->letterRange($level['word_length'], $file, "{$where}.word_length");
+        $swaps = $level['swaps'] ?? null;
+
+        if ($mechanic === RoomMechanic::Spelling && ! in_array($swaps, RoomWords::SWAPS, true)) {
+            $this->problem($file, "{$where}.swaps must be ".implode(' or ', RoomWords::SWAPS));
+            $swaps = null;
+        }
+
+        if ($length === null || $words === null) {
+            return;
+        }
+
+        for ($letters = $length->min; $letters <= $length->max; $letters++) {
+            $exactly = new RangeData($letters, $letters);
+            $count = count($mechanic === RoomMechanic::Anagram ? $words->forAnagram($exactly) : $words->ofLength($exactly));
+
+            if ($count < self::MIN_ROOM_WORDS) {
+                $this->problem($file, "{$where}.word_length: {$mechanic->value} draws words of {$letters} letters, and ".ContentRepository::ROOM_WORDS." has {$count} of them; it needs ".self::MIN_ROOM_WORDS);
+            }
+        }
+
+        if ($mechanic === RoomMechanic::Spelling && is_int($swaps)) {
+            $count = count($words->forSpelling($length, $swaps));
+
+            if ($count < self::MIN_ROOM_WORDS) {
+                $this->problem($file, "{$where}: spelling with {$swaps} swap".($swaps === 1 ? '' : 's')." draws from {$count} words of {$length->min}–{$length->max} letters that make three wrong spellings; it needs ".self::MIN_ROOM_WORDS);
+            }
+        }
+    }
+
+    /**
+     * A `{min, max}` of word letters within what the list holds
+     * (`RoomWords::MIN_LETTERS`–`MAX_LETTERS`), or null after reporting it.
+     */
+    private function letterRange(mixed $range, string $file, string $where): ?RangeData
+    {
+        $before = count($this->problems);
+        $this->range($range, RoomWords::MIN_LETTERS, RoomWords::MAX_LETTERS, $file, $where);
+
+        /** @var array{min: int, max: int} $range checked just now */
+        return count($this->problems) === $before ? RangeData::fromArray($range) : null;
+    }
+
+    // ── rooms/words.json ────────────────────────────────────────────────
+
+    /**
+     * The adults' word list (§12 "Room content", ADR 023 decision 10):
+     * `version` and two lists, each in Azerbaijani order (`AzCollator`), so
+     * a duplicate sits beside its twin in a diff:
+     *
+     * - `words`, what the games draw: non-empty; each one lowercase word of
+     *   the alphabet's letters with a vowel (`WordRules`), of 3–12 letters,
+     *   none twice by `Az::lower()` and none a first name of `names.json`.
+     * - `also_correct`, spellings that are correct too and never drawn
+     *   (forms of a word, words of another kind): each lowercase letters of
+     *   the alphabet, no word of `words` and none twice, and each a
+     *   spelling some word of `words` makes by swapping one or two letters
+     *   for their confusables — what it is there to keep from being
+     *   offered as wrong.
+     *
+     * The file needs a `credits.json` entry (`CREDITED_LISTS`).
+     *
+     * @return RoomWords|null what the games make of it, or null when the file has a problem
+     */
+    private function roomWords(): ?RoomWords
+    {
+        $file = ContentRepository::ROOM_WORDS;
+        $before = count($this->problems);
+        $data = $this->object($this->read($file), $file, '', ['version', 'words', 'also_correct']);
+
+        if ($data === null) {
+            return null;
+        }
+
+        $this->normalized($data, $file);
+
+        if (! is_int($data['version']) || $data['version'] < 1) {
+            $this->problem($file, 'version must be a whole number from 1');
+        }
+
+        $words = $this->strings($data['words'], $file, 'words');
+        $also = $this->strings($data['also_correct'], $file, 'also_correct', allowEmpty: true);
+        $names = array_flip(array_map(Az::lower(...), $this->names ?? []));
+        /** @var array<string, int> $seen lowercase → its place in `words` */
+        $seen = [];
+
+        foreach ($words ?? [] as $index => $word) {
+            $where = "words[{$index}] \"{$word}\"";
+            $letters = mb_strlen($word);
+
+            if (WordRules::problems($word) !== []) {
+                $this->problem($file, "{$where} must be one word of the alphabet's letters, with a vowel");
+            } elseif (Az::lower($word) !== $word) {
+                $this->problem($file, "{$where} must be lowercase");
+            } elseif ($letters < RoomWords::MIN_LETTERS || $letters > RoomWords::MAX_LETTERS) {
+                $this->problem($file, "{$where} must have ".RoomWords::MIN_LETTERS.'–'.RoomWords::MAX_LETTERS.' letters');
+            }
+
+            $key = Az::lower($word);
+
+            if (isset($seen[$key])) {
+                $this->problem($file, "{$where} is already words[{$seen[$key]}]");
+            }
+
+            if (isset($names[$key])) {
+                $this->problem($file, "{$where} is a first name of ".ContentRepository::NAMES.'; the list holds no names');
+            }
+
+            $seen[$key] ??= $index;
+        }
+
+        $this->collated($words ?? [], $file, 'words');
+        $list = new RoomWords(array_values(array_filter($words ?? [], static fn (string $word): bool => Az::lower($word) === $word)));
+        $variants = [];
+
+        foreach ($list->words() as $word) {
+            foreach ([1, 2] as $swaps) {
+                foreach (self::swapped($word, $swaps) as $variant) {
+                    $variants[$variant] = true;
+                }
+            }
+        }
+
+        $alsoSeen = [];
+
+        foreach ($also ?? [] as $index => $spelling) {
+            $where = "also_correct[{$index}] \"{$spelling}\"";
+
+            if (! WordRules::isWord($spelling) || Az::lower($spelling) !== $spelling) {
+                $this->problem($file, "{$where} must be one lowercase word of the alphabet's letters");
+            } elseif (isset($seen[$spelling])) {
+                $this->problem($file, "{$where} is words[{$seen[$spelling]}] already");
+            } elseif (! isset($variants[$spelling])) {
+                $this->problem($file, "{$where} is no spelling a word of the list makes by swapping one or two letters for their confusables; it would keep nothing from being offered as wrong");
+            }
+
+            if (isset($alsoSeen[$spelling])) {
+                $this->problem($file, "{$where} is already also_correct[{$alsoSeen[$spelling]}]");
+            }
+
+            $alsoSeen[$spelling] ??= $index;
+        }
+
+        $this->collated($also ?? [], $file, 'also_correct');
+
+        if (count($this->problems) !== $before || $words === null || $also === null) {
+            return null;
+        }
+
+        return new RoomWords($words, $also, $this->names ?? []);
+    }
+
+    /**
+     * Every spelling the word makes by swapping exactly `$swaps` of its
+     * letters for one of their confusables each.
+     *
+     * @return list<string>
+     */
+    private static function swapped(string $word, int $swaps): array
+    {
+        $spellings = [$word => mb_str_split($word)];
+
+        for ($round = 0; $round < $swaps; $round++) {
+            $next = [];
+
+            foreach ($spellings as $letters) {
+                foreach ($letters as $place => $letter) {
+                    // Only a letter still as the word has it: a place is swapped once.
+                    if ($letter !== mb_substr($word, $place, 1) || ! Alphabet::isLetter($letter)) {
+                        continue;
+                    }
+
+                    foreach (Alphabet::confusables($letter) as $confusable) {
+                        $other = $letters;
+                        $other[$place] = $confusable;
+                        $next[implode('', $other)] = $other;
+                    }
+                }
+            }
+
+            $spellings = $next;
+        }
+
+        return array_map(strval(...), array_keys($spellings));
+    }
+
+    /**
+     * A list in Azerbaijani alphabetical order (`AzCollator`), or one
+     * problem where it first is not.
+     *
+     * @param  list<string>  $list
+     */
+    private function collated(array $list, string $file, string $key): void
+    {
+        foreach (AzCollator::sort($list) as $at => $item) {
+            if ($list[$at] !== $item) {
+                $this->problem($file, "{$key} must be in Azerbaijani alphabetical order: {$key}[{$at}] \"{$list[$at]}\" belongs elsewhere (\"{$item}\" comes there)");
+
+                return;
+            }
         }
     }
 
@@ -1604,6 +1852,10 @@ final class ContentValidator
     // ── credits.json ────────────────────────────────────────────────────
 
     /**
+     * Every entry names files under a credited folder or a credited list;
+     * each pattern matches a file, but a missing list's, which its own
+     * check reports as missing.
+     *
      * @return list<CreditData>|null the credits, or null when the file has a problem
      */
     private function credits(): ?array
@@ -1619,6 +1871,7 @@ final class ContentValidator
         $this->normalized($credits, $file, 'credits');
         $files = $this->creditedFiles();
         $folders = array_map(static fn (string $folder): string => "{$folder}/", $this->creditedFolders());
+        $lists = $this->creditedLists();
         $shareAlikeFolder = $this->contentFolder().'/'.self::SHARE_ALIKE_FOLDER;
         // `content:voice` may run with every clip pruned: it makes them again.
         $voiceFolders = [$this->contentFolder().'/assets/'.VoiceClips::FOLDER.'/*', $this->contentFolder().'/'.NameVoices::FOLDER.'/*'];
@@ -1653,9 +1906,9 @@ final class ContentValidator
             foreach ($this->strings($credit['files'], $file, "{$where}.files") ?? [] as $pattern) {
                 $inside = array_filter($folders, static fn (string $folder): bool => str_starts_with($pattern, $folder));
 
-                if ($inside === [] || str_contains($pattern, '..')) {
-                    $this->problem($file, "{$where}.files \"{$pattern}\" must be under ".implode(' or ', $folders));
-                } elseif (array_filter($files, static fn (string $path): bool => CreditData::matches($pattern, $path)) === [] && ($this->voiceClipsRequired || ! in_array($pattern, $voiceFolders, true))) {
+                if (($inside === [] && ! in_array($pattern, $lists, true)) || str_contains($pattern, '..')) {
+                    $this->problem($file, "{$where}.files \"{$pattern}\" must be under ".implode(' or ', $folders).' or one of '.implode(', ', $lists));
+                } elseif (array_filter($files, static fn (string $path): bool => CreditData::matches($pattern, $path)) === [] && ($this->voiceClipsRequired || ! in_array($pattern, $voiceFolders, true)) && ! in_array($pattern, $lists, true)) {
                     $this->problem($file, "{$where}.files \"{$pattern}\" matches no file");
                 }
 
@@ -1674,7 +1927,8 @@ final class ContentValidator
     }
 
     /**
-     * Every asset, name clip and font file needs a credits entry (§8).
+     * Every asset, name clip, font file and credited list needs a credits
+     * entry (§8).
      *
      * @param  list<CreditData>  $credits
      */
@@ -1696,15 +1950,26 @@ final class ContentValidator
     }
 
     /**
+     * `CREDITED_LISTS` from the repository root.
+     *
+     * @return list<string>
+     */
+    private function creditedLists(): array
+    {
+        return array_map(fn (string $list): string => "{$this->contentFolder()}/{$list}", self::CREDITED_LISTS);
+    }
+
+    /**
      * Every file that needs a credits entry, as a path from the repository
-     * root. Hidden files (`.gitkeep`) are skipped.
+     * root: those under the credited folders, but hidden files (`.gitkeep`),
+     * and the credited lists that exist.
      *
      * @return list<string>
      */
     private function creditedFiles(): array
     {
         $project = dirname($this->root);
-        $files = [];
+        $files = array_values(array_filter($this->creditedLists(), static fn (string $list): bool => is_file("{$project}/{$list}")));
 
         foreach ($this->creditedFolders() as $folder) {
             if (! is_dir("{$project}/{$folder}")) {

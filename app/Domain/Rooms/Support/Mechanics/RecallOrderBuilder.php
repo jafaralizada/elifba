@@ -25,10 +25,11 @@ use Random\Randomizer;
  * the order shown (`sequence`).
  *
  * - One kind per round, drawn from the level's `kinds`: digits 0–9,
- *   letters of the alphabet (`Alphabet`) cased by `Az::upper`, or the
- *   shapes of `content/rooms/shapes.json` (B4), shown as their pictures
- *   (`asset`, the file's URL) with no text. Words (B6) are not built yet;
- *   the validator refuses a level that names them.
+ *   letters of the alphabet (`Alphabet`) cased by `Az::upper`, the shapes
+ *   of `content/rooms/shapes.json` (B4), shown as their pictures (`asset`,
+ *   the file's URL) with no text, or words of `content/rooms/words.json`
+ *   of at most `RoomWords::ROW_LETTERS` letters (B6), as the list writes
+ *   them.
  * - The row's length is drawn from the level's `length` (3–12: two items
  *   could only be asked reversed, which would tell the answer), and no
  *   item comes twice in it (`RoomItemKind::distinct()` bounds the length):
@@ -48,9 +49,11 @@ final readonly class RecallOrderBuilder implements RoomRoundBuilder
 {
     /**
      * @param  list<RoomShapeData>  $shapes  what a row of shapes is drawn from
+     * @param  list<string>  $words  what a row of words is drawn from (`RoomWords::forRow()`)
      */
     public function __construct(
         private array $shapes,
+        private array $words = [],
     ) {}
 
     public function build(RoomLevelData $level, int $count, Randomizer $random): array
@@ -118,6 +121,7 @@ final readonly class RecallOrderBuilder implements RoomRoundBuilder
             RoomItemKind::Digit => array_map($text, array_map(strval(...), range(0, 9))),
             RoomItemKind::Letter => array_map($text, array_map(Az::upper(...), Alphabet::letters())),
             RoomItemKind::Shape => array_map(static fn (RoomShapeData $shape): array => ['text' => null, 'asset' => $shape->url()], $this->shapes),
+            RoomItemKind::Word => array_map($text, $this->words),
             default => throw new InvalidArgumentException("recall_order does not show {$kind->value} yet."),
         };
     }

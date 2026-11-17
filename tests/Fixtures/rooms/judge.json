@@ -730,6 +730,262 @@
             "correct": false
         },
         {
+            "name": "anagram: the drawn word",
+            "items": [
+                {
+                    "id": "t4k9m2xa",
+                    "kind": "letter",
+                    "text": "M",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "b7q1w8ne",
+                    "kind": "letter",
+                    "text": "A",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "r2z6c0lu",
+                    "kind": "letter",
+                    "text": "L",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "h5y3j9dp",
+                    "kind": "letter",
+                    "text": "A",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["b7q1w8ne", "r2z6c0lu", "t4k9m2xa", "h5y3j9dp"],
+                "accept": [
+                    ["A", "L", "M", "A"],
+                    ["A", "M", "A", "L"]
+                ],
+                "word": "ALMA"
+            },
+            "picked": ["b7q1w8ne", "r2z6c0lu", "t4k9m2xa", "h5y3j9dp"],
+            "correct": true
+        },
+        {
+            "name": "anagram: another word of the list the letters spell",
+            "items": [
+                {
+                    "id": "t4k9m2xa",
+                    "kind": "letter",
+                    "text": "M",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "b7q1w8ne",
+                    "kind": "letter",
+                    "text": "A",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "r2z6c0lu",
+                    "kind": "letter",
+                    "text": "L",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "h5y3j9dp",
+                    "kind": "letter",
+                    "text": "A",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["b7q1w8ne", "r2z6c0lu", "t4k9m2xa", "h5y3j9dp"],
+                "accept": [
+                    ["A", "L", "M", "A"],
+                    ["A", "M", "A", "L"]
+                ],
+                "word": "ALMA"
+            },
+            "picked": ["h5y3j9dp", "t4k9m2xa", "b7q1w8ne", "r2z6c0lu"],
+            "correct": true
+        },
+        {
+            "name": "anagram: the two «A» tiles either way round",
+            "items": [
+                {
+                    "id": "t4k9m2xa",
+                    "kind": "letter",
+                    "text": "M",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "b7q1w8ne",
+                    "kind": "letter",
+                    "text": "A",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "r2z6c0lu",
+                    "kind": "letter",
+                    "text": "L",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "h5y3j9dp",
+                    "kind": "letter",
+                    "text": "A",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["b7q1w8ne", "r2z6c0lu", "t4k9m2xa", "h5y3j9dp"],
+                "accept": [
+                    ["A", "L", "M", "A"],
+                    ["A", "M", "A", "L"]
+                ],
+                "word": "ALMA"
+            },
+            "picked": ["h5y3j9dp", "r2z6c0lu", "t4k9m2xa", "b7q1w8ne"],
+            "correct": true
+        },
+        {
+            "name": "anagram: letters that spell no word of the list",
+            "items": [
+                {
+                    "id": "t4k9m2xa",
+                    "kind": "letter",
+                    "text": "M",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "b7q1w8ne",
+                    "kind": "letter",
+                    "text": "A",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "r2z6c0lu",
+                    "kind": "letter",
+                    "text": "L",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "h5y3j9dp",
+                    "kind": "letter",
+                    "text": "A",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "sequence",
+                "ids": ["b7q1w8ne", "r2z6c0lu", "t4k9m2xa", "h5y3j9dp"],
+                "accept": [
+                    ["A", "L", "M", "A"],
+                    ["A", "M", "A", "L"]
+                ],
+                "word": "ALMA"
+            },
+            "picked": ["r2z6c0lu", "b7q1w8ne", "t4k9m2xa", "h5y3j9dp"],
+            "correct": false
+        },
+        {
+            "name": "spelling: the right spelling",
+            "items": [
+                {
+                    "id": "g8v2n5ks",
+                    "kind": "word",
+                    "text": "kitab",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "p1d7x4qe",
+                    "kind": "word",
+                    "text": "kıtab",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "z9c3m6wr",
+                    "kind": "word",
+                    "text": "kitap",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "u0f2h8tb",
+                    "kind": "word",
+                    "text": "kıtap",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "choice",
+                "ids": ["g8v2n5ks"],
+                "word": "kitab"
+            },
+            "picked": ["g8v2n5ks"],
+            "correct": true
+        },
+        {
+            "name": "spelling: a spelling with a confusable letter",
+            "items": [
+                {
+                    "id": "g8v2n5ks",
+                    "kind": "word",
+                    "text": "kitab",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "p1d7x4qe",
+                    "kind": "word",
+                    "text": "kıtab",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "z9c3m6wr",
+                    "kind": "word",
+                    "text": "kitap",
+                    "asset": null,
+                    "cell": null
+                },
+                {
+                    "id": "u0f2h8tb",
+                    "kind": "word",
+                    "text": "kıtap",
+                    "asset": null,
+                    "cell": null
+                }
+            ],
+            "solution": {
+                "shape": "choice",
+                "ids": ["g8v2n5ks"],
+                "word": "kitab"
+            },
+            "picked": ["u0f2h8tb"],
+            "correct": false
+        },
+        {
             "name": "any shape: an item that is not the round's",
             "items": [
                 {

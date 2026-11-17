@@ -9,6 +9,10 @@ import {
     OddOneOutSolution,
 } from '@/components/rooms/mechanics/odd-one-out';
 import {
+    AnagramAsk,
+    AnagramSolution,
+} from '@/components/rooms/mechanics/anagram';
+import {
     RecallCellsAsk,
     RecallCellsSolution,
     RecallCellsStudy,
@@ -18,6 +22,10 @@ import {
     RecallOrderSolution,
     RecallOrderStudy,
 } from '@/components/rooms/mechanics/recall-order';
+import {
+    SpellingAsk,
+    SpellingSolution,
+} from '@/components/rooms/mechanics/spelling';
 import type {
     RoomAsk,
     RoomMechanic,
@@ -46,6 +54,8 @@ export type MechanicView = {
         ask: RoomAsk;
         solution: string[];
         mine: RoomMine | null;
+        /** A word game's word, from `reveal.word` (B6). */
+        word?: string | null;
         big?: boolean;
     }>;
 };
@@ -71,5 +81,16 @@ export const MECHANIC_VIEWS: Record<RoomMechanic, MechanicView> = {
         Study: NoStudy,
         Ask: OddOneOutAsk,
         Solution: OddOneOutSolution,
+    },
+    // B6: nothing is studied either.
+    anagram: {
+        Study: NoStudy,
+        Ask: AnagramAsk,
+        Solution: AnagramSolution,
+    },
+    spelling: {
+        Study: NoStudy,
+        Ask: SpellingAsk,
+        Solution: SpellingSolution,
     },
 };

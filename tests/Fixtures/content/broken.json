@@ -1119,7 +1119,7 @@
     "rooms levels: an unknown mechanic": {
         "file": "rooms/levels.json",
         "set": { "levels.0.mechanic": "find" },
-        "problem": "rooms/levels.json: levels[0].mechanic must be one of recall_order, recall_cells, next_in_sequence, odd_one_out"
+        "problem": "rooms/levels.json: levels[0].mechanic must be one of recall_order, recall_cells, next_in_sequence, odd_one_out, anagram, spelling"
     },
     "rooms levels: a difficulty outside 1–4": {
         "file": "rooms/levels.json",
@@ -1181,10 +1181,10 @@
         "set": { "levels.2.kinds": ["letter", "letter"] },
         "problem": "rooms/levels.json: levels[2].kinds lists a value twice"
     },
-    "rooms levels: words before the word list": {
+    "rooms levels: a kind recall_order cannot show": {
         "file": "rooms/levels.json",
-        "set": { "levels.1.kinds": ["letter", "word"] },
-        "problem": "rooms/levels.json: levels[1].kinds: recall_order can show digit, letter, shape, not word"
+        "set": { "levels.1.kinds": ["letter", "cell"] },
+        "problem": "rooms/levels.json: levels[1].kinds: recall_order can show digit, letter, word, shape, not cell"
     },
     "rooms levels: a row that cannot be shuffled": {
         "file": "rooms/levels.json",
@@ -1564,5 +1564,140 @@
             "groups.0.title": "Meyvələr"
         },
         "problem": "rooms/categories.json: groups[0] has an unknown key `title`"
+    },
+    "rooms levels: an anagram without its word length": {
+        "file": "rooms/levels.json",
+        "unset": ["levels.16.word_length"],
+        "problem": "rooms/levels.json: levels[16] needs `word_length`"
+    },
+    "rooms levels: an anagram with a spelling's swaps": {
+        "file": "rooms/levels.json",
+        "set": { "levels.17.swaps": 1 },
+        "problem": "rooms/levels.json: levels[17] has an unknown key `swaps`"
+    },
+    "rooms levels: words shorter than the list's": {
+        "file": "rooms/levels.json",
+        "set": { "levels.19.word_length": { "min": 2, "max": 5 } },
+        "problem": "rooms/levels.json: levels[19].word_length needs whole numbers from 3 to 12, min ≤ max"
+    },
+    "rooms levels: words longer than the list's": {
+        "file": "rooms/levels.json",
+        "set": { "levels.20.word_length": { "min": 5, "max": 13 } },
+        "problem": "rooms/levels.json: levels[20].word_length needs whole numbers from 3 to 12, min ≤ max"
+    },
+    "rooms levels: too few words of a length for an anagram": {
+        "file": "rooms/levels.json",
+        "set": { "levels.16.word_length": { "min": 4, "max": 5 } },
+        "problem": "rooms/levels.json: levels[16].word_length: anagram draws words of 4 letters, and rooms/words.json has 3 of them; it needs 60"
+    },
+    "rooms levels: too few words of a length for a spelling": {
+        "file": "rooms/levels.json",
+        "set": { "levels.21.word_length": { "min": 5, "max": 6 } },
+        "problem": "rooms/levels.json: levels[21].word_length: spelling draws words of 6 letters, and rooms/words.json has 0 of them; it needs 60"
+    },
+    "rooms levels: a spelling without its swaps": {
+        "file": "rooms/levels.json",
+        "unset": ["levels.22.swaps"],
+        "problem": "rooms/levels.json: levels[22] needs `swaps`"
+    },
+    "rooms levels: three swaps": {
+        "file": "rooms/levels.json",
+        "set": { "levels.23.swaps": 3 },
+        "problem": "rooms/levels.json: levels[23].swaps must be 1 or 2"
+    },
+    "rooms levels: too few words that make three wrong spellings": {
+        "file": "rooms/levels.json",
+        "set": { "levels.23.swaps": 2 },
+        "problem": "rooms/levels.json: levels[23]: spelling with 2 swaps draws from 56 words of 5–5 letters that make three wrong spellings; it needs 60"
+    },
+    "rooms words: no file": {
+        "file": "rooms/words.json",
+        "delete": ["rooms/words.json"],
+        "problem": "rooms/words.json: is missing"
+    },
+    "rooms words: no version": {
+        "file": "rooms/words.json",
+        "unset": ["version"],
+        "problem": "rooms/words.json: the file needs `version`"
+    },
+    "rooms words: a version below 1": {
+        "file": "rooms/words.json",
+        "set": { "version": 0 },
+        "problem": "rooms/words.json: version must be a whole number from 1"
+    },
+    "rooms words: a key of no list": {
+        "file": "rooms/words.json",
+        "set": { "source": "wiktionary" },
+        "problem": "rooms/words.json: the file has an unknown key `source`"
+    },
+    "rooms words: no words": {
+        "file": "rooms/words.json",
+        "set": { "words": [] },
+        "problem": "rooms/words.json: words must be a non-empty list of non-empty strings"
+    },
+    "rooms words: a word with a foreign letter": {
+        "file": "rooms/words.json",
+        "set": { "words.52": "kitaw" },
+        "problem": "rooms/words.json: words[52] \"kitaw\" must be one word of the alphabet's letters, with a vowel"
+    },
+    "rooms words: two words in one": {
+        "file": "rooms/words.json",
+        "set": { "words.52": "kitab-dəftər" },
+        "problem": "rooms/words.json: words[52] \"kitab-dəftər\" must be one word of the alphabet's letters, with a vowel"
+    },
+    "rooms words: a word in capitals": {
+        "file": "rooms/words.json",
+        "set": { "words.52": "Kitab" },
+        "problem": "rooms/words.json: words[52] \"Kitab\" must be lowercase"
+    },
+    "rooms words: a word of two letters": {
+        "file": "rooms/words.json",
+        "set": { "words.0": "ax" },
+        "problem": "rooms/words.json: words[0] \"ax\" must have 3–12 letters"
+    },
+    "rooms words: a word of thirteen letters": {
+        "file": "rooms/words.json",
+        "set": { "words.64": "zəncirvarilər" },
+        "problem": "rooms/words.json: words[64] \"zəncirvarilər\" must have 3–12 letters"
+    },
+    "rooms words: a duplicate by Azerbaijani casing": {
+        "file": "rooms/words.json",
+        "set": { "words.47": "İlan" },
+        "problem": "rooms/words.json: words[47] \"İlan\" is already words[46]"
+    },
+    "rooms words: a first name of the name list": {
+        "file": "rooms/words.json",
+        "set": { "words.47": "ilkin" },
+        "problem": "rooms/words.json: words[47] \"ilkin\" is a first name of names.json; the list holds no names"
+    },
+    "rooms words: words out of order": {
+        "file": "rooms/words.json",
+        "set": { "words.0": "zərif" },
+        "problem": "rooms/words.json: words must be in Azerbaijani alphabetical order: words[0] \"zərif\" belongs elsewhere"
+    },
+    "rooms words: a correct spelling no word makes": {
+        "file": "rooms/words.json",
+        "set": { "also_correct": ["babam", "kərpic"] },
+        "problem": "rooms/words.json: also_correct[1] \"kərpic\" is no spelling a word of the list makes by swapping one or two letters for their confusables"
+    },
+    "rooms words: a correct spelling that is a word": {
+        "file": "rooms/words.json",
+        "set": { "also_correct": ["babam", "badam"] },
+        "problem": "rooms/words.json: also_correct[1] \"badam\" is words[5] already"
+    },
+    "rooms words: a correct spelling in capitals": {
+        "file": "rooms/words.json",
+        "set": { "also_correct": ["Babam"] },
+        "problem": "rooms/words.json: also_correct[0] \"Babam\" must be one lowercase word of the alphabet's letters"
+    },
+    "rooms words: correct spellings out of order": {
+        "file": "rooms/words.json",
+        "set": { "also_correct": ["dərim", "babam"] },
+        "problem": "rooms/words.json: also_correct must be in Azerbaijani alphabetical order"
+    },
+    "rooms words: no credit": {
+        "file": "credits.json",
+        "set": { "credits.5.files": ["content/assets/rooms/*"] },
+        "problem": "credits.json: content/rooms/words.json has no entry"
     }
 }

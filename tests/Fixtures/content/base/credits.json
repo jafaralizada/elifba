@@ -40,6 +40,13 @@
             "license": "MIT"
         },
         {
+            "files": ["content/rooms/words.json"],
+            "title": "Sample words",
+            "author": "Elifba",
+            "source": "https://github.com/nijataliyev7/elifba",
+            "license": "MIT"
+        },
+        {
             "files": ["content/assets/rooms/*"],
             "title": "Sample shapes",
             "author": "Elifba",
