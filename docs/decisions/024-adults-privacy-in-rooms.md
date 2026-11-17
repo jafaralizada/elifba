@@ -1,0 +1,46 @@
+# 024 — Adults in rooms: what is stored, who sees a name, and no age
+
+- **Status:** Proposed, 2026-11-17 (roadmap step B1; accepted when the owner approves the design in B1-O; built in B2, B3 and B7)
+- **Sections:** architecture.md §7 "Agreements", §12 "Adults' privacy"
+- **Amends:** nothing for children: [001](001-students-without-accounts.md), [013](013-parents-and-their-childrens-privacy.md) and [018](018-students-full-names.md) stand. It adds a third kind of data subject to §7 — an account holder whose name other account holders see.
+- **Why it is hard to reverse:** it is a public promise on `/privacy`, and each account accepts a sentence that is stamped once. A field collected, a name shown wider or a result kept longer cannot be taken back from the people who saw it or from the backups.
+
+## Context
+
+Until now nobody saw anybody: a teacher saw their own classes, a parent their own children, and the children never used the app. In a room, **account holders see each other** — a name, and how fast and how well that person answered. They are also the first data subjects who use Elifba themselves and can agree for themselves.
+
+The owner decided (2026-11-17): no age, date of birth or age group; every player has an account ([020](020-rooms-and-joining.md)); results stay with names for the retention period ([022](022-room-scoring-and-history.md)). The area is made for adults, and Elifba cannot know that a given account holder is one — so the design has to be safe for a 15–18 year old who registers and joins a friend's room, without asking anyone's age.
+
+## Decision
+
+1. **For the account, one new fact:** `users.player_agreed_at` and the role row ([019](019-rooms-area-and-player-role.md)). No other column: no age, date of birth, gender, phone number, photo, avatar, nickname, city, school or workplace.
+2. **For a room, only what the race needs:** who was in it (`room_players`: an account id and the moments of joining, leaving and removal) and each answer (`room_answers`: which of the round's items were picked, right or wrong, the time it took, the points). Nothing a person typed: a room has no name and no chat, a player types no answer ([023](023-room-games-and-content.md) decision 4). No device id, address or location is stored for a room; server logs are what they are for every request.
+3. **The sentence of the player role** says what is new: «Otaqlarda öz adımla oynayıram; adım və nəticələrim olduğum otağın oyunçularına görünür.» It is accepted when the role is taken and stamped, like the other two.
+4. **Who sees a name.** The account's name (`users.name`, as the account wrote it) is shown to the host and the players of a room the account is in or was in, on the room page, the host's screen and the room's results, until one of the four ways out of [022](022-room-scoring-and-history.md) decision 7. To nobody else: there is no list of rooms or of players, no search, no profile page, and nobody ever sees another account's e-mail address or account id.
+5. **Never on the wire or in a log.** A player's name follows the children's rule: never in a log, an exception, a broadcast or a URL. A device knows a player only by `room_players.id` (a ULID that means nothing outside its room); names reach a page only through authenticated HTTP — the room page's props and the state.
+6. **No contact between people.** No chat, no message, no reaction, no invitation that Elifba sends: a room is entered with a code that one person gave another outside Elifba. A stranger can meet a player only by guessing a code, with an account, and is seen in the lobby and removed.
+7. **No age, and the same minimum for everyone.** Nothing asks an age. The area's texts speak to adults. A younger account holder who joins gets exactly the treatment above: a name among people who share a code, no contact, no profile, and every way out. A room can never hold a child of Elifba's: no room route takes `{student}` or `{child}`, there is no "play as my child", and a teacher's students and a parent's children never appear in the player area.
+8. **Nothing is computed about a person** beyond a room's ranking: no rating, level, history chart or "score of the mind", and no claim of a benefit ([023](023-room-games-and-content.md) decision 12).
+9. **Deletion** is [022](022-room-scoring-and-history.md) decision 7: take your name out of a closed room, delete a room you hosted, delete the account, or 400 days. Deleting an account leaves no name anywhere in a room table, because none was ever copied there.
+10. **`/privacy` gains a section «Otaqlar»** (az and en, B7; shown when the switch is on): what is stored for an account that plays and for a room, who sees a name and for how long, that Elifba asks no age and offers no way to write to another player, the four ways to delete, and the operator. The introduction names the third use. The sections for teachers, for parents and the note for a class's parents do not change.
+11. **No third party.** No outside moderation, analytics or anti-cheat service: every request of a room page goes to the app's own host, as §7 requires of every page.
+
+## Consequences
+
+- The privacy page can say in one sentence what a room knows about a player: that they were there, and how they answered.
+- A player's name in a room follows the account: correcting the name in the profile corrects every room, and deleting the account removes it everywhere at once.
+- Elifba cannot stop someone from registering under a name that is not theirs; the host's «Çıxar» is the remedy inside a room.
+- There is no way to find out who played with whom except from inside a room one was in.
+
+## Alternatives rejected
+
+- **Asking an age or a birth year, or a tick "I am 18":** more data about everyone, an untrue tick costs nothing, and the owner dropped age.
+- **A parent's consent for a young player:** it needs the parent's contact and a link between two accounts, far more data than a name in a room.
+- **A nickname instead of the account's name:** free text that others read, with no moderation; and the owner asked that everyone plays under their own name.
+- **Showing only a first name:** the account wrote one name field; guessing which part is the first name (`PersonName`) is right for a class list and wrong for a name its owner typed for themselves.
+- **Keeping a copy of the name with the results:** see [022](022-room-scoring-and-history.md).
+- **Chat or reactions:** the one feature that would need moderation and an age rule.
+
+## What would make us revisit
+
+A law that requires verifying age or a parent's consent where an instance runs; a request for public rooms, friends or messages; or evidence that rooms are used to reach children.

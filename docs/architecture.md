@@ -4,6 +4,8 @@ This document is the contract the code follows. It was written in roadmap step A
 
 Roles, parents' children and the picture and number games were designed the same way in roadmap step R1 (2026-11-11), before their code: text marked R2–R7 describes what that step builds ("What each step builds"), and is the contract for it. Until the step lands, the code is what the unmarked text says.
 
+The adults' area — rooms, where account holders race each other at memory, logic and word games — was designed in roadmap step B1 (2026-11-17), again before its code: §12 and the text marked B2–B7 are the contract for those steps. Nothing in it changes a rule of a class game, a home game or a child.
+
 - Azerbaijani terms and the English names used in code: [`glossary.md`](glossary.md).
 - The decisions that are hardest to reverse have their own records in [`decisions/`](decisions/):
   [001 students without accounts](decisions/001-students-without-accounts.md) ·
@@ -23,7 +25,13 @@ Roles, parents' children and the picture and number games were designed the same
   [015 voice](decisions/015-voice.md) ·
   [016 names in the board's voice](decisions/016-voiced-names.md) ·
   [017 remembered login](decisions/017-remembered-login.md) ·
-  [018 a student's name as the teacher writes it](decisions/018-students-full-names.md)
+  [018 a student's name as the teacher writes it](decisions/018-students-full-names.md) ·
+  [019 the rooms area and the player role](decisions/019-rooms-area-and-player-role.md) ·
+  [020 rooms and joining](decisions/020-rooms-and-joining.md) ·
+  [021 the race protocol](decisions/021-room-race-protocol.md) ·
+  [022 room scoring and history](decisions/022-room-scoring-and-history.md) ·
+  [023 room games and content](decisions/023-room-games-and-content.md) ·
+  [024 adults' privacy in rooms](decisions/024-adults-privacy-in-rooms.md)
 
 Every decision below is written as **Decision** (the choice), **Why** (the reason) and **Rejected** (the alternative and why not).
 
@@ -52,11 +60,19 @@ At home (R2–R6):
 6. A **parent** adds their own **children** — a first name and an avatar, no class — and starts a game for one child on whatever screen is at hand: the phone or tablet the child touches, or the television with the phone as the remote. A 3–6 year old plays the **picture and number games** (the parent says «Pişik hansıdır?» and the child taps the picture; «Neçə alma var?» and the child taps the digit); a 6–10 year old plays the reading games (§2, ADR 011, ADR 012).
 7. Every solved round gives the child **stars**. The parent sees each child's stars; there is no ranking and no podium between siblings (§5).
 
+Among adults (B2–B7; §12), in an area of its own that is switched off until it is launched:
+
+8. An account takes a third role, «Oyunçu» (**player**), and opens a **room** or joins one with the room's 6-digit code. Everyone in a room is an account, under its own name; there is no class, no child and no board.
+9. The room's host starts a game — «Yaddaş» (memory), «Məntiq və ardıcıllıq» (logic and sequences) or «Söz oyunları» (word games), at a difficulty — and everyone answers **the same rounds at the same time, each on their own phone**. A big screen is optional. The server alone knows the answers, keeps the time and gives the points; being fast counts.
+10. After every round the room sees its **ranking**. A closed room's results stay with its players' names for the retention period; a player can take their name out, the host can delete the room.
+
 Owner decisions (fixed): name `elifba`; interface Azerbaijani first, bilingual foundation (az default + en) from day one; MIT unless the owner changes it (roadmap step O1); public GitHub repository; reuse ready-made packages where they fit.
 
 Owner decisions of 2026-11-11 (fixed; the records say where each one lives): two roles, `teacher` and `parent`, chosen right after registration by e-mail or with Google (ADR 010); the roles come from `spatie/laravel-permission` (ADR 010); one account may hold both (ADR 010); a parent plays with their own children without a class, the 3–6 year olds with pictures and the 6–10 year olds with the reading games (ADR 011, ADR 012); stars and progress per child, no ranking or podium between siblings (ADR 011, §5); no recorded voice, the parent reads the prompt aloud (§3 "Voice"; reopened the same day after R1 and replaced by ADR 015: the board says the prompt and the praise in a prerecorded synthetic voice, and never a name; names reopened on 2026-11-12, below); the picture games are open to both roles (ADR 012); the numbers 1–10 mean recognising a digit and counting (ADR 012); colours are plain shapes drawn as our own SVGs (ADR 012, §8); the landing page and the READMEs get a parent section last (R7).
 
 Owner decisions of 2026-11-12 (fixed; ADR 016, built in the step called V2): the board says a student's or a child's first name only when it is on Elifba's built-in name list of common Azerbaijani first names, voiced once, offline, in the board's voice and committed as content; any other name stays silent and is still shown; no name from the database ever reaches a speech provider, and an instance needs no key. The name is said before the praise after a solved round (a chosen student, or the home child), before «Salam!» at the start of a home game and before «Əla oynadın!» at the end of a game; never when «Kim oynayır?» picks a student, and never in rankings, on the podium or on the share card. A name's clip is the name alone, said before the phrase, the order the owner chose by ear (§3 "Voice").
+
+Owner decisions of 2026-11-17 (fixed; ADRs 019–024, §12, built in B2–B7): games for adults live in a separate area — not in the teacher or the parent area, nothing of it on a class, student, child or board page or in the game catalog — behind a switch that is off by default, so that it is hidden from teachers and parents too until launch (ADR 019); no age, date of birth or age group: a room chooses a difficulty (ADR 023, ADR 024); a live race in which everyone plays the same rounds at the same time on their own phone, a big screen optional and never required (ADR 021); the first game families are memory, logic and sequences, and Azerbaijani word games, without quick arithmetic (ADR 023); a room is opened by an account that holds a third role with its own agreement sentence (ADR 019); every player joins with an account, not with a code and a typed name (ADR 020); a room's results are kept with names for the retention period (ADR 022).
 
 ### Stack
 
@@ -96,6 +112,12 @@ Versions checked 2026-11-09. Replace one only with a concrete reason, recorded h
 | D17 | A first name is voiced only from a built-in list, made once like the prompts; a board fetches its clip by ids through its game (`/games/{game}/players/{player}/voice`), never by a public URL              | §3, §7  | [016](decisions/016-voiced-names.md)                             |
 | D18 | «Məni xatırla» is on by default and covers Google too; a remembered login lasts 30 days; a password change, a reset and «Başqa cihazlardan çıx» end every other device at once; «Çıxış» ends this one only  | §7      | [017](decisions/017-remembered-login.md)                         |
 | D19 | A student's display name is the name as the teacher writes it, first name first; two children with one first name are a warning, never an added initial; the share card shows first names only              | §7, §6  | [018](decisions/018-students-full-names.md)                      |
+| D20 | Adults' games are an area of their own: a third role, `player`, with its own sentence and a fifth route group, behind `elifba.rooms.enabled` (off by default); nothing of it reaches the children's side    | §1, §12 | [019](decisions/019-rooms-area-and-player-role.md)               |
+| D21 | Every player of a room is an account, shown under the account's name; a room code (`RoomCode`, its own code space, `/otaq`) admits such an account into that one room and grants nothing else               | §12     | [020](decisions/020-rooms-and-joining.md)                        |
+| D22 | In a room each player's device writes its own answer; the server alone judges, keeps the clock and holds the solution until the round closes; the timetable is derived, the channel carries signals only    | §12     | [021](decisions/021-room-race-protocol.md)                       |
+| D23 | A right answer gives 10 points plus up to 10 for speed; the room's ranking is derived, dense; a room's results stay with names for the retention period, with four ways to delete                           | §12     | [022](decisions/022-room-scoring-and-history.md)                 |
+| D24 | Room games live in a seventh domain, `Rooms`, last in the order and apart from `Classroom`, `Family` and `Play`: mechanic (code) × difficulty (data), a contract of their own, our own word list under MIT  | §1, §12 | [023](decisions/023-room-games-and-content.md)                   |
+| D25 | A room stores who was in it and how they answered, nothing typed; a name is seen only inside a room; no age is asked, no contact between players exists, nothing is computed about a person                 | §7, §12 | [024](decisions/024-adults-privacy-in-rooms.md)                  |
 
 ---
 
@@ -115,10 +137,13 @@ Versions checked 2026-11-09. Replace one only with a concrete reason, recorded h
 | `Family`    | A parent's children (R3)                                                                                                                 | `children`                                                                      | Language, Content, Classroom      |
 | `Play`      | Game sessions, rounds, answers, guest boards, remembered setups; round generation, the judge, points, pairing codes, the school calendar | `game_sessions`, `game_rounds`, `game_answers`, `guest_boards`, `setup_choices` | all four before it                |
 | `Rankings`  | Derived scores: daily and weekly class rankings, the podium, a child's stars (R3)                                                        | none (reads Play)                                                               | Language, Classroom, Family, Play |
+| `Rooms`     | Adults' rooms (B2, B3): rooms, players, room games, rounds, answers; the room code, the timetable, the judge, the points, the ranking    | `rooms`, `room_players`, `room_games`, `room_rounds`, `room_answers`            | Language, Content, `DenseRank`    |
 
-`Family` stands before `Play` because a game may be for a child (below); it uses `Classroom` only for the display-name rule. `Rankings` stays the read-only end: it derives everything from Play's rounds, for a class or for a child.
+`Family` stands before `Play` because a game may be for a child (below); it uses `Classroom` only for the display-name rule. `Rankings` stays the read-only end of the children's side: it derives everything from Play's rounds, for a class or for a child.
 
-The account is the starter kit's `App\Models\User` (table `users`), kept where the starter kit puts it, with its authentication code. It was the teacher and nothing else until R2; from R2 it holds the role `teacher`, `parent` or both ("Accounts and roles" below), and R2 adds three columns: `area` (string, nullable: `teacher` | `parent`, the area an account with both roles is in), `teacher_agreed_at` and `parent_agreed_at` (timestamps, nullable: when the account accepted each role's sentence, §7). Before R2 it gained five columns: `locale` (`az` | `en`), `terms_accepted_at` (§7), `phone_remote` (boolean, not null, default true: whether the teacher board offers the phone remote, §4 "Pairing"), `board_sounds` (JSON, nullable: the sounds the account chose for its boards, a `content/sounds.json` key per moment, §3 "Sounds"; hidden from the page props), `google_id` (string, nullable, unique: the OpenID `sub` of the teacher's Google account, §7 "Google sign-in", ADR 008; hidden from the page props) and `email_changed_at` (timestamp, nullable: when the teacher last changed the address in their profile, so Google sign-in never takes over an account whose new address is unconfirmed). Its `password` is nullable: a teacher who signed up with Google has none until they set one. It is not a domain: every domain may reference `User`, and `App\Enums\Role` with it.
+`Rooms` (B2, ADR 023) is a seventh domain, last in the order — `Language → Content → Classroom → Family → Play → Rankings → Rooms` — so no domain may use it. Its own rule is stricter than the order: it uses `Language`, `Content` and the pure `Rankings\Support\DenseRank`, and nothing of `Classroom`, `Family` or `Play`. A room game is never a `game_sessions` row, and "a game is for a class or for one child" keeps its two cases (§12).
+
+The account is the starter kit's `App\Models\User` (table `users`), kept where the starter kit puts it, with its authentication code. It was the teacher and nothing else until R2; from R2 it holds the role `teacher`, `parent` or both ("Accounts and roles" below), and R2 adds three columns: `area` (string, nullable: `teacher` | `parent`, the area an account with both roles is in), `teacher_agreed_at` and `parent_agreed_at` (timestamps, nullable: when the account accepted each role's sentence, §7). B2 adds the role `player`, a third value of `area` and one column, `player_agreed_at` (ADR 019); `name` is what a room shows of the account (§12). Before R2 it gained five columns: `locale` (`az` | `en`), `terms_accepted_at` (§7), `phone_remote` (boolean, not null, default true: whether the teacher board offers the phone remote, §4 "Pairing"), `board_sounds` (JSON, nullable: the sounds the account chose for its boards, a `content/sounds.json` key per moment, §3 "Sounds"; hidden from the page props), `google_id` (string, nullable, unique: the OpenID `sub` of the teacher's Google account, §7 "Google sign-in", ADR 008; hidden from the page props) and `email_changed_at` (timestamp, nullable: when the teacher last changed the address in their profile, so Google sign-in never takes over an account whose new address is unconfirmed). Its `password` is nullable: a teacher who signed up with Google has none until they set one. It is not a domain: every domain may reference `User`, and `App\Enums\Role` with it.
 
 The share card (§6) is front-end only and needs no domain.
 
@@ -191,7 +216,7 @@ Unique among active students of a class: `display_name`, compared case-insensiti
 
 Unique among one parent's children: `display_name`, compared case-insensitively with Azerbaijani casing by `AddChild` and `UpdateChild` under a lock on the parent's `users` row (the lock `AddCustomWord` takes), which also counts the children: at most `elifba.children.max` (10). There is no `archived_at`: a child is deleted, not archived (§7). Nothing joins a child to a `students` row.
 
-**`roles`, `model_has_roles`** and the three permission tables of `spatie/laravel-permission` (R2, ADR 010), as the package's migration creates them. `roles` holds exactly `teacher` and `parent` (guard `web`), created by the migration; `model_has_roles` has one row per role an account holds, with `model_type` `user` (a morph alias) and `model_id` = `users.id`. The permission tables stay empty.
+**`roles`, `model_has_roles`** and the three permission tables of `spatie/laravel-permission` (R2, ADR 010), as the package's migration creates them. `roles` holds exactly `teacher` and `parent` (guard `web`), created by the migration — and from B2 `player`, added by B2's migration whatever the switch says (ADR 019); `model_has_roles` has one row per role an account holds, with `model_type` `user` (a morph alias) and `model_id` = `users.id`. The permission tables stay empty.
 
 **`game_sessions`** (`Play\Models\GameSession`)
 
@@ -287,6 +312,80 @@ A guest board is **active** while it is neither closed nor past `expires_at`; an
 
 A row holds no name and nothing about a child (ADR 013): a mode, level keys, cases, letters and a flag. It belongs to its class or child and goes with it (cascade); its owner is theirs, so the setup routes' scoped binding guards it and no policy asks for a role.
 
+**The five tables of `Rooms`** (B2, B3; ADRs 020–022) reference `users` and each other only — never a class, a student, a child or a game. No column holds a name or anything a person typed. Moments that scoring reads are Unix milliseconds (`bigint`), because engines differ in sub-second timestamps.
+
+**`rooms`** (`Rooms\Models\Room`, B2)
+
+| Column             | Type                 | Notes                                                                               |
+| ------------------ | -------------------- | ----------------------------------------------------------------------------------- |
+| `id`               | ulid                 | route parameter `{room}`; also the channel name `room.{id}`                         |
+| `user_id`          | fk users, cascade    | the host: the account that opened the room                                          |
+| `code`             | char(6) null, unique | the room code (`RoomCode`, §12); cleared when the room closes                       |
+| `locked_at`        | timestamp null       | set: no new player comes in                                                         |
+| `revision`         | int, default 0       | raised by every action that changes what the room sees; the signal carries it (§12) |
+| `last_activity_at` | timestamp            | a join, a game started, an answer; idle for `elifba.rooms.idle_hours` → closed      |
+| `closed_at`        | timestamp null       | final                                                                               |
+| timestamps         |                      | `created_at` is what the retention period counts from                               |
+
+**`room_players`** (`Rooms\Models\RoomPlayer`, B2) — an account in a room
+
+| Column       | Type                          | Notes                                                                                            |
+| ------------ | ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| `id`         | ulid                          | route parameter `{member}`; the only id of a player a device ever gets                           |
+| `room_id`    | fk rooms, cascade             |                                                                                                  |
+| `user_id`    | fk users null, null on delete | the account; null = the account is gone or took its name out: the row is «Oyunçu» without a name |
+| `joined_at`  | timestamp                     |                                                                                                  |
+| `left_at`    | timestamp null                | left; may come back with the code and keeps the row                                              |
+| `removed_at` | timestamp null                | removed by the host: no way back, out of the ranking                                             |
+| timestamps   |                               |                                                                                                  |
+
+Unique: `(room_id, user_id)`. A player is **present** while `user_id` is set and `left_at` and `removed_at` are null.
+
+**`room_games`** (`Rooms\Models\RoomGame`, B3) — one game played in a room; a room plays several, one at a time
+
+| Column            | Type              | Notes                                                                                   |
+| ----------------- | ----------------- | --------------------------------------------------------------------------------------- |
+| `id`              | ulid              |                                                                                         |
+| `room_id`         | fk rooms, cascade |                                                                                         |
+| `position`        | int               | order in the room; unique with `room_id`                                                |
+| `mechanic`        | string            | `Content\Enums\RoomMechanic`                                                            |
+| `level`           | string            | key in `content/rooms/levels.json`                                                      |
+| `content_version` | int               | the version of the room content the rounds were built from                              |
+| `seed`            | int               | makes round generation reproducible in tests                                            |
+| `reveal_ms`       | int               | copied from `elifba.rooms.reveal_ms` at the start, so a live game keeps its timetable   |
+| `started_ms`      | bigint            | when round 0 opens: the start plus `elifba.rooms.countdown_ms`                          |
+| `ended_ms`        | bigint null       | a fact: the host ended the game, or the room closed under it; null = the timetable ends |
+| `created_at`      | timestamp         |                                                                                         |
+
+**`room_rounds`** (`Rooms\Models\RoomRound`, B3)
+
+| Column         | Type                   | Notes                                                                      |
+| -------------- | ---------------------- | -------------------------------------------------------------------------- |
+| `id`           | ulid                   |                                                                            |
+| `room_game_id` | fk room_games, cascade |                                                                            |
+| `position`     | int                    | 0-based; unique with `room_game_id`                                        |
+| `payload`      | json                   | what players may see: the study material and the question (§12)            |
+| `solution`     | json                   | what the judge reads; hidden from every serialization                      |
+| `study_ms`     | int                    | 0 except in memory games                                                   |
+| `answer_ms`    | int                    | the time to answer                                                         |
+| `closed_ms`    | bigint null            | a fact: every present player had answered before the bell; null = the bell |
+
+**`room_answers`** (`Rooms\Models\RoomAnswer`, B3) — one per player per round
+
+| Column           | Type                     | Notes                                                  |
+| ---------------- | ------------------------ | ------------------------------------------------------ |
+| `id`             | bigint                   |                                                        |
+| `event_id`       | ulid, unique             | made by the device; makes the write idempotent         |
+| `room_round_id`  | fk room_rounds, cascade  |                                                        |
+| `room_player_id` | fk room_players, cascade |                                                        |
+| `picked`         | json                     | item ids of the round, in the order tapped; never text |
+| `correct`        | bool                     | judged by the server (`RoomJudge`)                     |
+| `elapsed_ms`     | int                      | the server's receipt − the moment the question opened  |
+| `points`         | smallint                 | `RoomPointsRule`: 0, or 10–20                          |
+| `created_at`     | timestamp                |                                                        |
+
+Unique: `(room_round_id, room_player_id)`. The current round, its phase, the ranking and whether a game is over are derived (`RoomTimetable`, `RoomRanking`), never stored.
+
 ### Status lifecycle
 
 `GameSessionStatus::allowedTransitions()`:
@@ -309,6 +408,7 @@ A session is created `live` by `StartGame`. Only `TransitionGameSession` changes
 | Family    | `AddChild`, `UpdateChild`, `UpdateChildLetters`, `ReorderChildren`, `DeleteChild` (R3)                                                                                                                                                                                                                          |
 | Account   | `App\Actions\Roles\GrantRole`, `SwitchArea` (R2), next to the kit's `App\Actions\Fortify\*` and `App\Actions\Settings\UpdateLocale`, `UpdatePassword`, `LogOutOtherDevices` (ADR 017)                                                                                                                           |
 | Play      | `StartGame`, `ChangeRoundCount`, `ReplayGame`, `ClaimBoard`, `IssueJoinCode`, `RecordBoardEvents`, `TransitionGameSession`, `AbandonStaleGames`, `PruneOldGames`, `OpenGuestBoard`, `ClaimGuestBoard`, `ShowGameOnGuestBoard`, `CloseGuestBoard`, `PruneGuestBoards`, `UpdatePlaySettings`, `RememberSetupMode` |
+| Rooms     | B2: `OpenRoom`, `JoinRoom`, `LeaveRoom`, `LockRoom`, `RemoveRoomPlayer`, `CloseRoom`, `CloseIdleRooms`, `DeleteRoom`, `ForgetRoomPlayer`, `PruneOldRooms`; B3: `StartRoomGame`, `EndRoomGame`, `RecordRoomAnswer` (§12)                                                                                         |
 
 Classroom actions take the `Classroom\Data` objects (`ClassData`, `StudentData`, `AddStudentsData`, `LearnedLettersData`, `ReorderStudentsData`; each with `rules()` and `validate()`, normalizing names before they are checked) and report a conflict the teacher can fix (a taken name, a restore blocked by a name, an order that is not exactly the class's active students) as a `ValidationException` on the field, with a translated message that never contains the name. The paste preview is `Classroom\Support\NameListParser` (§7); it writes nothing.
 
@@ -318,7 +418,7 @@ The Family actions (R3) take `Family\Data\ChildData` (`display_name`, `avatar`),
 
 Events dispatched after commit: `GameSessionTransitioned` (its listener `Play\Listeners\BroadcastSessionStatus`, registered in `AppServiceProvider`, broadcasts `session.status` on the game channel so a device that is still connected learns the status; a failed broadcast is reported with ids only and never fails the change, §4), `RoundSolved` (no listener in v1; it is the hook for future statistics). Both carry ids only; from R3 `RoundSolved` carries the class id or the child id, the other null.
 
-Scheduled (one `scheduler` process, §10; the commands are in `routes/console.php`): `AbandonStaleGames` (`play:abandon-stale`; it checks the idle time again under the row lock, so a board that synced a moment ago keeps its game) and `PruneGuestBoards` (`play:prune-guest-boards`: closed boards, boards past `expires_at` and boards never claimed before their code expired; games are untouched) hourly; `PruneOldGames` (`play:prune-old-games`, games whose `started_at` is older than `elifba.retention_days`, with their rounds and answers by cascade) and `PruneArchived` daily; expired join codes are simply ignored (no job), and `TransitionGameSession` clears the code of a game that ends.
+Scheduled (one `scheduler` process, §10; the commands are in `routes/console.php`): `AbandonStaleGames` (`play:abandon-stale`; it checks the idle time again under the row lock, so a board that synced a moment ago keeps its game) and `PruneGuestBoards` (`play:prune-guest-boards`: closed boards, boards past `expires_at` and boards never claimed before their code expired; games are untouched) hourly; `PruneOldGames` (`play:prune-old-games`, games whose `started_at` is older than `elifba.retention_days`, with their rounds and answers by cascade) and `PruneArchived` daily; expired join codes are simply ignored (no job), and `TransitionGameSession` clears the code of a game that ends. From B2: `CloseIdleRooms` (`rooms:close-idle`) hourly and `PruneOldRooms` (`rooms:prune`, rooms created longer than `elifba.retention_days` ago, with everything under them) daily; nothing is scheduled for a round or a game of a room, whose timetable is derived (§12).
 
 ### Accounts and roles
 
@@ -332,6 +432,8 @@ A role opens an **area**; ownership still decides rows. Every authenticated rout
 | Parent  | `auth`, `role.chosen`, `verified`, `role:parent`          | children, home games (`/children/{child}/games…`) (R3)                                                         |
 | Shared  | `auth`, `role.chosen`, `verified`, `role:teacher\|parent` | the board page, the join code, the remote, `/pult`, the next game of a guest board                             |
 | Account | `auth` (and what each route has today)                    | `/role`, `/start`, `/area`, the profile; security, appearance, play and roles settings also take `role.chosen` |
+
+From B2 (ADR 019) there is a fifth group, and the play settings move: **Player** — `auth`, `role.chosen`, `verified`, `role:player`, `rooms.enabled` — holds every room route (`/rooms…`, `/otaq…`, `routes/rooms.php`) and nothing else; Settings → «Oyun» (`play-settings.*`) joins the shared group, since only a teacher or a parent has a board. The shared group stays `role:teacher|parent`: the player role opens no board, remote or `/pult`. While `elifba.rooms.enabled` is off the role is not offered, not granted and not listed among an account's roles, and the group answers 404 (§12 "The area and the switch").
 
 The board endpoints a guest board's bearer may call (`auth:board,web`: claim, state, sync, status, closing a board) and the public routes name no role: a bearer is not an account, and `GameSessionPolicy::play` and `GuestBoardPolicy` decide (§4).
 
@@ -350,7 +452,7 @@ The board endpoints a guest board's bearer may call (`auth:board,web`: claim, st
 
 **Rejected.** A role system of our own; the role as a registration field; role checks in policies; permissions; one navigation for both areas; the area in the session (ADR 010 has the reasons).
 
-`tests/Feature/Auth/RoleAreasTest.php` enumerates every route with `auth` and fails for one that is in no group.
+`tests/Feature/Auth/RoleAreasTest.php` enumerates every route with `auth` and fails for one that is in no group — five groups from B2.
 
 ---
 
@@ -1145,6 +1247,8 @@ Ordinals take vowel harmony (1-ci, 2-ci, 3-cü, 4-cü, 5-ci, 6-cı, 9-cu, 10-cu�
 
 ## 4. Live play
 
+This section is the live play of a class game and a home game: a board, a remote, pairing codes, the `game.*` channel. A room (B2–B7) has no board and none of this section applies to it or is changed by it; its own protocol is §12 "The race" (ADR 021).
+
 ### Devices
 
 | Device                                                        | Page                                                                                               | Authenticated as                                                                | Writes                                                   |
@@ -1424,6 +1528,8 @@ Checked on the live board (a scratch SQLite database, `php -S`, Vite and Reverb 
 
 ## 5. Scoring and rankings
 
+This section scores classes and children. A room has its own rule and its own ranking (§12 "Scoring and what is kept", ADR 022); `PointsRule`, `ClassRanking`, `Podium` and `ChildStars` are not used by it and do not change.
+
 **Decision.**
 
 - **Points belong to a solved round**, credited to the student at the board when the round was solved: **3** with no wrong hit, **2** with one, **1** with more (a `pop` round has no wrong item, so it always gives 3). Never negative; nothing for a skipped round. A round solved with nobody at the board (whole class) stores its points but credits no one. The rule lives only in `Play\Support\PointsRule`.
@@ -1514,6 +1620,8 @@ R2, ADR 013. An account agrees to three separate things, each at the moment it a
 | Registration (the form, or the Google completion page)    | «[Məxfilik qeydini] oxumuşam.» / "I have read the [privacy note]."                                                            | `users.terms_accepted_at` |
 | Taking the teacher role (`/role`, or Settings → «Rollar») | «Elifba-dan məktəbimin icazəsi ilə istifadə edirəm.» / "I use Elifba with my school's permission."                            | `users.teacher_agreed_at` |
 | Taking the parent role (the same pages)                   | «Əlavə etdiyim uşaqların valideyni və ya qanuni nümayəndəsiyəm.» / "I am the parent or legal guardian of the children I add." | `users.parent_agreed_at`  |
+
+From B2 (ADR 019, ADR 024) a fourth moment, offered only while `elifba.rooms.enabled` is on: taking the player role, on the same pages — «Otaqlarda öz adımla oynayıram; adım və nəticələrim olduğum otağın oyunçularına görünür.» / "I play in rooms under my own name; my name and my results are shown to the players of the rooms I am in." — stored in `users.player_agreed_at`. What a room stores about an adult and who sees it is §12 "Adults' privacy".
 
 `CreateNewUser` and `CreateUserFromGoogle` keep requiring `terms`; only its text changes. `GrantRole` refuses a role whose sentence is not accepted (`RoleChoiceData`: `agreement` accepted) and stamps the column with `forceFill`, as registration does. An account that registered before R2 accepted the school sentence at registration, so the migration copies that moment into `teacher_agreed_at`.
 
@@ -1741,13 +1849,15 @@ app/
 │   ├── Classroom/  Actions/ Models/ Data/ Enums/ Policies/ Support/{NameListParser,DisplayName,ClassLock}.php
 │   ├── Family/     (R3) Actions/{AddChild,UpdateChild,UpdateChildLetters,ReorderChildren,DeleteChild}.php Models/Child.php Data/{ChildData,ChildLettersData,ReorderChildrenData}.php Policies/ChildPolicy.php
 │   ├── Play/       Actions/ Models/ Enums/ Data/ Events/ Exceptions/ Listeners/ Policies/ Support/{RoundJudge,PointsRule,SchoolCalendar,Playable,StartableGame,BoardState,BoardProps,PairingCode,GuestBoardGuard,GameChannel,Requester,Mechanics/*}.php
-│   └── Rankings/   Enums/Period.php Data/{PeriodData,RankedStudentData,PodiumPlaceData,ShareCardData}.php Support/{ClassRanking,DenseRank,Podium}.php (R3: Data/ChildStarsData.php, Support/ChildStars.php)
+│   ├── Rankings/   Enums/Period.php Data/{PeriodData,RankedStudentData,PodiumPlaceData,ShareCardData}.php Support/{ClassRanking,DenseRank,Podium}.php (R3: Data/ChildStarsData.php, Support/ChildStars.php)
+│   └── Rooms/      (B2, B3; §12) Actions/ Models/{Room,RoomPlayer,RoomGame,RoomRound,RoomAnswer}.php Data/ Events/RoomChanged.php Policies/RoomPolicy.php
+│                   Support/{RoomCode,RoomChannel,RoomClock,RoomTimetable,RoomState,RoomJudge,RoomPointsRule,RoomRanking,RoomPlayable,Mechanics/*}.php
 ├── Http/Controllers/  (thin: validate → action → Inertia/JSON), Http/Controllers/Auth/ (Google sign-in), Http/Middleware/EnsureGoogleSignInIsEnabled.php, Exceptions/GoogleSignInRefused.php
 ├── Models/User.php    (the account, from the starter kit; `HasRoles` from R2), Models/Concerns/BelongsToOwner.php (scoped binding, §7; `BelongsToTeacher` until R3)
 ├── Enums/Role.php, Actions/Roles/{GrantRole,SwitchArea}.php, Data/{RoleChoiceData,AreaData}.php, Http/Middleware/EnsureRoleChosen.php  (R2, §1 "Accounts and roles")
 ├── Providers/ContentServiceProvider.php  (the repository, the content:* commands, optimize hooks)
 └── Support/Translations.php, GoogleSignIn.php, GoogleProfile.php, PasswordConfirmation.php (§7 "Google sign-in"), WebApp.php (the manifest, §10 "Installing Elifba")
-config/elifba.php      (timezone, locales, retention_days, pairing_code_ttl_minutes, guest_board_hours, abandon_after_hours, rounds, custom_words.max_length, custom_words.max_per_teacher, operator.name, operator.email, source_url; R3: children.max)
+config/elifba.php      (timezone, locales, retention_days, pairing_code_ttl_minutes, guest_board_hours, abandon_after_hours, rounds, custom_words.max_length, custom_words.max_per_teacher, operator.name, operator.email, source_url; R3: children.max; B2: rooms.enabled, rooms.max_players, rooms.idle_hours; B3: rooms.rounds, rooms.countdown_ms, rooms.reveal_ms)
 config/permission.php  (R2: the roles package, published; teams and the Gate hook off)
 content/               (§3)
 scripts/city-maps/     generate.php + cities.csv: the cities pack's maps (§8)
@@ -1756,17 +1866,19 @@ docs/                  architecture.md, frontend.md (A2), glossary.md, decisions
 lang/                  az.json, en.json, {az,en}/*.php
 resources/js/
 ├── pages/             classes, students, games/setup, games/board, games/remote, lovhe, pult/{index,guest-board}, rankings/show, podium, words/index, auth/google-register, credits, privacy, welcome
-│                      R2: auth/choose-role, settings/roles; R4: children/{index,show}
+│                      R2: auth/choose-role, settings/roles; R4: children/{index,show}; B2: rooms/{index,join,show}; B4: rooms/screen
 ├── components/ui      (shadcn/ui from the starter kit)
 ├── components/app     (the shared kit, as in the precedent)
 ├── components/{classes,students,games,rankings,share,words,welcome}   (R4: children)
 ├── game/              contract.ts (+ .test.ts), engine.ts (+ .test.ts), live.ts, outbox.ts, scenes/, styles/
+├── rooms/             (B2, B3) contract.ts (+ .test.ts), clock.ts (+ .test.ts), live.ts — no judge and no solution; components/rooms (B4: mechanics/*)
 └── lib/               (R3: game-players.ts; R4: setup-levels.ts, replaced by setup-choices.ts for frontend.md rule 13)
-routes/web.php (+ auth.php, classroom.php, play.php, rankings.php, settings.php, words.php; R3: family.php), channels.php, console.php
+routes/web.php (+ auth.php, classroom.php, play.php, rankings.php, settings.php, words.php; R3: family.php; B2: rooms.php), channels.php, console.php
 tests/Feature, tests/Unit, tests/Fixtures/contract/, tests/Fixtures/content/ (a valid content root + broken.json), tests/Support/ (ContentFixture, Games, FakeGoogle)
+B2, B3: tests/Feature/Rooms, tests/Unit/Rooms, tests/Fixtures/rooms/, tests/Support/Rooms.php
 ```
 
-Routes (names in English; `/pult` is the one Azerbaijani path because teachers type it):
+Routes (names in English; `/pult` is the one Azerbaijani path because teachers type it — and from B2 `/otaq`, which players type):
 
 | Route                                                                                                                                   | Purpose                                                                       |
 | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
@@ -1789,6 +1901,7 @@ Routes (names in English; `/pult` is the one Azerbaijani path because teachers t
 | `/role` (GET, POST), `/start`, `PUT /area`, `/settings/roles` (GET, POST)                                                               | R2: the role choice, home by role, the area switch, the second role (§1)      |
 | `/children`, `POST /children`, `/children/{child}` (GET, PATCH, DELETE), `PUT /children/order`, `PUT /children/{child}/learned-letters` | R3: a parent's children (§7 "Parents and their children")                     |
 | `/children/{child}/games/create`, `POST /children/{child}/games`                                                                        | R3: home game setup → `StartGame` for the child                               |
+| `/rooms`, `POST /rooms`, `/otaq`, `/otaq/{code}` (GET, POST), `/rooms/{room}…`                                                          | B2, B3: rooms; every route and who reaches it: §12; 404 unless switched on    |
 | `/auth/google/{redirect,confirm,callback}`, `/auth/google/register` (GET, POST, DELETE)                                                 | Google sign-in (§7 "Google sign-in"); 404 unless configured                   |
 | `/`                                                                                                                                     | the welcome page (`WelcomeController`, frontend.md rule 10)                   |
 | `/credits`, `/privacy`                                                                                                                  |                                                                               |
@@ -1825,6 +1938,282 @@ GitHub Actions (`.github/workflows/ci.yml`, actions pinned by SHA as in the prec
 - **Database portability.** Query builder only; no engine-specific SQL; Baku dates come from `SchoolCalendar`. Tests must pass on SQLite and PostgreSQL.
 - **Tests** use Pest; fake time with `travelTo` around midnight and Monday boundaries; never call a real Reverb server in a test: tests run the `reverb` broadcaster with test keys and `tests/Support/FakeReverb` (`$this->reverb->sent`, `->down()`) in place of its HTTP client; or fake the event.
 - **Gate:** run `composer ci:check` before calling work done.
+
+---
+
+## 12. Rooms: adults' games (B2–B7)
+
+Designed in B1 (2026-11-17, ADRs 019–024) and built by B2–B7; until a step lands, nothing of what it is marked with exists. The section is whole on purpose: everything about rooms is here, and §1–§11 only point to it, so the contract of class and home games reads as before.
+
+A **room** is opened by an account and entered by other accounts with its code. In it, everyone plays the same rounds at the same time, each on their own phone, and the room sees a ranking. The games are memory, logic and sequences, and Azerbaijani word games, at a difficulty the host picks.
+
+### Three rules that have a scope now
+
+`CLAUDE.md` states three rules without a scope. Each stays exactly as it is for class and home games; a room has its own.
+
+| The rule                                                 | For a class game and a home game: unchanged                                                                       | A room's own rule                                                                                                                                                                                                                              |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The board is the only writer of results                  | `RecordBoardEvents`, `event_id`, `board_epoch`; the phone sends client events and never posts a hit (§4, ADR 002) | There is no board. Each player's device posts that player's own answer, and only `RecordRoomAnswer` writes it: one per player per round, idempotent by `event_id`, judged and timed by the server. No client event counts (ADR 021).           |
+| Codes come only from `PairingCode` and authorize nothing | A pairing code says which board; authority is the owner's session or a guest board's bearer (§4)                  | A room code comes only from `RoomCode`, a code space and an entrance (`/otaq`) of its own. It admits a signed-in, confirmed account that holds the player role into that one room — nothing without that account, nothing else ever (ADR 020). |
+| A game is for a class or for one child                   | `GamePlayers` has two cases; `game_sessions`, `game_rounds` and `game_answers` hold nothing else (§1, ADR 011)    | A room game is a `room_games` row of the `Rooms` domain, never a `game_sessions` row. `Rooms` uses nothing of `Classroom`, `Family` or `Play`, and nothing uses `Rooms` (ADR 023).                                                             |
+
+Three more follow from them: `RoundJudge`, `engine.ts` and `PointsRule` stay the one judge and the one points rule of the children's games, and a room has `RoomJudge` and `RoomPointsRule`, in PHP only; a child still has stars and never a ranking, and a room can never hold a student or a child; the guest board's bearer still reaches only the game its board shows, and never a room.
+
+### The area and the switch
+
+**Decision** (B2, ADR 019). Adults' games are an area of their own, opened by a third role and hidden behind a switch.
+
+- **The role.** `App\Enums\Role::Player` (`player`, «Oyunçu»): a third `roles` row, `users.player_agreed_at`, home `rooms.index`. One role for the account that opens a room and the accounts that join it; the **host** is the room's `user_id`, not a role. Taken like the others — `/role`, or Settings → «Rollar» — with its own sentence (§7 "Agreements").
+- **The group.** Every room route is in the player group — `auth`, `role.chosen`, `verified`, `role:player`, `rooms.enabled` — and in no other (§1 "Accounts and roles"). `users.area` may be `player`; `components/app/nav-areas.ts` gets a third navigation with one entry, «Otaqlar».
+- **The switch.** `config('elifba.rooms.enabled')` ← `ELIFBA_ROOMS`, false unless set; `.env.example` and `.env.production.example` carry it switched off. `App\Support\RoomsArea::enabled()` is the one reader. While it is off: `rooms.enabled` (`EnsureRoomsAreEnabled`) answers 404 on every room route; `Role::available()` leaves the role out, so it is neither offered nor granted (`RoleChoiceData::rules()`); `User::roleList()` and `User::area()` leave it out, so no page prop, navigation or switch shows it and `/start` ignores it; the room channel refuses. The tables and the `roles` row exist either way.
+- **Nothing on the children's side**, with the switch on as well: no class, student, child, ranking, podium, words, setup, board, remote, `/pult` or guest board page gets a prop, link or request about rooms, and the game catalog lists no room game. Outside the player area an account sees of rooms only the «Oyunçu» card where roles are taken and, once it holds the role, «Otaqlar» in its own user menu's area switch.
+- **An invited account.** `/otaq/{code}` keeps its address as the intended one through login, registration, e-mail confirmation and the role: an account without the player role is sent to `/role` (no role yet) or Settings → «Rollar», with «Oyunçu» preselected, and `GrantRole` redirects on to it.
+- **Factory.** `User::factory()->player()` and `->teacherAndPlayer()`; the default stays a teacher. `tests/TestCase` leaves the switch off; `tests/Support/Rooms.php` turns it on for a test (`Rooms::on()`) and builds rooms (`Rooms::open()`, `Rooms::playing()`).
+
+**Why.** A role is how Elifba already says what an account may enter, with a test that enumerates the routes; a switch in `.env` is how an instance already turns an optional thing on (Google sign-in). An instance for schools only never shows the area.
+
+**Rejected.** Rooms for any teacher or parent; an account with no role; a host role beside a player role; a permission; a separate app (ADR 019).
+
+### Rooms and joining
+
+**Decision** (B2, ADR 020). Every player is an account, shown under the account's name; a room code admits such an account into one room.
+
+- **Opening.** `POST /rooms` → `OpenRoom` (`Rooms\Data\OpenRoomData`: `plays` boolean, default true — the host is the first player): a `rooms` row with a code from `RoomCode`. One open room per host, checked under a lock on the host's `users` row; a second is refused with `rooms.errors.already_open`.
+- **The code.** `Rooms\Support\RoomCode`: 6 digits, unique among open rooms by the column's unique index (a collision is retried in its own transaction, as `PairingCode` does), valid while the room is open, cleared when it closes. `RoomCode::resolve(code)` finds an open room or nothing. It shares nothing with `PairingCode`: the same six digits may be a room and a board at once, and each is unknown at the other's entrance.
+- **Joining.** `GET /otaq` is the code field (`GET /otaq?code=482 913` → `/otaq/482913`; spaces and dashes dropped; anything but 6 digits is a validation error on `code`). `GET /otaq/{code}` shows page `rooms/join` — the code, the account's own name as the room will show it, «Qoşul» — or redirects a present player to the room. `POST /otaq/{code}` → `JoinRoom`: under the room row's lock it refuses a locked room and a full one (`rooms.errors.locked`, `rooms.errors.full`, shown on the join page with nothing else about the room), brings back a player who had left (the same row, `left_at` cleared) or adds a row, raises the revision and signals. An unknown code, a closed room and an account the host removed get the same 404.
+- **Who reaches what** is ownership, as everywhere: `{room}` (`Room::resolveRouteBinding`) finds only a room the current account hosts or has a row in that is not removed, so any other id is a 404 before controller code; `{member}` is scoped under `{room}` (`scopeBindings()`); `Rooms\Policies\RoomPolicy` is the second layer — `view` (the host; a player, present or past), `play` (a present player of an open room), `host` (the host) — on every such route. A player who left an open room sees its page without the live state, and comes back with the code.
+- **Names.** A room shows `users.name` of each player, read when the page props or the state are built; no room table holds a name. A row without an account (`user_id` null) is «Oyunçu». Two players with one name are two rows; the page marks the viewer's own («siz»).
+- **The host's tools.** `PATCH /rooms/{room}` `{locked}` → `LockRoom`; `DELETE /rooms/{room}/members/{member}` → `RemoveRoomPlayer` (not the host's own row); `POST /rooms/{room}/close` → `CloseRoom`. A player leaves with `POST /rooms/{room}/leave` → `LeaveRoom`.
+- **Limits.** `elifba.rooms.max_players` (20) present players; `elifba.rooms.idle_hours` (3) without activity closes a room (`Room::isOpen()` says so at once, `CloseIdleRooms` writes it within the hour). Limiters in `AppServiceProvider`: `rooms-open` (6 a minute per account), `room-join` (10 a minute per account, for `/otaq` and both `/otaq/{code}`), `room-state` (120 a minute per account), `room-answers` (30 a minute per account).
+- **Closing** sets `closed_at`, clears the code, ends a running game (`room_games.ended_ms`) and is final. A closed room is its results page.
+
+Routes (all in the player group; `{room}` and `{member}` are ULIDs):
+
+| Method and path                         | Reaches it (policy)                       | Answer                                                                              |
+| --------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------- |
+| `GET /rooms`                            | any player account                        | page `rooms/index`: the account's open rooms, the code field, «Otaq aç», past rooms |
+| `POST /rooms`                           | any player account, `throttle:rooms-open` | redirect to the room / `already_open`                                               |
+| `GET /otaq`, `GET /otaq/{code}`         | any player account, `throttle:room-join`  | the code field; page `rooms/join`, a redirect to the room, or 404                   |
+| `POST /otaq/{code}`                     | any player account, `throttle:room-join`  | redirect to the room / the join page with the reason / 404                          |
+| `GET /rooms/{room}`                     | `view`                                    | page `rooms/show`: the lobby and the game while open, the results once closed       |
+| `GET /rooms/{room}/state`               | `play` or `host`, `throttle:room-state`   | `RoomState` (JSON, `no-store`)                                                      |
+| `POST /rooms/{room}/leave`              | `play`                                    | redirect to `/rooms`                                                                |
+| `PATCH /rooms/{room}`                   | `host`                                    | lock or unlock; back                                                                |
+| `DELETE /rooms/{room}/members/{member}` | `host`                                    | remove a player; back                                                               |
+| `POST /rooms/{room}/close`              | `host`                                    | close; back to the results                                                          |
+| `DELETE /rooms/{room}`                  | `host`, closed room                       | `DeleteRoom`; redirect to `/rooms`                                                  |
+| `DELETE /rooms/{room}/name`             | `view`, closed room, a player's own row   | `ForgetRoomPlayer`; redirect to `/rooms`                                            |
+| `GET /rooms/{room}/screen`              | `host`, open room                         | page `rooms/screen` (B4)                                                            |
+| `POST /rooms/{room}/games`              | `host`, open room, no game running        | B3: `StartRoomGame`; 204                                                            |
+| `DELETE /rooms/{room}/game`             | `host`, a game running                    | B3: `EndRoomGame`; 204                                                              |
+| `POST /rooms/{room}/answers`            | `play`, `throttle:room-answers`           | B3: `{status, revision}`                                                            |
+| `POST /broadcasting/auth`               | the host or a present player, open room   | the `room.{room}` signature / 403                                                   |
+
+**Why.** An account behind every name means a name cannot be borrowed, a removed player stays removed, and results can be kept with names. A code of its own keeps `PairingCode` and `/pult` exactly what they were.
+
+**Rejected.** A code and a typed name without an account (the advisor's recommendation; the owner chose accounts); both ways in; a nickname; reusing `PairingCode`; host approval of every joiner; a presence channel (ADR 020).
+
+### The race
+
+**Decision** (B3, ADR 021). Each player's device writes its own answer over HTTP; the server alone judges, keeps the clock and holds the solution until the round is closed; the timetable is derived and the channel carries signals only.
+
+```
+ phone A        phone B        server (PHP)                         Reverb
+   │              │   GET state  │  (at each moment of the timetable)  │
+   │ ◀── the question, no solution ──│                                 │
+   │ POST answer ─────────────────▶ │ RecordRoomAnswer: judge, time,   │
+   │ ◀──────────── accepted ─────── │ points; stored once              │
+   │              │ POST answer ──▶ │ everyone answered → closed_ms    │
+   │              │                 │ ── room.changed {revision} ────▶ │ ─▶ A, B
+   │ GET state ───────────────────▶ │ the solution, results, ranking   │
+```
+
+**Starting a game.** `POST /rooms/{room}/games` → `StartRoomGame` with `Rooms\Data\RoomGameSetupData` (`mechanic`, `difficulty`, `rounds` between `elifba.rooms.rounds.min` and `.max`; `rules()` accepts only a level of `content/rooms/levels.json` whose mechanic `RoomPlayable` lists). Under the room row's lock it refuses a closed room and a room whose game is still running, builds every round with the mechanic's builder from a fresh `seed`, stores each as `payload` and `solution`, and sets `started_ms` to now + `elifba.rooms.countdown_ms` (3 000). `DELETE /rooms/{room}/game` → `EndRoomGame` sets `ended_ms`.
+
+**The timetable** (`Rooms\Support\RoomTimetable`, pure; `RoomClock::nowMs()` is the only source of "now", so tests move time with `travelTo`):
+
+```
+opens(0)        = started_ms
+answer_from(i)  = opens(i) + study_ms(i)
+bell(i)         = answer_from(i) + answer_ms(i)
+closes(i)       = closed_ms(i) ?? bell(i)
+opens(i + 1)    = closes(i) + reveal_ms
+over            = ended_ms ?? closes(last) + reveal_ms
+```
+
+`RoomTimetable::at($game, $nowMs)` gives the round and its phase — `countdown`, `study`, `answer`, `reveal` — or `over`. Nothing stores them. A change that time causes needs no trigger: every device holds the moments and asks again when one comes, and whoever asks later is answered from the later phase. Only facts are written: the start, an answer, an early close (`closed_ms`), the host's end (`ended_ms`).
+
+**The state.** `GET /rooms/{room}/state` → `Rooms\Support\RoomState::for($room, $account)` as `Rooms\Data\RoomStateData`, the one thing a room page reads after its first props:
+
+```
+RoomState {
+  v: 1, revision, server_ms,
+  room:    { id, status: open | closed, locked, code | null },         // code: while open
+  me:      { player_id | null, host: bool },                           // a host who does not play has no player_id
+  players: [{ id, name | null, present, host }],                       // never an account id or an address
+  game:    { id, mechanic, difficulty, rounds, phase: live | over } | null,
+  round:   RoomRound | null,                                           // the current round, while the game is live
+  ranking: [{ player_id, points, place | null }]                       // the game's, over its closed rounds; the room's when no game is live
+}
+RoomRound {
+  id, index, total, phase: countdown | study | answer | reveal,
+  opens_ms, answer_from_ms, bell_ms, closes_ms | null, next_ms | null,
+  study:  { layout: row | grid, grid: {cols, rows} | null, items: Item[] } | null,   // only in phase study
+  ask:    { shape: choice | sequence | set, pick, layout, grid, items: Item[] } | null, // only from phase answer
+  answered, answered_count, present_count,
+  reveal: { solution: string[], word: string | null,                    // only in phase reveal
+            mine: { picked: string[], correct, points, elapsed_ms } | null,
+            results: [{ player_id, correct, points }] } | null
+}
+Item { id: string(8), kind: digit | letter | word | number | shape | cell, text | null, asset | null, cell: [col, row] | null }
+```
+
+What is withheld is the rule: nothing of a round before it opens; the study material only while it is studied (a reload during `answer` does not show it again); the question only from `answer`; the solution, anybody's right or wrong and the round's points only from `reveal`. `server_ms` lets the page estimate the server's clock (`resources/js/rooms/clock.ts`: the answer's `server_ms` against the midpoint of its own send and receive times) and ask again at `opens_ms`, `answer_from_ms`, the bell and `next_ms`; a page that asked a little early is told the same phase and asks again.
+
+**An answer.** `POST /rooms/{room}/answers` `{event_id, round_id, picked}` (`Rooms\Data\RoomAnswerData::rules()`: a ULID, a ULID, 1–36 item ids). `RecordRoomAnswer`, in one transaction with the room row and then the round row locked, always in that order:
+
+1. the `event_id` is already stored → `duplicate`; this player already answered the round → `answered`;
+2. the round is not the game's current round in its `answer` phase by the server's clock — before the question, after the bell or the early close, a round of another game, a game that is over, a closed room → `late`, nothing written. Nothing is accepted after the bell: the reveal is served from that moment;
+3. `picked` is not made of the round's own `ask` item ids in the count its shape asks for → 422, nothing written;
+4. otherwise it is judged (`RoomJudge`), timed (`elapsed_ms` = receipt − `answer_from`), scored (`RoomPointsRule`), stored, and the room's `last_activity_at` touched → `accepted`;
+5. if every present player has now answered, `closed_ms` = this moment, the revision is raised and `RoomChanged` is dispatched after commit. `LeaveRoom` and `RemoveRoomPlayer` make the same check.
+
+The answer is `{status: accepted | duplicate | answered | late, revision}` — never whether it was right. The player is the session's account: a body cannot name another.
+
+**The channel.** `private-room.{roomId}`:
+
+```php
+// routes/channels.php — an account's session only; never a guest board's bearer
+Broadcast::channel('room.{room}', static fn (User $user, string $room): bool
+    => RoomChannel::allows($user, $room), ['guards' => ['web']]);
+
+// Rooms\Support\RoomChannel::allows(): the switch is on, the account holds the
+// player role, the room exists and is open, and the account is its host or a
+// present player.
+```
+
+The server broadcasts one event on it, `room.changed` `{v: 1, revision}` (`Rooms\Events\RoomChanged`, `ShouldBroadcastNow`, after commit), for a join, a leave, a removal, a lock, a game started or ended, an early close and the room's close. A page that sees a revision above its own fetches the state. Nothing else travels on the channel — no content, name, answer or result — and no client event means anything in a room: the pages send none and listen for none (`resources/js/rooms/live.ts` has no whisper). A broadcast that fails never fails the write; it is reported as `Rooms\Exceptions\RoomChangeNotBroadcast` with the room id and the cause's class. Without a socket a page polls the state every 3 s in the lobby and after it has answered.
+
+**Late, lost and gone.**
+
+| What happens                                   | The room                                                                                                                        |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| A player joins during a game (room not locked) | gets the state like everyone, may answer the open round in the time that is left, has nothing for earlier rounds                |
+| A phone reloads or reconnects                  | the state is everything; an answer sent twice is stored once                                                                    |
+| A player vanishes without leaving              | each round runs to its bell instead of closing early; the host can remove them                                                  |
+| The host's phone is gone                       | the game goes on by its timetable; a new game, the lock, a removal and closing wait for the host; an idle room closes by itself |
+| Reverb is down                                 | the phases still change by the timetable; joins and early closes are seen within 3 s                                            |
+| Nobody is watching                             | nothing runs and nothing needs to: the game is over when its timetable says, the room closes when idle                          |
+
+There is no pause, and the host is never replaced.
+
+**The big screen** (B4). `GET /rooms/{room}/screen`, page `rooms/screen`, for the host's own session on a laptop or a television's browser: the code and its QR (`qrcode.react`, `{APP_URL}/otaq/{code}`) while the room waits; in a game what every player sees of the round, the count of answers, then the reveal and the ranking. It reads the same state and writes nothing; a room never needs it. It is not the guest board: `/lovhe`, the `board` guard and its bearer are untouched and never show a room.
+
+**Why.** Twenty people answering the same round against each other leave no device that may hold the solution or be trusted to judge. A timetable every device can compute needs no queue and no worker, which Elifba does not have, and cannot drift with whoever looks late.
+
+**Rejected.** One writing device, as in class; a hashed solution for a local judge; rounds and results in broadcasts; client events between players; delayed jobs or a ticking worker; a `GET` that settles the round; the device's clock; a grace period after the bell; the guest board as the screen (ADR 021).
+
+### Scoring and what is kept
+
+**Decision** (B3, B4; ADR 022).
+
+- **Points belong to an answer** (`Rooms\Support\RoomPointsRule`, PHP only): a right answer gives **10**, plus **0–10** for speed — `ceil(10 × (answer_ms − elapsed_ms) ÷ answer_ms)` — so 20 at once and 10 at the bell; a wrong answer and no answer give 0; nothing is negative. A round is all or nothing and one attempt.
+- **The ranking is derived** (`Rooms\Support\RoomRanking`): `ofGame()` sums `room_answers.points` per player over the game's closed rounds, never the open one; `ofRoom()` over the room's games. Dense places (`DenseRank`), no tie-breaker; inside a place names in Azerbaijani order (`AzCollator`), a nameless player last; a player with no points is listed after the places without one; a removed player is not listed. A row is `{player_id, points, place}`, and the page gets `place_label` from `Ordinal::label()` in its props.
+- **Who sees it:** the host and the players of that room, on the room page and the screen — each round's results, the game's ranking after every round, the room's standing between games. All places are shown.
+- **Kept:** the room with its players, games, rounds and answers, for `elifba.retention_days` from the room's `created_at` (`PruneOldRooms`). `/rooms` lists an account's past rooms (the date by `DateLabel`, the games, the number of players, the account's own place); `/rooms/{room}` shows a closed room's games and rankings, names read from the accounts as they are now.
+- **Deleted:** a player takes their name out of a closed room (`ForgetRoomPlayer`: `user_id` null; the points stay as «Oyunçu»); the host deletes a closed room (`DeleteRoom`, cascade); an account is deleted (its rooms by cascade, its rows elsewhere nameless); time.
+- **Never:** a total, rating, level, streak or profile across rooms; a ranking of anything but one room; a share card of a room.
+
+**Why.** A race the players chose may reward speed, where a class's turn-taking may not (§5). Ten coarse steps keep network time from deciding more than a point or two.
+
+**Rejected.** No speed; a bonus by order of arrival; time as a tie-breaker; partial credit; stored totals; a copied name; keeping nothing, or results without names (the advisor's recommendation; the owner chose names) (ADR 022).
+
+### Room games
+
+**Decision** (B3–B6, ADR 023). A room game is **mechanic × difficulty**, with a number of rounds; there is no theme pack.
+
+| Part           | Is                                                                      | Where                                                                                                             | Adding one needs |
+| -------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------- |
+| **Mechanic**   | What a round shows and asks, and the shape of its answer                | Code: `Rooms\Support\Mechanics\*` (a builder), `RoomJudge` (the shape), `components/rooms/mechanics/*` (the view) | Code             |
+| **Difficulty** | How long, how many, how much time: «Asan», «Orta», «Çətin», «Çox çətin» | Data: `content/rooms/levels.json`, one entry per mechanic and difficulty 1–4                                      | A JSON entry     |
+| **Material**   | Words, groups of words, shapes                                          | Data: `content/rooms/{words,categories,shapes}.json`, `content/assets/rooms/`                                     | Data             |
+
+`Content\Enums\RoomFamily` (`memory`, `logic`, `words`) and `Content\Enums\RoomMechanic` name them; they are separate from `Mechanic`, `Unit` and the children's `levels.json`, which do not change. `Rooms\Support\RoomPlayable` lists the mechanics whose view exists; the setup offers only those.
+
+| Family   | Mechanic           | A round                                                                                      | Shape      | Built in |
+| -------- | ------------------ | -------------------------------------------------------------------------------------------- | ---------- | -------- |
+| `memory` | `recall_order`     | a row of digits, letters, words or shapes is shown, then hidden: tap them in the order shown | `sequence` | B3       |
+| `memory` | `recall_cells`     | cells of a grid light up, then go dark: tap the cells that were lit                          | `set`      | B4       |
+| `logic`  | `next_in_sequence` | a row of numbers follows a rule: choose what comes next among four                           | `choice`   | B5       |
+| `logic`  | `odd_one_out`      | one of the numbers or words does not belong: choose it                                       | `choice`   | B5       |
+| `words`  | `anagram`          | the letters of a word, shuffled and never in their own order: tap them into a word           | `sequence` | B6       |
+| `words`  | `spelling`         | one word written four ways, the wrong ones by swapping confusable letters: choose the right  | `choice`   | B6       |
+
+**The judge** (`Rooms\Support\RoomJudge`, PHP only; cases in `tests/Fixtures/rooms/judge.json`) knows three shapes. `choice`: the one picked id is the solution's. `set`: the picked ids are the solution's, in any order. `sequence`: what the picked items say, in order, equals one of the solution's accepted readings — so two tiles with the same letter are interchangeable, and an anagram accepts every word of the list that its letters spell. A stored solution is `{shape, ids}` or `{shape, accept: string[][]}`; it never reaches a device before the reveal, where it is shown as the canonical ids and, for a word, the word.
+
+**The builders** take the level, the count and a seeded random source and return rounds; each has its unit test.
+
+- `recall_order` — level: `kinds` (of `digit`, `letter`, `word`, `shape`), `length` [min, max] (at most 12), `study_ms`, `answer_ms`. One kind per round; letters come from `Alphabet`, cased by `Az::upper`; words from `content/rooms/words.json` once B6 ships it (until then a level may not name `word`). `study` is the row in order; `ask` the same items shuffled, never in the shown order.
+- `recall_cells` — level: `grid` [cols, rows] (at most 6 × 6), `lit` [min, max] (fewer than the cells). `study` is the grid with the lit cells; `ask` the dark grid, `pick` = the number lit.
+- `next_in_sequence` — level: `rules` (of `arithmetic`, `geometric`, `alternating`, `squares`, `fibonacci`, `interleaved`), `terms`, `range`. Four options: the next term and three near misses, all different; a round whose shown terms fit two of the level's rules with different next terms is built again.
+- `odd_one_out` — level: `source` (`numbers`: three or four share a property — a multiple, a parity, a square — and one does not; `words`: from one group of `categories.json` and one from another), `options` (4 or 5).
+- `anagram` — level: `word_length` [min, max]. The solution accepts every listed word with the same letters.
+- `spelling` — level: `word_length`, `swaps` (1 or 2). The wrong spellings swap a letter for its confusable (`Alphabet::confusables()`); none may itself be a word of the list.
+
+**The contract** is the room's own: PHP DTOs in `Rooms\Data\*` (`RoomStateData`, `RoomRoundData`, `RoomItemData`, `RoomRevealData`, `RoomAnswerData`, `RoomAnswerReceiptData`), zod schemas in `resources/js/rooms/contract.ts` with the TypeScript types inferred from them, fixtures in `tests/Fixtures/rooms/` (`state.lobby.json`, `state.countdown.json`, `state.study.json`, `state.answer.json`, `state.reveal.json`, `state.over.json`, `answer.json`, `receipt.json`, `judge.json`) read by `RoomContractTest` and `contract.test.ts`. The schemas are strict, so a name or a solution in the wrong place fails them. `resources/js/game/contract.ts`, `RoundData` and `tests/Fixtures/contract/` are not touched.
+
+**The pages** are React on a phone, without Phaser, sound or voice (B4; `docs/frontend.md` gets a rule for the player shell). A mechanic's instruction is interface text — `rooms.mechanics.{mechanic}.{name,line,study,ask}` in `lang/az.json` and `lang/en.json` — and what a round shows is content, Azerbaijani in every locale and cased on the server.
+
+**No promise.** No interface text, landing text or README says that a game improves memory, intelligence, attention or health; the games are named by what one does.
+
+### Room content
+
+`content/rooms/` (ADR 023, ADR 004), read by `ContentRepository` (`roomLevels()`, `roomWords()`, `roomCategories()`, `roomShapes()`), cached with the rest by `content:cache`, and checked by `ContentValidator` with one broken fixture per rule:
+
+| File                           | Step | Holds                                                                | The validator requires                                                                                                                                                                                                                                         |
+| ------------------------------ | ---- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `levels.json`                  | B3   | `version`; per level `mechanic`, `difficulty`, times and its numbers | a known mechanic; difficulty 1–4; one level per pair, and all four for a mechanic `RoomPlayable` lists; `answer_ms` 5 000–60 000; `study_ms` > 0 for a memory mechanic and 0 otherwise; the numbers inside what the builder can build; no key it does not know |
+| `shapes.json`, `assets/rooms/` | B4   | plain shapes of our own for memory rounds                            | every file exists, passes the SVG safety check and has a `credits.json` entry (§8)                                                                                                                                                                             |
+| `categories.json`              | B5   | groups of words for `odd_one_out`                                    | at least 4 groups of at least 8 words; every word passes `WordRules`; a word is in exactly one group                                                                                                                                                           |
+| `words.json`                   | B6   | the adults' word list                                                | lowercase words of 3–12 letters of the alphabet (`WordRules`), unique by `Az::lower`; none equal to a first name of `content/names.json`; at least 60 words in every length a word level asks for; for a `spelling` length, words holding a confusable letter  |
+
+**The word list is our own** (ADR 023 decision 10): written in the repository under MIT with a `credits.json` entry "Elifba contributors", starting from the words the theme packs already hold, reviewed by the owner (B7-O). The first stage plays only from a closed list, so a few hundred words are enough. A source from outside is copied only under a license `Content\Enums\License` allows and with its own credit: Wiktionary (CC BY-SA 4.0) would stay in `content/rooms/wiktionary/`; the Hunspell and Aspell dictionaries (GPL, MPL 2.0) and anything without a stated license are not copied.
+
+### Adults' privacy
+
+**Decision** (B2, B3, B7; ADR 024). In a room account holders see each other, so §7's rules get a third kind of data subject — one who uses the app and agrees for themselves.
+
+| Rule                             | How                                                                                                                                                                                                                                                                                                         |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Minimum data**                 | For the account: the role row and `player_agreed_at`. For a room: who was in it and when (`room_players`), and each answer — the items picked, right or wrong, the time, the points (`room_answers`). No age, date of birth, age group, gender, phone, photo, avatar, nickname, place, device id.           |
+| **Nothing typed**                | A room has no name and no chat; a player never types an answer. No free text of a person is stored for a room, so nothing needs moderating and nothing typed can reach a log.                                                                                                                               |
+| **Who sees a name**              | The host and the players of a room the account is or was in: on the room page, the screen and the results. Nobody else, and never an e-mail address or an account id. There is no list of rooms or players, no search and no profile.                                                                       |
+| **Never on the wire or in logs** | A player's name is never in a log, an exception, a broadcast or a URL; a device knows a player by `room_players.id`. Names reach a page only in authenticated HTTP: the room page's props and the state. No room page makes a third-party request.                                                          |
+| **No contact**                   | No message, reaction or invitation sent by Elifba. A code passes from person to person outside it.                                                                                                                                                                                                          |
+| **No age**                       | Nothing asks one. The area speaks to adults; a younger account holder who joins a friend's room gets the same minimum, the same absence of contact and the same ways out. A room never holds a student or a child: no room route takes `{student}` or `{child}`.                                            |
+| **Nothing computed**             | Beyond a room's ranking: no rating, level or chart of a person, and no claim of a benefit.                                                                                                                                                                                                                  |
+| **Deletion**                     | Take your name out of a closed room; delete a room you hosted; delete the account (its rooms go, its rows elsewhere lose the account); `elifba.retention_days`.                                                                                                                                             |
+| **Notice**                       | `/privacy` gets a section «Otaqlar» (az + en, B7), shown when the switch is on: what is stored, who sees a name and how long, that no age is asked and no player can write to another, how to delete, the operator. The sections for teachers and parents and the note for a class's parents do not change. |
+
+**Why.** A name among people who share a code, and nothing else, is what a board game around a table gives away. Everything further — an age, a nickname, a chat, a profile — would need data or moderation that Elifba does not have and the owner did not ask for.
+
+**Rejected.** An age or an "I am 18" tick; a parent's consent for a young player; nicknames; first names only; chat (ADR 024).
+
+### Guard tests
+
+How "the teacher, parent and child sides are untouched" is proven, and which test proves it (B2 unless marked):
+
+| Test                                               | What it gains                                                                                                                                                                                                                                                           |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/Feature/Auth/RoleAreasTest.php`             | the fifth group in "puts every authenticated route in one area"; "refuses an account without the player role on every room route"; "keeps the board, the remote and the pult out of the player role"; the play settings in the shared group                             |
+| `tests/Feature/Rooms/RoomsSwitchTest.php` (new)    | "answers 404 on every room route while the switch is off"; "offers and grants no player role while the switch is off"; "shares no player role or area with any page while the switch is off"; "refuses the room channel while the switch is off"                        |
+| `tests/Feature/Rooms/RoomsApartTest.php` (new)     | "sends nothing about rooms to a class, child, ranking, words, setup, board, remote, pult or guest board page"; "takes no class, student, child, game or word in any room route"; "keeps the domains apart"; B3: "leaves the game tables untouched by a whole room game" |
+| `tests/Feature/Play/BearerReachTest.php`           | the world gains an open room with a player; every room route answers a guest board's bearer as it answers a visitor                                                                                                                                                     |
+| `tests/Feature/Play/ChannelAuthTest.php`           | "refuses a guest board's bearer on a room channel"; the `game.*` cases unchanged                                                                                                                                                                                        |
+| `tests/Feature/Classroom/TeacherIsolationTest.php` | `room` and `member` in `ISOLATED_PARAMETERS`; a case for every room route: an account that is not in the room gets 404 and changes nothing, a removed player the same, a visitor the login                                                                              |
+| `tests/Feature/Family/ChildPagesTest.php`          | "sends nothing about rooms to a page of the parent area"                                                                                                                                                                                                                |
+| `tests/Feature/Play/GameCatalogTest.php`           | "lists no room game": the catalog's games stay the pinned list, and no `RoomMechanic` value is a `Mechanic` value                                                                                                                                                       |
+| `tests/Feature/Auth/RolesTableTest.php`            | "holds exactly the roles of the enum": three rows                                                                                                                                                                                                                       |
 
 ---
 
@@ -1910,6 +2299,41 @@ R1 wrote ADRs 010–013 and the R-marked text of this document; it changed no co
         - **READMEs:** a section «Evdə, valideynlər üçün» / "At home, for parents" after "What it does", and the first steps of "What it does" and "Develop" now say that an account chooses its role after registering.
         - **Tests:** `WelcomePageTest` ("has the section for parents in both languages", "shows a signed-in parent the same page, with the parent area"); `LandingTest` ("makes no third-party request from the welcome page": every `src`/`href` the server's HTML loads is relative or on the app's host, and the page's TSX names no outside address); `TranslationsTest`.
 
+### Adults' rooms (B1–B7)
+
+B1 wrote ADRs 019–024, §12 and the B-marked text of this document; it changed no code. The owner reads the design before B2 starts (roadmap step B1-O) and switches the area on after B7 (B7-O). Each step below changes the contract first if it has to depart from it, runs `composer ci:check`, keeps `ELIFBA_ROOMS` off wherever it is not testing rooms, and is done only when its named tests exist and pass on SQLite and PostgreSQL. No step changes a file of `Classroom`, `Family`, `Play` or `Rankings`, a children's page, or the content outside `content/rooms/` and `content/assets/rooms/`, except the lines named below.
+
+- **B2 — The area, the switch, rooms and joining.**
+    - _Scope._ §12 "The area and the switch" and "Rooms and joining", and the B2 lines of §1 and §7: the role `player` with its sentence, the switch, the fifth route group and the play settings' move to the shared group; the `Rooms` domain with `rooms` and `room_players`, `RoomCode`, the ten room actions, `{room}` and `{member}`, `RoomPolicy`, the limiters, the two scheduled commands; the room channel and `room.changed`; `GET /rooms/{room}/state` for a room without a game (`room`, `me`, `players`, an empty `ranking`); the invited account's way in. Pages only as far as the routes need them, plain (B4 designs them): `rooms/index`, `rooms/join`, `rooms/show` with the lobby (the code, the players, lock, remove, leave, close). No game yet.
+    - _Files._ `app/Enums/Role.php` (`Player`, `available()`); `app/Models/User.php` (`roleList()`, `area()`); `app/Support/RoomsArea.php`; `app/Http/Middleware/EnsureRoomsAreEnabled.php`; `bootstrap/app.php` (alias `rooms.enabled`, the intended address on the way to the role); `app/Actions/Roles/GrantRole.php`, `app/Data/{RoleChoiceData,AreaData}.php`, `app/Http/Controllers/{RoleController,StartController}.php`, `Settings/RolesController.php`; migrations `add_player_role` (the `roles` row, `users.player_agreed_at`) and `create_rooms_tables` (`rooms`, `room_players`); `config/elifba.php` (`rooms.enabled`, `max_players`, `idle_hours`), `.env.example`, `.env.production.example`; `app/Domain/Rooms/{Actions,Models,Data,Events,Exceptions,Policies,Support}/**` as §12 names them; `routes/rooms.php`, `routes/settings.php` (the play settings' group), `routes/channels.php`, `routes/console.php`; `app/Http/Controllers/Rooms/*`; `app/Providers/AppServiceProvider.php` (the limiters); `database/factories/{UserFactory,RoomFactory,RoomPlayerFactory}.php`; `resources/js/pages/rooms/{index,join,show}.tsx`, `resources/js/rooms/{contract,live}.ts`, `components/app/nav-areas.ts`, `pages/auth/choose-role.tsx`, `pages/settings/roles.tsx`; `tests/Support/Rooms.php`, `tests/Fixtures/rooms/state.lobby.json`; `lang/az.json`, `lang/en.json`; `php artisan wayfinder:generate --with-form`; `docs/glossary.md` if a name changes.
+    - _Tests._ `tests/Feature/Rooms/RoomsSwitchTest.php` and `tests/Feature/Rooms/RoomsApartTest.php` (the cases of §12 "Guard tests"); `tests/Feature/Auth/PlayerRoleTest.php` ("grants the player role and stamps its agreement", "refuses the role without its sentence", "adds the role to a teacher from the roles page", "lands a player on the rooms", "sends an invited account through the role and on to the room", "adds the player role without giving it to any existing account"); `tests/Feature/Rooms/OpenRoomTest.php` ("opens a room with a code and the host as its first player", "opens a room the host does not play in", "refuses a second open room of the same host", "never gives two open rooms one code"); `tests/Feature/Rooms/JoinRoomTest.php` ("joins with the code and an account", "sends a visitor to the login and back to the code", "answers 404 for an unknown code, a closed room and a removed account alike", "says that a room is locked or full and nothing else about it", "brings a player who left back to the same row", "refuses a twenty-first player", "does not know a pairing code, and the pult does not know a room code", "limits guessing per account"); `tests/Feature/Rooms/RoomHostTest.php` ("locks and unlocks", "removes a player for good", "cannot remove the host's own row", "closes the room and clears its code", "lets only the host do any of it"); `tests/Feature/Rooms/RoomLifetimeTest.php` ("treats an idle room as closed before the scheduler runs", "closes idle rooms", "prunes rooms past the retention period with everything under them", "deletes a host's rooms with the account and leaves a player's rows without an account"); `tests/Feature/Rooms/RoomStateTest.php` ("gives the lobby its players by name and never an account id or an address", "names no one who took their name out", "refuses the state to an account outside the room"); `tests/Feature/Rooms/RoomChannelTest.php` ("authorizes the host and a present player of an open room", "refuses a player who left, a removed player, another account and a visitor", "refuses everyone once the room is closed"); `tests/Feature/Rooms/RoomSignalsTest.php` ("signals a change with the revision and nothing else", "keeps the change when Reverb is down"); `tests/Unit/Rooms/RoomCodeTest.php`; Vitest `resources/js/rooms/contract.test.ts` ("accepts the lobby fixture", "refuses a state that carries an account id or an address") and `resources/js/lib/nav-active.test.ts` (the third navigation); and, updated, `RoleAreasTest`, `RolesTableTest`, `BearerReachTest`, `ChannelAuthTest`, `TeacherIsolationTest`, `ChildPagesTest`, `GameCatalogTest`, `RegistrationTest`, `ProfileUpdateTest` ("deleting the account removes its rooms"), `TranslationsTest`.
+    - _Finish line._ With the switch off, no page, prop, role card or route shows rooms and every room route is a 404. With it on, two accounts sit in one lobby and see each other's name, a third without the role is sent to take it, a removed one cannot return, and a guest board's bearer gets nothing; PHPStan level 8 passes with no ignore and no baseline; `composer ci:check` passes and the `pgsql` job is green.
+- **B3 — The race, and the first game.**
+    - _Scope._ §12 "The race", "Scoring and what is kept" (the rule, the ranking) and the B3 parts of "Room games" and "Room content": `room_games`, `room_rounds`, `room_answers`; `RoomFamily`, `RoomMechanic`, `content/rooms/levels.json` with the four levels of `recall_order` (digits and letters) and its validator rules; `StartRoomGame`, `EndRoomGame`, `RecordRoomAnswer`; `RoomClock`, `RoomTimetable`, `RoomJudge`, `RoomPointsRule`, `RoomRanking`, `RoomPlayable`, the whole `RoomState`; the contract with its fixtures on both sides; the early close in `LeaveRoom` and `RemoveRoomPlayer`. The room page plays `recall_order` plainly — enough to race in two browsers; B4 designs it.
+    - _Files._ migration `create_room_games_tables`; `config/elifba.php` (`rooms.rounds`, `countdown_ms`, `reveal_ms`); `app/Domain/Content/Enums/{RoomFamily,RoomMechanic}.php`, `Content/Data/RoomLevelData.php`, `Content/Support/{ContentRepository,ContentValidator}.php`; `content/rooms/levels.json`; `tests/Fixtures/content/rooms/**` and `broken.json`; `app/Domain/Rooms/Actions/{StartRoomGame,EndRoomGame,RecordRoomAnswer,LeaveRoom,RemoveRoomPlayer,CloseRoom}.php`, `Rooms/Models/{RoomGame,RoomRound,RoomAnswer}.php`, `Rooms/Data/*`, `Rooms/Support/{RoomClock,RoomTimetable,RoomState,RoomJudge,RoomPointsRule,RoomRanking,RoomPlayable}.php`, `Rooms/Support/Mechanics/{RoomRoundBuilder,RecallOrderBuilder}.php`; `routes/rooms.php`, `app/Http/Controllers/Rooms/{RoomGameController,RoomAnswerController}.php`; `resources/js/rooms/{contract,clock,live}.ts`, `components/rooms/mechanics/recall-order.tsx`, `pages/rooms/show.tsx`; `tests/Fixtures/rooms/*`; factories; `lang/*`.
+    - _Tests._ `tests/Unit/Rooms/RoomTimetableTest.php` ("derives every phase from the start, the durations and the facts", "opens the next round a reveal after an early close", "is over at the host's end", "is over by itself after the last reveal"); `tests/Unit/Rooms/RoomJudgeTest.php` ("judges a choice, a set and a sequence from the shared cases", "takes tiles that say the same as interchangeable"); `tests/Unit/Rooms/RoomPointsRuleTest.php` ("gives 20 at once and 10 at the bell", "gives nothing for a wrong answer", "never goes below zero or above 20"); `tests/Unit/Rooms/RecallOrderBuilderTest.php` ("shows one kind per round within the level's length", "never asks in the order shown", "builds the same rounds from the same seed"); `tests/Unit/Rooms/RoomContractTest.php` ("round-trips every fixture", "has no solution in any state before the reveal"); `tests/Feature/Rooms/RoomRaceTest.php` ("serves nothing of a round before it opens", "serves the study material only while it is studied", "serves the question only from the answer phase", "never serves the solution or a result before the round closes", "counts each player's answer once, whatever is sent twice", "refuses a second answer of the same player", "refuses an answer after the bell", "refuses items that are not the round's", "measures the time on the server's clock", "never says right or wrong in the receipt", "closes the round when every present player has answered", "does not wait for a player who left or was removed", "lets a late joiner answer the open round", "runs to its end with nobody watching", "ends when the host ends it", "starts no second game while one is running", "ends the game when the room closes"); `tests/Feature/Rooms/RoomRankingTest.php` ("sums only closed rounds", "shares a place on a tie and skips none", "orders names inside a place by the Azerbaijani alphabet", "leaves out a removed player", "keeps a nameless player's points"); `RoomSignalsTest` ("signals an early close and a game's start"); `RoomsApartTest` ("leaves the game tables untouched by a whole room game"); `ContentValidatorTest` (a broken fixture per `levels.json` rule) and `ContentRepositoryTest` ("reads the room levels"); Vitest `resources/js/rooms/contract.test.ts` (every fixture; "refuses a solution outside the reveal") and `clock.test.ts` ("estimates the server's clock from a state", "asks again at each moment of the timetable", "polls when there is no socket").
+    - _Finish line._ Two accounts in two browsers play a whole `recall_order` game and see the same ranking; a third joins in the middle; the network tab of a playing browser shows no solution before a reveal; `composer ci:check` passes and the `pgsql` job is green.
+- **B4 — The phone pages, the screen and the second memory game.**
+    - _Scope._ The player area's interface, phone first: «Otaqlar» (open a room, the code field, the account's open and past rooms), the join page, the room page (the lobby with the code and its QR, the host's tools; the setup of a game: family, game, difficulty, rounds; the countdown, the study and the answer views with the time bar; the reveal with one's own points; the ranking; the end of a game and the room's standing), a closed room's results with «Adımı sil» and the host's «Otağı sil», the screen page; `recall_cells` and the shapes for `recall_order`, proving that a mechanic is a builder, a shape and a view. No server rule changes but the new mechanic.
+    - _Files._ `resources/js/pages/rooms/{index,join,show,screen}.tsx`, `components/rooms/*`, `components/rooms/mechanics/{recall-order,recall-cells}.tsx`; `app/Domain/Content/Enums/RoomMechanic.php`, `Rooms/Support/Mechanics/RecallCellsBuilder.php`, `Rooms/Support/RoomPlayable.php`; `content/rooms/{levels,shapes}.json`, `content/assets/rooms/*.svg`, `content/credits.json`, `CREDITS.md` (generated); `app/Http/Controllers/Rooms/RoomScreenController.php`; `docs/frontend.md` (rule 15, the player shell); `lang/*`.
+    - _Tests._ `tests/Feature/Rooms/RoomPagesTest.php` ("lists an account's open and past rooms and nobody else's", "gives a closed room its games and rankings by name", "sends no account id, address or solution to any room page", "takes a player's name out of a closed room and keeps the points", "deletes a closed room for everyone", "gives the screen only to the host"); `tests/Unit/Rooms/RecallCellsBuilderTest.php` ("lights fewer cells than the grid has", "asks for exactly the lit cells"); `RoomJudgeTest` on the `set` cases; `ContentValidatorTest` (the shapes rules) and `CreditsDocumentTest`; Vitest `resources/js/rooms/clock.test.ts` ("draws the same bar on a slow clock") and `components/rooms/standing.test.ts` ("shows a shared place once").
+    - _Finish line._ Checked in a browser at phone width (375 px) with three accounts on three devices or profiles, and the screen on a laptop: open a room, join by QR and by typed code, play both memory games at two difficulties, read the ranking, close the room, read its results, take a name out; with screenshots.
+- **B5 — «Məntiq və ardıcıllıq».**
+    - _Scope._ `next_in_sequence` and `odd_one_out`: the builders, the six sequence rules, `content/rooms/categories.json`, the eight levels, the two views. The judge needs nothing new (`choice`).
+    - _Files._ `app/Domain/Content/Enums/RoomMechanic.php`, `Content/Data/RoomCategoryData.php`, `Content/Support/{ContentRepository,ContentValidator}.php`; `content/rooms/{levels,categories}.json`; `app/Domain/Rooms/Support/Mechanics/{NextInSequenceBuilder,OddOneOutBuilder,SequenceRules}.php`, `Rooms/Support/RoomPlayable.php`; `components/rooms/mechanics/{next-in-sequence,odd-one-out}.tsx`; `tests/Fixtures/rooms/*`, `tests/Fixtures/content/rooms/**`; `lang/*`.
+    - _Tests._ `tests/Unit/Rooms/NextInSequenceBuilderTest.php` ("continues every rule of the level", "offers four different numbers with one right", "builds no row that two rules continue differently"); `tests/Unit/Rooms/OddOneOutBuilderTest.php` ("takes all but one word from one group", "leaves exactly one number without the shared property"); `ContentValidatorTest` (a word in two groups, a group too small, an unknown rule); `RoomRaceTest` ("plays a logic game to its ranking"); `contract.test.ts` on the new fixtures.
+    - _Finish line._ Both logic games play in a room at every difficulty from the phone (seen in a browser); `content:validate` passes; `composer ci:check` passes.
+- **B6 — «Söz oyunları».**
+    - _Scope._ `anagram` and `spelling`: the builders, `content/rooms/words.json` (our own list, ADR 023 decision 10), its validator rules and its credit, the eight levels, the two views; `word` becomes a kind `recall_order` may show. If the own list cannot fill a level, the step stops and reports it rather than copying a source.
+    - _Files._ `app/Domain/Content/Enums/RoomMechanic.php`, `Content/Data/RoomWordData.php`, `Content/Support/{ContentRepository,ContentValidator}.php`; `content/rooms/{levels,words}.json`, `content/credits.json`, `CREDITS.md`; `app/Domain/Rooms/Support/Mechanics/{AnagramBuilder,SpellingBuilder}.php`, `Rooms/Support/RoomPlayable.php`; `components/rooms/mechanics/{anagram,spelling}.tsx`; fixtures; `lang/*`.
+    - _Tests._ `tests/Unit/Rooms/AnagramBuilderTest.php` ("never shows the letters in the word's own order", "accepts every listed word the letters spell", "cases the letters with Azerbaijani rules"); `tests/Unit/Rooms/SpellingBuilderTest.php` ("makes the wrong spellings from confusable letters only", "offers no wrong spelling that is a listed word", "offers four different spellings with one right"); `ContentValidatorTest` (a word with a foreign letter, a duplicate by Azerbaijani casing, a first name of the name list, too few words for a level); `ContentRepositoryTest` ("reads the word list"); `CreditsDocumentTest`; `RoomRaceTest` ("plays a word game to its ranking", "stores no text a player wrote"); `contract.test.ts` on the new fixtures.
+    - _Finish line._ Both word games play in a room at every difficulty; the word list has its credit under MIT and passes `content:validate`; `composer ci:check` passes.
+- **B7 — The privacy page, the landing page, the READMEs and the deploy.**
+    - _Scope._ `/privacy`'s section «Otaqlar» in both languages (§12 "Adults' privacy"), shown when the switch is on; a section for rooms on the welcome page and in both READMEs, on the page only when the switch is on and with no promise of a benefit; `ELIFBA_ROOMS` in the install sections; elifba.io updated with the switch still off — the owner turns it on (B7-O).
+    - _Files._ `PrivacyController`, `resources/js/pages/privacy.tsx`; `WelcomeController`, `resources/js/pages/welcome.tsx`, `components/welcome/*`; `README.md`, `README.az.md`, `docs/screenshots/`; `.env.production.example`; `lang/*`.
+    - _Tests._ `PrivacyPageTest` ("has the section for rooms in both languages when the switch is on", "says nothing of rooms when it is off"); `WelcomePageTest` ("shows rooms only when the switch is on"); `LandingTest` ("makes no third-party request"); `tests/Unit/RoomsWordingTest.php` ("promises no benefit in any room text": no `rooms.*`, `welcome.rooms.*` or `privacy.rooms.*` string in either language holds a word of its short list — «inkişaf», «gücləndir», «sağlam», "improve", "boost", "train your"…); `TranslationsTest`.
+    - _Finish line._ The privacy page says what a room stores and who sees a name; the landing page of an instance with the switch off is unchanged; `composer ci:check` passes; elifba.io runs the release with `ELIFBA_ROOMS` unset.
+
 ## Open questions for the owner
 
 The owner answered the five questions A1 raised on 2026-11-09 by accepting the recommendations, and the sections above follow them:
@@ -1933,3 +2357,26 @@ Raised by R1 (2026-11-11). None blocks a step: each has a recommendation, and R2
 | 10  | How many children a parent may add               | 10 (`elifba.children.max`): a family fits, a class does not.                                                                                                                                                                                                    | §7, ADR 011         |
 | 11  | No archive for a child                           | A child is deleted (with a confirmation), never archived; the roadmap's R4 line said "archive". Deleting removes the child's games and stars at once.                                                                                                           | §7, ADR 011         |
 | 12  | Own words for parents                            | Not in this roadmap: «Sözlər» stays in the teacher area. A parent who is also a teacher gets their own words in home games too. A words page for parents can follow if parents ask.                                                                             | §3 "Teacher words"  |
+
+Asked by B1 (2026-11-17) before it wrote, after the options were compared against the code; the owner's answers are fixed and §12 follows them:
+
+| #   | Question                       | Answer                                                                                                                                                                   | Where        |
+| --- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| 13  | Who may open a room            | An account that holds a third role with its own agreement sentence — not any teacher or parent, and not an account without a role                                        | §12, ADR 019 |
+| 14  | Does a joiner need an account  | Yes, every player; the advisor had recommended a code and a typed name. The same role then serves the host and the players                                               | §12, ADR 020 |
+| 15  | What stays after a room closes | The results with names, for the retention period (400 days); the advisor had recommended keeping nothing. A player can take their name out, the host can delete the room | §12, ADR 022 |
+
+Raised by B1. None blocks a step: each has a recommendation, and B2–B7 follow it unless the owner says otherwise when reading the design (B1-O).
+
+| #   | Question                                   | Recommendation (what the design follows)                                                                                                                                                                                                                                               | Where                 |
+| --- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| 16  | The names and the sentence of the new role | The role «Oyunçu», the area «Otaqlar», and the sentence of §7 "Agreements". The sentence is the owner's promise to players, so the owner (or a lawyer) should read it and `/privacy`'s section before the switch is turned on; changing them is lines in `lang/`.                      | §7, §12, ADR 019      |
+| 17  | Does speed count                           | Yes: 10 points for a right answer and up to 10 more for speed, in ten steps; a wrong answer gives 0. Without speed a race ends in ties. Changing the numbers is one class (`RoomPointsRule`); old rooms keep the points they were given.                                               | §12, ADR 022          |
+| 18  | The name a room shows                      | The account's name as the account wrote it (`users.name`), not a nickname per room: nothing new to store or moderate, and "everyone under their own name". Showing only the first word of it is a small change if the owner prefers.                                                   | §12, ADR 020, ADR 024 |
+| 19  | Confirmed e-mail before joining            | Required, as in every area (`verified`). It is the accountability the owner chose accounts for; Google sign-in confirms at once, the form needs the mail's link.                                                                                                                       | §12, ADR 020          |
+| 20  | The limits                                 | 20 players in a room, one open room per host, closed after 3 idle hours, 5–20 rounds a game (`elifba.rooms.*`). One server carries this; larger rooms are a new decision (ADR 021).                                                                                                    | §12, ADR 020          |
+| 21  | The big screen on a shared computer        | Not in the first stage: the screen is a page of the host's own session, and the guest board stays a children's board. If hosts ask for a screen without a login, it gets a credential of its own then.                                                                                 | §12, ADR 021          |
+| 22  | The first games                            | Two per family: «Ardıcıllığı yadda saxla» and «Xanaları yadda saxla»; «Sıranı davam etdir» and «Artıq olanı tap»; «Anaqram» and «Düzgün yazılış». The names are working names for `lang/`; the owner reviews them with the content (B7-O).                                             | §12, ADR 023          |
+| 23  | Where the adults' words come from          | Our own list under MIT, grown from the theme packs' words and reviewed by the owner. An open game («hərflərdən istənilən söz») waits for a full word list under an allowed license: the Hunspell list is GPL / MPL, Wiktionary is CC BY-SA and would need its own folder and a review. | §12, ADR 023          |
+| 24  | A young player                             | No age is asked. The design is the same minimum for everyone: a name among people who share a code, no chat, no profile, every way out. If the owner wants the area's texts to say «böyüklər üçün» more firmly, that is wording, not a field.                                          | §12, ADR 024          |
+| 25  | A share card of a room's winners           | Not in the first stage: it would carry adults' names out of the room, and §6's card is a class's. It can follow as its own decision if players ask.                                                                                                                                    | §12, ADR 022          |
