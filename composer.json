@@ -91,6 +91,10 @@
             "npm run test",
             "@test"
         ],
+        "test:pgsql": [
+            "Composer\\Config::disableProcessTimeout",
+            "scripts/test-pgsql.sh"
+        ],
         "types:check": [
             "phpstan analyse"
         ],

@@ -1918,7 +1918,7 @@ Routes (names in English; `/pult` is the one Azerbaijani path because teachers t
 5. PHPStan level 8 with Larastan;
 6. Pest: unit and feature tests, including translation parity, `ContentValidator` over all packs, the syllable set, the contract fixtures, the judge cases, credits coverage and teacher isolation.
 
-GitHub Actions (`.github/workflows/ci.yml`, actions pinned by SHA as in the precedent): job `ci` — PHP 8.4, Node 22, `composer setup`, `composer ci:check` on SQLite; job `pgsql` — a `postgres:17` service and `php artisan test` with `DB_CONNECTION=pgsql`; job `docker` — `scripts/docker-smoke.sh` against the Docker stack from the checkout (§10).
+GitHub Actions (`.github/workflows/ci.yml`, actions pinned by SHA as in the precedent): job `ci` — PHP 8.4, Node 22, `composer setup`, `composer ci:check` on SQLite; job `pgsql` — a `postgres:17` service and `php artisan test` with `ELIFBA_TEST_PGSQL_URL` (`phpunit.xml` forces in-memory SQLite over every `DB_*`, and `tests/bootstrap.php` switches to PostgreSQL only on that opt-in), failing when the suite is not on `pgsql` (`DatabaseEngineTest`, and a check that the run migrated the service database); `composer test:pgsql` runs the same suite locally on a throwaway `postgres:17` container; job `docker` — `scripts/docker-smoke.sh` against the Docker stack from the checkout (§10).
 
 ### Rules the `CLAUDE.md` will give later agents (A2 writes it)
 

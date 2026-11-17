@@ -90,15 +90,23 @@ jobs:
       - name: Setup Application
         run: composer setup
 
+      # phpunit.xml forces in-memory SQLite over DB_*; ELIFBA_TEST_PGSQL_URL is
+      # the one opt-in (tests/bootstrap.php), and DatabaseEngineTest fails if
+      # the suite is not on pgsql.
       - name: Run Pest on PostgreSQL
         run: php artisan test
         env:
-          DB_CONNECTION: pgsql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 5432
-          DB_DATABASE: elifba
-          DB_USERNAME: elifba
-          DB_PASSWORD: elifba
+          ELIFBA_TEST_PGSQL_URL: pgsql://elifba:elifba@127.0.0.1:5432/elifba
+
+      # The same proof from outside PHP: the service database is empty until
+      # the suite migrates it, so no `migrations` table means it never ran here.
+      - name: Fail unless the suite ran on PostgreSQL
+        run: |
+          applied=$(docker exec "$PG_CONTAINER" psql -U elifba -d elifba -tAc 'select count(*) from migrations')
+          echo "Migrations the suite applied on PostgreSQL: $applied"
+          test "$applied" -gt 0
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
 
   # The Docker stack from a clean checkout (docs/architecture.md §10):
   # build, every service healthy, /up and the assets through Caddy, Reverb's

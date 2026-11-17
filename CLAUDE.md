@@ -8,6 +8,7 @@ Elifba is a Laravel 13 + Inertia 3 + React 19 app (the official React starter ki
 
 - `composer ci:check` — the gate CI runs: `vp check` (oxlint + oxfmt), `tsc --noEmit`, `vp test` (Vitest: `resources/js/**/*.test.ts` against `tests/Fixtures/contract/`), Pint, PHPStan level 8 (Larastan), Pest. Run it before calling work done.
 - `php artisan test --compact --filter=<name>` — the tests you touched.
+- `composer test:pgsql` — the Pest suite on a throwaway `postgres:17` container (Docker), as the CI `pgsql` job runs it; arguments go through `scripts/test-pgsql.sh --filter=<name>`. A plain `php artisan test` is always in-memory SQLite.
 - `vendor/bin/pint --dirty` and `npm run check:fix` — fix formatting.
 - `php artisan wayfinder:generate --with-form` — regenerate typed routes after changing a route.
 - `composer setup` once (it also writes the Reverb keys to `.env`), then `composer dev` (Vite, Reverb, logs, `artisan serve`); Herd serves `http://elifba.test`. `composer dev:lan` runs the same stack on the laptop's LAN IP so a real phone can open `/pult` (architecture §10).
