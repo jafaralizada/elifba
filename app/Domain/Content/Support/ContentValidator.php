@@ -19,6 +19,7 @@ use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Content\Enums\RoomSequenceRule;
 use App\Domain\Content\Enums\RoomSound;
 use App\Domain\Content\Enums\RoomSource;
+use App\Domain\Content\Enums\RoomSpeaker;
 use App\Domain\Content\Enums\SlotStyle;
 use App\Domain\Content\Enums\Sound;
 use App\Domain\Content\Enums\Unit;
@@ -193,10 +194,20 @@ final class ContentValidator
     public const string ROOM_SOUNDS_FOLDER = 'rooms/sounds/';
 
     /**
-     * A room sound is short, so a page can fetch its speaker's set as soon
-     * as sound is unlocked: no file above this many bytes (ADR 025).
+     * A room sound is one event, so a page can fetch its speaker's set as
+     * soon as sound is unlocked: no file above this many bytes — the 5 s
+     * clock is the longest (ADR 028 decision 12).
      */
-    public const int MAX_ROOM_SOUND_BYTES = 48 * 1024;
+    public const int MAX_ROOM_SOUND_BYTES = 64 * 1024;
+
+    /**
+     * A speaker's whole set, fetched at once when sound is unlocked: the
+     * screen's on the computer by the wall, a phone's a few short files, so
+     * a phone that joins stays light (ADR 028 decision 12).
+     *
+     * @var array<value-of<RoomSpeaker>, int>
+     */
+    public const array MAX_ROOM_SPEAKER_BYTES = ['screen' => 320 * 1024, 'phone' => 64 * 1024];
 
     /**
      * Where the rivalry strip's emoji are, under `assets/`: Fluent Emoji
@@ -1389,11 +1400,12 @@ final class ContentValidator
     // ── rooms/sounds.json ───────────────────────────────────────────────
 
     /**
-     * The sounds of a room game (§12 "Room content", ADR 025 "Sound"):
-     * `version` and `sounds`, an object with one file for every
+     * The sounds of a room game (§12 "Room content", ADR 025 "Sound", ADR
+     * 028): `version` and `sounds`, an object with one file for every
      * `RoomSound` and no other key. Each is an MP3 under
      * `assets/rooms/sounds/` that exists, no other sound uses and holds at
-     * most `MAX_ROOM_SOUND_BYTES`; and every file in that folder is a
+     * most `MAX_ROOM_SOUND_BYTES`; each speaker's files together hold at
+     * most its `MAX_ROOM_SPEAKER_BYTES`; and every file in that folder is a
      * sound of the list. The files need a credits entry like every asset.
      */
     private function roomSounds(): void
@@ -1417,6 +1429,8 @@ final class ContentValidator
 
         /** @var array<string, string> $used sound path → the entry that has it */
         $used = [];
+        /** @var array<value-of<RoomSpeaker>, int> $speakers bytes of each speaker's files */
+        $speakers = array_fill_keys(array_keys(self::MAX_ROOM_SPEAKER_BYTES), 0);
 
         foreach ($sounds as $name => $path) {
             $where = "sounds.{$name}";
@@ -1444,6 +1458,18 @@ final class ContentValidator
 
             if ($bytes > self::MAX_ROOM_SOUND_BYTES) {
                 $this->problem($file, "{$where} \"{$path}\" holds {$bytes} bytes; a room sound holds at most ".self::MAX_ROOM_SOUND_BYTES);
+            }
+
+            $speaker = RoomSound::tryFrom((string) $name)?->speaker();
+
+            if ($speaker !== null) {
+                $speakers[$speaker->value] += $bytes;
+            }
+        }
+
+        foreach ($speakers as $speaker => $bytes) {
+            if ($bytes > self::MAX_ROOM_SPEAKER_BYTES[$speaker]) {
+                $this->problem($file, "the {$speaker}'s sounds hold {$bytes} bytes; a {$speaker}'s sounds hold at most ".self::MAX_ROOM_SPEAKER_BYTES[$speaker]);
             }
         }
 

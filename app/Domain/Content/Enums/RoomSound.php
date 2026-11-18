@@ -4,26 +4,29 @@ namespace App\Domain\Content\Enums;
 
 /**
  * The sounds of a room game (docs/architecture.md §12 "Room content", ADR
- * 025 "Sound"), one file each in `content/rooms/sounds.json`. The page
- * decides when one plays (`components/rooms/sound-cues.ts`, which names
+ * 025 "Sound", ADR 028), one file each in `content/rooms/sounds.json`. The
+ * page decides when one plays (`components/rooms/sound-cues.ts`, which names
  * the same values); nothing audible before the reveal tells right from
- * wrong: `Sent` is one sound for every answer, and `Right` and `Wrong`
- * play only from the reveal, on the viewer's own phone. Separate from the
- * children's `Sound` and `content/sounds.json`.
+ * wrong: `Clock` is the same for everyone and `Sent` one sound for every
+ * answer, and `Right` and `Wrong` play only from the reveal, on the viewer's
+ * own phone. Separate from the children's `Sound` and `content/sounds.json`.
  */
 enum RoomSound: string
 {
-    /** The screen: each second of the countdown. */
-    case Count = 'count';
+    /** The screen: the countdown before round 0, one file that ends at `opens_ms`. */
+    case Countdown = 'countdown';
 
-    /** The screen: the study opens. */
+    /** The screen: round 0 opens, in place of its study or its question. */
+    case Go = 'go';
+
+    /** The screen: a later round's study opens. */
     case Study = 'study';
 
-    /** The screen: the question opens. */
+    /** The screen: a question opens. */
     case Question = 'question';
 
-    /** The screen: each of the last three seconds of an answer. */
-    case Tick = 'tick';
+    /** The screen: the last 5 s of an answer, one file that ends at `bell_ms`. */
+    case Clock = 'clock';
 
     /** The screen: the round closes and the reveal opens, whatever anyone answered. */
     case Close = 'close';
@@ -31,11 +34,17 @@ enum RoomSound: string
     /** The screen: the reveal's ranking comes in. */
     case Ranking = 'ranking';
 
+    /** The screen: the final's third or second place opens. */
+    case Place = 'place';
+
     /** The screen: the final's roll, ending where the first place opens. */
     case Roll = 'roll';
 
     /** The screen: the fanfare when the final's first place opens. */
     case Fanfare = 'fanfare';
+
+    /** The screen, between games: a player joined. */
+    case Join = 'join';
 
     /** A phone: the viewer's own tap, the same for every item. */
     case Tap = 'tap';

@@ -423,7 +423,7 @@ it('sends the screen the room\'s sounds and a phone only its own, and a closed r
     $room = Rooms::open($this->resad);
     Rooms::join($room, $this->aygun);
     $folder = asset('content/rooms/sounds').'/';
-    $screen = ['count', 'study', 'question', 'tick', 'close', 'ranking', 'roll', 'fanfare'];
+    $screen = ['countdown', 'go', 'study', 'question', 'clock', 'close', 'ranking', 'place', 'roll', 'fanfare', 'join'];
     $phone = ['tap', 'undo', 'sent', 'right', 'wrong'];
 
     $sounds = pagesProps($this->actingAs($this->resad)->get(route('rooms.screen', $room)))['sounds'];

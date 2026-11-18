@@ -4,17 +4,24 @@ import type { RoomState as State } from '@/rooms/contract';
 import type { RoomSpeaker } from '@/rooms/sound';
 import { finalTimeline } from './final';
 import { REVEAL_MS } from './motion';
-import { roomCues, sameMoment, STALE_MS } from './sound-cues';
+import {
+    CLOCK_MS,
+    LEAD_MS,
+    roomCues,
+    sameMoment,
+    STALE_MS,
+} from './sound-cues';
 import type { RoomCue, RoomEar } from './sound-cues';
 import { standingGroups } from './standing-groups';
 
 /*
- * When a room game sounds (ADR 025 "Sound", docs/frontend.md rule 15
- * "Sound"): a cue plays when its moment begins and the page saw it begin,
- * once however often the state comes again, never for the moment a page
- * opened on; the screen plays the room's moments and the same whatever
- * anyone answered; a phone plays its own answer sent, one sound for every
- * answer, and its verdict only from the reveal.
+ * When a room game sounds (ADR 025 "Sound", ADR 028, docs/frontend.md rule
+ * 15 "Sound"): a cue plays when its moment begins and the page saw it
+ * begin, once however often the state comes again, never for the moment a
+ * page opened on; the countdown and the clock are one file each, placed to
+ * end at `opens_ms` and `bell_ms`; the screen plays the room's moments and
+ * the same whatever anyone answered; a phone plays its own answer sent,
+ * one sound for every answer, and its verdict only from the reveal.
  */
 const fixtures = import.meta.glob<unknown>(
     '../../../../tests/Fixtures/rooms/state.*.json',
@@ -103,8 +110,8 @@ function game(mine: 'right' | 'wrong' | 'none'): RoomEar[] {
         { state: answer, now: answerFrom + 1200 },
         { state: sent, now: answerFrom + 2400 },
         { state: sent, now: answerFrom + 3000 },
+        { state: sent, now: bell - 5400 },
         { state: sent, now: bell - 2900 },
-        { state: sent, now: bell - 2500 },
         { state: sent, now: bell - 1900 },
         { state: sent, now: bell - 900 },
         { state: sent, now: bell - 100 },
@@ -137,24 +144,23 @@ function heard(
 const names = (played: { cue: RoomCue }[]) =>
     played.map(({ cue }) => cue.sound);
 
-const winnerAt =
-    finalTimeline(standingGroups(over.ranking, []), 'screen').winnerAt ?? -1;
+const overTimeline = finalTimeline(standingGroups(over.ranking, []), 'screen');
+const winnerAt = overTimeline.winnerAt ?? -1;
+/** The fixture's final has a first and a second place, then two players without points. */
+const secondAt = overTimeline.opensAt[1];
 
 describe('roomCues on the screen', () => {
     it("plays each of the room's moments once, however often the state comes again", () => {
         const played = heard(game('right'), 'screen');
 
         expect(played.map(({ step, cue }) => [step, cue])).toEqual([
-            [1, { sound: 'count', at: 0 }],
-            [3, { sound: 'count', at: 0 }],
-            [4, { sound: 'count', at: 0 }],
+            [1, { sound: 'countdown', at: 2500, ends: true }],
             [6, { sound: 'study', at: 0 }],
             [8, { sound: 'question', at: 0 }],
-            [12, { sound: 'tick', at: 0 }],
-            [14, { sound: 'tick', at: 0 }],
-            [15, { sound: 'tick', at: 0 }],
+            [12, { sound: 'clock', at: 5400, ends: true }],
             [17, { sound: 'close', at: 0 }],
             [17, { sound: 'ranking', at: REVEAL_MS.ranking }],
+            [20, { sound: 'place', at: secondAt }],
             [20, { sound: 'roll', at: winnerAt, ends: true }],
             [20, { sound: 'fanfare', at: winnerAt }],
         ]);
@@ -187,16 +193,228 @@ describe('roomCues on the screen', () => {
         expect(winnerAt).toBeGreaterThan(0);
     });
 
-    it('ticks only in the last three seconds, once a second', () => {
-        const ticks = heard(game('right'), 'screen').filter(
-            ({ cue }) => cue.sound === 'tick',
+    it('runs the clock once, as one file ending at the bell, heard ahead of its last five seconds', () => {
+        const clocks = heard(game('right'), 'screen').filter(
+            ({ cue }) => cue.sound === 'clock',
         );
 
-        expect(ticks.map(({ step }) => game('right')[step].now)).toEqual([
-            bell - 2900,
-            bell - 1900,
-            bell - 900,
+        expect(clocks).toHaveLength(1);
+        expect(game('right')[clocks[0].step].now).toBe(bell - 5400);
+        expect(clocks[0].cue).toEqual({ sound: 'clock', at: 5400, ends: true });
+        expect(CLOCK_MS + LEAD_MS).toBeGreaterThanOrEqual(5400);
+
+        // Not yet, more than CLOCK_MS + LEAD_MS before the bell.
+        expect(
+            roomCues(
+                { state: answer, now: bell - 9000 },
+                { state: answer, now: bell - CLOCK_MS - LEAD_MS - 1 },
+                'screen',
+            ),
+        ).toEqual([]);
+    });
+
+    it('places the countdown to end where round 0 opens, from its middle when it is heard late', () => {
+        expect(
+            roomCues(
+                { state: lobby, now: opens - 4000 },
+                { state: countdown, now: opens - 1200 },
+                'screen',
+            ),
+        ).toEqual([{ sound: 'countdown', at: 1200, ends: true }]);
+        // Without the server's clock there is no countdown to place.
+        expect(
+            roomCues(
+                { state: lobby, now: null },
+                { state: countdown, now: null },
+                'screen',
+            ),
+        ).toEqual([]);
+    });
+
+    it('starts the game with «go»: round 0 opens with it in place of its study or its question', () => {
+        const first = <T extends LiveState>(
+            source: T,
+            studied: boolean,
+        ): State =>
+            ({
+                ...source,
+                round: {
+                    ...source.round,
+                    index: 0,
+                    answer_from_ms: studied
+                        ? source.round.answer_from_ms
+                        : source.round.opens_ms,
+                },
+            }) as State;
+        const from = { state: countdown, now: opens - 100 };
+
+        // A memory game: round 0's study is the start; its question is a question.
+        expect(
+            roomCues(
+                from,
+                { state: first(study, true), now: opens + 80 },
+                'screen',
+            ),
+        ).toEqual([{ sound: 'go', at: 0 }]);
+        expect(
+            roomCues(
+                { state: first(study, true), now: opens + 900 },
+                {
+                    state: first(answer as LiveState, true),
+                    now: answerFrom + 60,
+                },
+                'screen',
+            ),
+        ).toEqual([{ sound: 'question', at: 0 }]);
+
+        // A game without a study: round 0's question is the start.
+        const opening = first(answer as LiveState, false);
+
+        expect(
+            roomCues(
+                from,
+                { state: opening, now: (opening.round?.opens_ms ?? 0) + 80 },
+                'screen',
+            ),
+        ).toEqual([{ sound: 'go', at: 0 }]);
+    });
+
+    it('plays the clock with the question when the answer is shorter than the clock', () => {
+        const short = {
+            ...answer,
+            round: { ...answer.round, bell_ms: answerFrom + 4000 },
+        } as State;
+
+        expect(
+            roomCues(
+                { state: study, now: answerFrom - 100 },
+                { state: short, now: answerFrom + 60 },
+                'screen',
+            ),
+        ).toEqual([
+            { sound: 'question', at: 0 },
+            { sound: 'clock', at: 3940, ends: true },
         ]);
+    });
+
+    it('ends the clock with its moment when everybody answered: the round closes early for the whole room', () => {
+        const early = {
+            ...reveal,
+            round: { ...reveal.round, closes_ms: bell - 2000 },
+        } as State;
+        const before = { state: answered, now: bell - 2100 };
+        const after = { state: early, now: bell - 1900 };
+
+        expect(sameMoment(before, after, 'screen')).toBe(false);
+        expect(
+            roomCues(before, after, 'screen').map(({ sound }) => sound),
+        ).toEqual(['close', 'ranking']);
+    });
+
+    it('hits the third and the second place as they open, then rolls to the first', () => {
+        const five = {
+            ...over,
+            ranking: [
+                { player_id: 'p1', points: 90, place: 1 },
+                { player_id: 'p2', points: 70, place: 2 },
+                { player_id: 'p3', points: 60, place: 3 },
+                { player_id: 'p4', points: 30, place: 4 },
+                { player_id: 'p5', points: 0, place: null },
+            ],
+        } as State;
+        const timeline = finalTimeline(
+            standingGroups(five.ranking, []),
+            'screen',
+        );
+
+        expect(
+            roomCues(
+                { state: reveal, now: closes + 100 },
+                { state: five, now: closes + 3100 },
+                'screen',
+            ),
+        ).toEqual([
+            { sound: 'place', at: timeline.opensAt[2] },
+            { sound: 'place', at: timeline.opensAt[1] },
+            { sound: 'roll', at: timeline.winnerAt, ends: true },
+            { sound: 'fanfare', at: timeline.winnerAt },
+        ]);
+    });
+
+    it('plays «join» between games when a player appears, once a state, never during a game or for a player who leaves or comes back', () => {
+        const extra = {
+            id: '01kaqrx9zz9zz9zz9zz9zz9zz9',
+            name: 'Yeni',
+            present: true,
+            host: false,
+        };
+        const joined = (source: State, count = 1): State =>
+            ({
+                ...source,
+                players: [
+                    ...source.players,
+                    ...Array.from({ length: count }, (_, n) => ({
+                        ...extra,
+                        id: extra.id.slice(0, -1) + String(n),
+                    })),
+                ],
+            }) as State;
+        const away = {
+            ...lobby,
+            players: lobby.players.map((player, n) =>
+                n === 1 ? { ...player, present: false } : player,
+            ),
+        } as State;
+
+        expect(
+            roomCues(
+                { state: lobby, now: 1 },
+                { state: joined(lobby, 3), now: 2 },
+                'screen',
+            ),
+        ).toEqual([{ sound: 'join', at: 0 }]);
+        expect(
+            roomCues(
+                { state: over, now: 1 },
+                { state: joined(over), now: 2 },
+                'screen',
+            ),
+        ).toEqual([{ sound: 'join', at: 0 }]);
+        expect(
+            roomCues(
+                { state: joined(lobby), now: 1 },
+                { state: lobby, now: 2 },
+                'screen',
+            ),
+        ).toEqual([]);
+        expect(
+            roomCues(
+                { state: lobby, now: 1 },
+                { state: away, now: 2 },
+                'screen',
+            ),
+        ).toEqual([]);
+        expect(
+            roomCues(
+                { state: away, now: 1 },
+                { state: lobby, now: 2 },
+                'screen',
+            ),
+        ).toEqual([]);
+        expect(
+            roomCues(
+                { state: answered, now: answerFrom + 2000 },
+                { state: joined(answered), now: answerFrom + 2100 },
+                'screen',
+            ),
+        ).toEqual([]);
+        expect(
+            roomCues(
+                { state: lobby, now: 1 },
+                { state: joined(lobby), now: 2 },
+                'phone',
+            ),
+        ).toEqual([]);
     });
 });
 
@@ -215,14 +433,17 @@ describe('roomCues on a phone', () => {
         const played = names(heard(game('right'), 'phone'));
 
         for (const room of [
-            'count',
+            'countdown',
+            'go',
             'study',
             'question',
-            'tick',
+            'clock',
             'close',
             'ranking',
+            'place',
             'roll',
             'fanfare',
+            'join',
         ]) {
             expect(played).not.toContain(room);
         }
@@ -283,19 +504,42 @@ describe('roomCues and the moment a page opened on', () => {
             });
         }
 
-        // Opened in the countdown's second second: the next second is new, not a replay.
+        // Opened in the countdown: it is one moment, silent to the end.
+        expect(
+            heard(
+                [
+                    { state: countdown, now: opens - 1500 },
+                    { state: countdown, now: opens - 1400 },
+                    { state: countdown, now: opens - 500 },
+                ],
+                'screen',
+            ),
+        ).toEqual([]);
+
+        // Opened in an answer's last seconds: the clock it opened in is not played.
+        expect(
+            heard(
+                [
+                    { state: answered, now: bell - 3000 },
+                    { state: answered, now: bell - 2800 },
+                    { state: answered, now: bell - 100 },
+                ],
+                'screen',
+            ),
+        ).toEqual([]);
+
+        // Opened earlier in the answer: the clock begins after it, so it plays.
         expect(
             names(
                 heard(
                     [
-                        { state: countdown, now: opens - 1500 },
-                        { state: countdown, now: opens - 1400 },
-                        { state: countdown, now: opens - 500 },
+                        { state: answered, now: bell - 9000 },
+                        { state: answered, now: bell - 5300 },
                     ],
                     'screen',
                 ),
             ),
-        ).toEqual(['count']);
+        ).toEqual(['clock']);
 
         // Opened on the final: no roll and no fanfare.
         expect(

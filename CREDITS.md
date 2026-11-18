@@ -88,9 +88,17 @@ The app shows the same list on its `/credits` page.
 - License: [MIT License](https://opensource.org/license/mit) (`MIT`)
 - Source: <https://github.com/nijataliyev7/elifba>
 
-### Sounds of the adults' room games: the screen's countdown, question, last seconds, reveal and final, and a phone's taps, answer and verdict, synthesised by scripts/room-sounds/make.py
+### Sounds of the adults' room games made from recordings: the screen's countdown, start, study, clock, bell, roll and fanfare, and a phone's tap and «right» (marimba, glockenspiel, harp, timpani, snare and bass drum, cymbal, tubular bell, log drums, claves, cello, trumpets, horn, trombone)
 
-- Files: `content/assets/rooms/sounds/*`
+- Files: `content/assets/rooms/sounds/countdown.mp3`, `content/assets/rooms/sounds/go.mp3`, `content/assets/rooms/sounds/study.mp3`, `content/assets/rooms/sounds/clock.mp3`, `content/assets/rooms/sounds/close.mp3`, `content/assets/rooms/sounds/roll.mp3`, `content/assets/rooms/sounds/fanfare.mp3`, `content/assets/rooms/sounds/tap.mp3`, `content/assets/rooms/sounds/right.mp3`
+- Author: Sam Gossner and Simon Dalzell (Versilian Studios), VS Chamber Orchestra: Community Edition; sample cutting by Elan Hickler (Soundemote)
+- License: [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) (`CC0-1.0`)
+- Source: <https://github.com/sgossner/VSCO-2-CE>
+- Changes: Downloaded from commit 440300901dfe9275fd84e0b7763af1f8443ae62e and checked by SHA-256; mixed down to mono, trimmed, faded, some pitched by resampling, layered, given a small synthetic room where noted and levelled to one loudness, then encoded as 96 kb/s MP3 by scripts/room-sounds/make.py, whose README lists each cue's recordings
+
+### Sounds of the adults' room games synthesised by scripts/room-sounds/make.py: the screen's question, ranking, place and join, and a phone's undo, «answer sent» and «wrong»
+
+- Files: `content/assets/rooms/sounds/question.mp3`, `content/assets/rooms/sounds/ranking.mp3`, `content/assets/rooms/sounds/place.mp3`, `content/assets/rooms/sounds/join.mp3`, `content/assets/rooms/sounds/undo.mp3`, `content/assets/rooms/sounds/sent.mp3`, `content/assets/rooms/sounds/wrong.mp3`
 - Author: Elifba contributors
 - License: [MIT License](https://opensource.org/license/mit) (`MIT`)
 - Source: <https://github.com/nijataliyev7/elifba>

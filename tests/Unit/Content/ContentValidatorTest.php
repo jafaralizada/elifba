@@ -54,12 +54,37 @@ it('keeps every room sound small enough to fetch once sound is unlocked', functi
     }
 });
 
+it('keeps each speaker\'s whole set of room sounds light: a phone that joins fetches only a few short files', function (): void {
+    $limit = ContentValidator::MAX_ROOM_SPEAKER_BYTES['phone'];
+    $half = intdiv($limit, 2) + 1;
+    $root = ContentFixture::make(['write' => [
+        'assets/rooms/sounds/tap.mp3' => str_repeat('x', $half),
+        'assets/rooms/sounds/undo.mp3' => str_repeat('x', $half),
+    ]]);
+    $phone = 2 * $half + array_sum(array_map(
+        static fn (RoomSound $sound): int => (int) filesize($root.'/assets/rooms/sounds/'.$sound->value.'.mp3'),
+        array_filter(RoomSound::of(RoomSpeaker::Phone), static fn (RoomSound $sound): bool => ! in_array($sound, [RoomSound::Tap, RoomSound::Undo], true)),
+    ));
+
+    expect((new ContentValidator($root))->validate())
+        ->toBe(["rooms/sounds.json: the phone's sounds hold {$phone} bytes; a phone's sounds hold at most {$limit}"]);
+
+    foreach (RoomSpeaker::cases() as $speaker) {
+        $bytes = array_sum(array_map(
+            static fn (RoomSound $sound): int => (int) filesize(base_path('content/assets/rooms/sounds/'.$sound->value.'.mp3')),
+            RoomSound::of($speaker),
+        ));
+
+        expect($bytes)->toBeLessThanOrEqual(ContentValidator::MAX_ROOM_SPEAKER_BYTES[$speaker->value]);
+    }
+});
+
 it('sends a page only its own speaker\'s room sounds, as content URLs with the file\'s version', function (): void {
     $sounds = (new ContentRepository(base_path('content')))->roomSounds();
     $screen = $sounds->urls(RoomSpeaker::Screen);
     $phone = $sounds->urls(RoomSpeaker::Phone);
 
-    expect(array_keys($screen))->toBe(['count', 'study', 'question', 'tick', 'close', 'ranking', 'roll', 'fanfare'])
+    expect(array_keys($screen))->toBe(['countdown', 'go', 'study', 'question', 'clock', 'close', 'ranking', 'place', 'roll', 'fanfare', 'join'])
         ->and(array_keys($phone))->toBe(['tap', 'undo', 'sent', 'right', 'wrong'])
         ->and($phone['tap'])->toBe(asset('content/rooms/sounds/tap.mp3').'?v='.$sounds->version);
 });

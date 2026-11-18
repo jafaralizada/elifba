@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vite-plus/test';
 import {
+    MIN_TAIL_MS,
     MUTE_STORAGE_KEYS,
     readMuted,
     ROOM_SOUNDS,
     roomSoundPlayer,
     SPEAKER_GAIN,
+    STOP_MS,
     writeMuted,
 } from './sound';
 import type {
@@ -15,10 +17,12 @@ import type {
 } from './sound';
 
 /*
- * A room page's sound player (ADR 025 "Sound", docs/frontend.md rule 15
- * "Sound"): nothing before a gesture, nothing while the device is muted,
- * its own speaker's files only, a cue that ends where it is asked to, and
- * never a throw where audio is missing, refused or a file fails.
+ * A room page's sound player (ADR 025 "Sound", ADR 028, docs/frontend.md
+ * rule 15 "Sound"): nothing before a gesture, nothing while the device is
+ * muted or the page hidden, its own speaker's files only, a long cue that
+ * ends where it is asked to — from its middle when late, not at all when
+ * too little is left — every cue stopped when its moment ends, and never a
+ * throw where audio is missing, refused or a file fails.
  */
 
 function memoryStorage(): StorageLike & { items: Map<string, string> } {
@@ -50,6 +54,16 @@ type Started = {
     offset: number;
     gain: number;
     stopped: boolean;
+    /** When it was told to stop, if at a time; how its gain fell. */
+    stopAt?: number;
+    ramp?: [number, number][];
+};
+
+/** How long each fake file lasts, in seconds: the long cues as ADR 028 makes them. */
+const DURATIONS: Record<string, number> = {
+    countdown: 3,
+    clock: 5,
+    roll: 2.5,
 };
 
 /** A fake Web Audio context: buffers know their sound's name, sources record their start. */
@@ -84,19 +98,36 @@ function fakeAudio({ allowed = true }: { allowed?: boolean } = {}) {
             },
             createBuffer: () => ({ duration: 0 }),
             createGain: () => {
-                const node = { gain: { value: 1 }, connect: () => node };
+                const ramp: [number, number][] = [];
+                const node = {
+                    ramp,
+                    gain: {
+                        value: 1,
+                        setValueAtTime: (value: number, time: number) =>
+                            ramp.push([value, time]),
+                        linearRampToValueAtTime: (
+                            value: number,
+                            time: number,
+                        ) => ramp.push([value, time]),
+                    },
+                    connect: () => node,
+                };
 
                 return node;
             },
             createBufferSource: () => {
                 let gain = 1;
+                let ramp: [number, number][] = [];
                 const source: AudioSourceLike & { record?: Started } = {
                     buffer: null,
                     onended: null,
                     connect: (node) => {
-                        gain =
-                            (node as { gain?: { value: number } }).gain
-                                ?.value ?? 1;
+                        const target = node as {
+                            gain?: { value: number };
+                            ramp?: [number, number][];
+                        };
+                        gain = target.gain?.value ?? 1;
+                        ramp = target.ramp ?? [];
 
                         return node;
                     },
@@ -111,25 +142,32 @@ function fakeAudio({ allowed = true }: { allowed?: boolean } = {}) {
                                 offset,
                                 gain,
                                 stopped: false,
+                                ramp,
                             };
                             started.push(source.record);
                         }
                     },
-                    stop: () => {
+                    stop: (when?: number) => {
                         if (source.record) {
                             source.record.stopped = true;
+
+                            if (when !== undefined) {
+                                source.record.stopAt = when;
+                            }
                         }
                     },
                 };
 
                 return source;
             },
-            decodeAudioData: (data) =>
-                Promise.resolve({
-                    name: new TextDecoder().decode(data),
-                    duration:
-                        new TextDecoder().decode(data) === 'roll' ? 2.4 : 0.2,
-                } as AudioBufferLike),
+            decodeAudioData: (data) => {
+                const name = new TextDecoder().decode(data);
+
+                return Promise.resolve({
+                    name,
+                    duration: DURATIONS[name] ?? 0.2,
+                } as AudioBufferLike);
+            },
         };
         made.push(context);
 
@@ -198,7 +236,7 @@ describe('roomSoundPlayer', () => {
             load: files.load,
         });
 
-        player.play('count');
+        player.play('countdown');
         expect(player.snapshot()).toEqual({ muted: false, locked: true });
         expect(audio.made).toHaveLength(0);
         expect(files.asked).toEqual([]);
@@ -211,14 +249,15 @@ describe('roomSoundPlayer', () => {
             ROOM_SOUNDS.screen.map((name) => `/content/${name}.mp3`),
         );
 
-        player.play('count');
+        player.play('go');
         expect(audio.started).toEqual([
             {
-                sound: 'count',
+                sound: 'go',
                 when: 10,
                 offset: 0,
                 gain: SPEAKER_GAIN.screen,
                 stopped: false,
+                ramp: [],
             },
         ]);
     });
@@ -235,7 +274,7 @@ describe('roomSoundPlayer', () => {
 
         player.unlock();
         await settle();
-        player.play('tick');
+        player.play('clock');
         player.play('fanfare');
         player.play('tap');
 
@@ -268,7 +307,7 @@ describe('roomSoundPlayer', () => {
 
         player.play('fanfare', { at: 3000 });
         player.setMuted(true);
-        player.play('count');
+        player.play('go');
 
         expect(
             audio.started.map(({ sound, stopped }) => [sound, stopped]),
@@ -276,7 +315,7 @@ describe('roomSoundPlayer', () => {
         expect(readMuted(storage, 'screen')).toBe(true);
     });
 
-    it('ends a cue where it is asked to, starting it from its middle when there is no time', async () => {
+    it('ends a long cue where it is asked to, starting it from its middle when the page is late', async () => {
         const audio = fakeAudio();
         const player = roomSoundPlayer({
             speaker: 'screen',
@@ -290,21 +329,28 @@ describe('roomSoundPlayer', () => {
         await settle();
         player.play('roll', { at: 3100, ends: true });
         player.play('roll', { at: 600, ends: true });
+        // The countdown heard 1.2 s late: its last 1.8 s, ending at `opens_ms`.
+        player.play('countdown', { at: 1800, ends: true });
+        // The clock heard ahead: it starts 0.4 s from now and ends at the bell.
+        player.play('clock', { at: 5400, ends: true });
 
         const round = (value: number) => Math.round(value * 1000) / 1000;
 
         expect(
-            audio.started.map(({ when, offset }) => [
+            audio.started.map(({ sound, when, offset }) => [
+                sound,
                 round(when),
                 round(offset),
             ]),
         ).toEqual([
-            [10.7, 0],
-            [10, 1.8],
+            ['roll', 10.6, 0],
+            ['roll', 10, 1.9],
+            ['countdown', 10, 1.2],
+            ['clock', 10.4, 0],
         ]);
     });
 
-    it('drops the cues scheduled for a moment that ended, and lets one already sounding ring', async () => {
+    it('plays nothing of a long cue with less than a quarter second of it left', async () => {
         const audio = fakeAudio();
         const player = roomSoundPlayer({
             speaker: 'screen',
@@ -316,15 +362,80 @@ describe('roomSoundPlayer', () => {
 
         player.unlock();
         await settle();
-        player.play('close');
+        player.play('countdown', { at: MIN_TAIL_MS - 10, ends: true });
+        player.play('clock', { at: 0, ends: true });
+        player.play('roll', { at: -100, ends: true });
+        player.play('countdown', { at: MIN_TAIL_MS + 10, ends: true });
+
+        expect(
+            audio.started.map(({ sound, offset }) => [
+                sound,
+                Math.round(offset * 1000),
+            ]),
+        ).toEqual([['countdown', 3000 - MIN_TAIL_MS - 10]]);
+    });
+
+    it('stops every cue of a moment that ended: one scheduled never plays, one sounding fades out at once', async () => {
+        const audio = fakeAudio();
+        const player = roomSoundPlayer({
+            speaker: 'screen',
+            urls: urls.screen,
+            storage: memoryStorage,
+            createContext: audio.create,
+            load: loader().load,
+        });
+
+        player.unlock();
+        await settle();
+        // The round closed early: the clock was sounding, the ranking of another moment was not due yet.
+        player.play('clock', { at: 2600, ends: true });
         player.play('ranking', { at: 420 });
+        audio.made[0].currentTime = 10.2;
         player.cancel();
+
+        const [clock, ranking] = audio.started;
+
+        expect(clock.stopAt).toBeCloseTo(10.2 + STOP_MS / 1000, 6);
+        expect(clock.ramp).toEqual([
+            [SPEAKER_GAIN.screen, 10.2],
+            [0, 10.2 + STOP_MS / 1000],
+        ]);
+        expect(ranking.stopped).toBe(true);
+        expect(ranking.stopAt).toBeUndefined();
+
+        // A cue played after the stop belongs to the next moment and plays.
+        player.play('close');
+        expect(audio.started.at(-1)).toMatchObject({
+            sound: 'close',
+            stopped: false,
+        });
+    });
+
+    it('stops at once when the page is hidden and plays nothing until it is shown again', async () => {
+        const audio = fakeAudio();
+        const player = roomSoundPlayer({
+            speaker: 'screen',
+            urls: urls.screen,
+            storage: memoryStorage,
+            createContext: audio.create,
+            load: loader().load,
+        });
+
+        player.unlock();
+        await settle();
+        player.play('fanfare');
+        player.hide();
+        player.play('close');
 
         expect(
             audio.started.map(({ sound, stopped }) => [sound, stopped]),
-        ).toEqual([
-            ['close', false],
-            ['ranking', true],
+        ).toEqual([['fanfare', true]]);
+
+        player.resume();
+        player.play('close');
+        expect(audio.started.map(({ sound }) => sound)).toEqual([
+            'fanfare',
+            'close',
         ]);
     });
 
@@ -339,9 +450,10 @@ describe('roomSoundPlayer', () => {
 
         expect(() => {
             none.unlock();
-            none.play('count');
+            none.play('countdown', { at: 3000, ends: true });
             none.setMuted(true);
             none.setMuted(false);
+            none.hide();
             none.resume();
             none.cancel();
             none.release();
@@ -359,7 +471,7 @@ describe('roomSoundPlayer', () => {
 
         player.unlock();
         await settle();
-        player.play('count');
+        player.play('go');
         expect(player.snapshot().locked).toBe(true);
         expect(refused.started).toEqual([]);
 

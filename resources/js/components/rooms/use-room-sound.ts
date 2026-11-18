@@ -56,14 +56,15 @@ function allowedWithoutGesture(): boolean {
 }
 
 /**
- * A room page's sound (ADR 025 "Sound", docs/frontend.md rule 15
+ * A room page's sound (ADR 025 "Sound", ADR 028, docs/frontend.md rule 15
  * "Sound"): the player of its speaker's files (`sounds`, null for none),
  * fed with what the page hears — the state and the estimated server clock
  * every 200 ms — through `roomCues()`. The first gesture on the page
  * unlocks sound unless the device muted it (at once where the document
- * already had one, as after «Qoşul»); coming back to a hidden page
- * wakes it where the browser lets it. A cue scheduled for a moment that
- * ended before it played is dropped.
+ * already had one, as after «Qoşul»). Every cue stops when its moment
+ * ends — one scheduled is dropped, one sounding fades out at once — and
+ * when the page is hidden; coming back wakes the sound where the browser
+ * lets it and plays nothing that was missed.
  */
 export function useRoomSound({
     speaker,
@@ -131,10 +132,17 @@ export function useRoomSound({
         const visible = () => {
             if (document.visibilityState === 'visible') {
                 player.resume();
+            } else {
+                player.hide();
             }
         };
 
         listenRef.current = listen;
+
+        if (document.visibilityState === 'hidden') {
+            player.hide();
+        }
+
         listen();
 
         // A page reached by a tap (Inertia keeps the document) may sound at once.

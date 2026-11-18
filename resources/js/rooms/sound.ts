@@ -1,6 +1,6 @@
 /**
  * A room game's sound (docs/architecture.md §12 "Room content", ADR 025
- * "Sound", docs/frontend.md rule 15 "Sound"): the screen is the room's
+ * "Sound", ADR 028, docs/frontend.md rule 15 "Sound"): the screen is the room's
  * speaker and plays the moments everybody shares; a phone plays only quiet
  * cues of its own. A page is sent the URLs of its own speaker's files in
  * its props (`sounds`) and plays nothing else. When a cue plays is
@@ -13,19 +13,28 @@
  * speaker's key — never the account's, never sent anywhere. Where audio is
  * missing, refused or a file fails, nothing throws: the game plays on in
  * silence.
+ *
+ * A cue belongs to its moment (ADR 028 decision 7): when the moment ends
+ * (`cancel()`) or the page is hidden (`hide()`), every cue stops at once —
+ * one not yet started is dropped, one sounding fades out within `STOP_MS`.
+ * A long cue placed to end at a moment (`ends`) starts from its middle when
+ * the page is late, and not at all when less than `MIN_TAIL_MS` is left.
  */
 
 /** Each speaker's sounds, as `content/rooms/sounds.json` and `RoomSound` name them. */
 export const ROOM_SOUNDS = {
     screen: [
-        'count',
+        'countdown',
+        'go',
         'study',
         'question',
-        'tick',
+        'clock',
         'close',
         'ranking',
+        'place',
         'roll',
         'fanfare',
+        'join',
     ],
     phone: ['tap', 'undo', 'sent', 'right', 'wrong'],
 } as const;
@@ -53,6 +62,12 @@ export const SPEAKER_GAIN: Record<RoomSpeaker, number> = {
     screen: 1,
     phone: 0.5,
 };
+
+/** How quickly a cue still sounding when its moment ends goes silent: at once, without a click. */
+export const STOP_MS = 40;
+
+/** A cue placed to end at a moment plays nothing when less than this is left of it: a fragment is noise. */
+export const MIN_TAIL_MS = 250;
 
 export type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -118,7 +133,11 @@ export type AudioContextLike = {
     close: () => Promise<void>;
     createBufferSource: () => AudioSourceLike;
     createGain: () => AudioNodeLike & {
-        gain: { value: number };
+        gain: {
+            value: number;
+            setValueAtTime: (value: number, time: number) => unknown;
+            linearRampToValueAtTime: (value: number, time: number) => unknown;
+        };
         connect: (node: AudioNodeLike) => unknown;
     };
     createBuffer: (
@@ -148,15 +167,22 @@ export type RoomSoundPlayer = {
     /** The mute toggle (a gesture: turning sound on also unlocks it). */
     setMuted: (muted: boolean) => void;
     play: (sound: RoomSoundName, when?: PlayAt) => void;
-    /** Drops the cues scheduled for later (the moment they belonged to is over). */
+    /** The moment the cues belonged to is over: drops those scheduled, fades out those sounding. */
     cancel: () => void;
-    /** After the page was hidden: wakes a context the browser suspended, where it lets it. */
+    /** The page is hidden: everything stops, and nothing plays until `resume()`. */
+    hide: () => void;
+    /** The page is shown again: wakes a context the browser suspended, where it lets it. */
     resume: () => void;
     /** The page is gone: the context is closed; the decoded files stay for a next one. */
     release: () => void;
 };
 
-type Scheduled = { source: AudioSourceLike; startsAt: number };
+type Scheduled = {
+    source: AudioSourceLike;
+    gain: ReturnType<AudioContextLike['createGain']>;
+    level: number;
+    startsAt: number;
+};
 
 /**
  * One page's sound. `createContext` and `load` come from outside, so
@@ -181,6 +207,7 @@ export function roomSoundPlayer({
     const scheduled = new Set<Scheduled>();
     let context: AudioContextLike | null = null;
     let loading = false;
+    let hidden = false;
     let muted = readMuted(storage(), speaker);
     let state: RoomSoundState = { muted, locked: true };
 
@@ -221,19 +248,25 @@ export function roomSoundPlayer({
         }
     };
 
-    const stopScheduled = (all: boolean) => {
+    /** Every cue stops: one not yet started never plays, one sounding fades out within STOP_MS. */
+    const stopAll = () => {
         const now = context?.currentTime ?? 0;
+        const end = now + STOP_MS / 1000;
 
         for (const cue of scheduled) {
-            if (all || cue.startsAt > now) {
-                try {
+            try {
+                if (cue.startsAt > now) {
                     cue.source.stop();
-                } catch {
-                    // Already stopped.
+                } else {
+                    cue.gain.gain.setValueAtTime(cue.level, now);
+                    cue.gain.gain.linearRampToValueAtTime(0, end);
+                    cue.source.stop(end);
                 }
-
-                scheduled.delete(cue);
+            } catch {
+                // Already stopped.
             }
+
+            scheduled.delete(cue);
         }
     };
 
@@ -290,7 +323,7 @@ export function roomSoundPlayer({
             writeMuted(storage(), speaker, next);
 
             if (next) {
-                stopScheduled(true);
+                stopAll();
             } else {
                 unlock();
             }
@@ -300,7 +333,7 @@ export function roomSoundPlayer({
         play: (sound, { at = 0, ends = false } = {}) => {
             const buffer = buffers.get(sound);
 
-            if (muted || !running() || context === null || !buffer) {
+            if (muted || hidden || !running() || context === null || !buffer) {
                 return;
             }
 
@@ -321,16 +354,22 @@ export function roomSoundPlayer({
                     }
                 }
 
-                if (offset >= buffer.duration) {
+                if (ends && buffer.duration - offset < MIN_TAIL_MS / 1000) {
                     return;
                 }
 
+                const level = SPEAKER_GAIN[speaker];
                 source.buffer = buffer;
-                gain.gain.value = SPEAKER_GAIN[speaker];
+                gain.gain.value = level;
                 source.connect(gain);
                 gain.connect(audio.destination);
 
-                const cue = { source, startsAt: audio.currentTime + wait };
+                const cue = {
+                    source,
+                    gain,
+                    level,
+                    startsAt: audio.currentTime + wait,
+                };
                 scheduled.add(cue);
                 source.onended = () => scheduled.delete(cue);
                 source.start(cue.startsAt, offset);
@@ -338,8 +377,14 @@ export function roomSoundPlayer({
                 // A cue that cannot play is skipped.
             }
         },
-        cancel: () => stopScheduled(false),
+        cancel: stopAll,
+        hide: () => {
+            hidden = true;
+            stopAll();
+        },
         resume: () => {
+            hidden = false;
+
             if (muted || context === null || running()) {
                 return;
             }
@@ -350,7 +395,7 @@ export function roomSoundPlayer({
                 .then(emit);
         },
         release: () => {
-            stopScheduled(true);
+            stopAll();
 
             if (context !== null) {
                 const audio = context;
