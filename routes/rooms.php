@@ -84,12 +84,13 @@ Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::mid
         ->can('screen', 'room')
         ->name('rooms.screen');
 
-    // The final's winner, said by the screen after the fanfare: a member's
-    // first-name clip, by ids only, for whoever may open the screen (ADR 030).
+    // The final's winner, said after the fanfare by the screen — and by every phone in a room
+    // without a screen: a member's first-name clip, by ids only, for the host and the present
+    // players of an open room (ADR 030 as amended 2026-11-19).
     Route::get('rooms/{room}/members/{member}/voice', RoomMemberVoiceController::class)
         ->whereUlid(['room', 'member'])
         ->scopeBindings()
-        ->can('screen', 'room')
+        ->can('hear', 'room')
         ->name('rooms.members.voice');
 
     // A present player's own answer to the round open now (B3).

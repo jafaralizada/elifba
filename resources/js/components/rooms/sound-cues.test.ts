@@ -551,26 +551,38 @@ describe("roomCues and the winner's cheer (ADR 030)", () => {
         expect(finalOf(nobody)).toEqual([]);
     });
 
-    it('never cheers on a phone, not even the winner on their own', () => {
+    it("cheers on a phone only in a room without a screen, at the phone final's pace", () => {
         const mine = {
             ...over,
             me: { ...over.me, player_id: winner },
         } as State;
 
+        // With the screen on, the screen alone cheers: not even the winner's own phone.
         expect(finalOf(withScreen(over), 'phone')).toEqual([]);
         expect(finalOf(withScreen(mine), 'phone')).toEqual([]);
         expect(
-            names(heard(game('right'), 'phone')).filter(
+            names(heard(screened(game('right')), 'phone')).filter(
                 (sound) => sound === 'cheer',
             ),
         ).toEqual([]);
 
-        // A phone that carries a room without a screen plays the final, never the cheer.
-        for (const final of [over, mine]) {
-            const played = finalOf(final, 'phone').map(({ sound }) => sound);
+        // Without one, every phone cheers, after its own fanfare (ADR 030 as amended 2026-11-19).
+        const phoneAt =
+            finalTimeline(standingGroups(over.ranking, []), 'phone').winnerAt ??
+            -1;
 
-            expect(played).toContain('fanfare');
-            expect(played).not.toContain('cheer');
+        expect(phoneAt).toBeLessThan(winnerAt);
+
+        for (const final of [over, mine]) {
+            const played = finalOf(final, 'phone');
+
+            expect(played).toContainEqual({ sound: 'fanfare', at: phoneAt });
+            expect(played).toContainEqual({
+                sound: 'cheer',
+                at: phoneAt + FANFARE_MS,
+                players: [winner],
+                many: false,
+            });
         }
     });
 });
@@ -665,18 +677,44 @@ describe('roomCues on a phone in a room without a screen', () => {
         expect(carriesRoom(null)).toBe(false);
     });
 
-    it("plays every one of the room's moments as the screen does but the cheer, and its own cues too", () => {
-        for (const mine of ['right', 'wrong', 'none'] as const) {
-            // All the screen plays but the cheer, the screen's one voice (ADR 030).
-            const merged = [
-                ...heard(game(mine), 'screen').filter(
-                    ({ cue }) => cue.sound !== 'cheer',
-                ),
-                ...heard(screened(game(mine)), 'phone'),
-            ].sort((a, b) => a.step - b.step);
+    it("plays every one of the room's moments as the screen does, its final at a phone's pace, and its own cues too", () => {
+        // The final is the steps from `over` on: there the pace differs.
+        const final = game('right').findIndex(
+            ({ state }) => state?.game?.phase === 'over',
+        );
 
-            expect(heard(game(mine), 'phone')).toEqual(merged);
+        for (const mine of ['right', 'wrong', 'none'] as const) {
+            const merged = [
+                ...heard(game(mine), 'screen'),
+                ...heard(screened(game(mine)), 'phone'),
+            ]
+                .filter(({ step }) => step < final)
+                .sort((a, b) => a.step - b.step);
+
+            expect(
+                heard(game(mine), 'phone').filter(({ step }) => step < final),
+            ).toEqual(merged);
         }
+
+        // The final, at a phone's pace: the places, the roll and the fanfare where the phone's final opens them, then the cheer.
+        const timeline = finalTimeline(
+            standingGroups(over.ranking, []),
+            'phone',
+        );
+        const finalPlayed = heard(game('right'), 'phone')
+            .filter(({ step }) => step >= final)
+            .map(({ cue }) => cue);
+
+        expect(finalPlayed).toContainEqual({
+            sound: 'fanfare',
+            at: timeline.winnerAt,
+        });
+        expect(finalPlayed).toContainEqual({
+            sound: 'roll',
+            at: timeline.winnerAt,
+            ends: true,
+        });
+        expect(names(finalPlayed.map((cue) => ({ cue })))).toContain('cheer');
 
         expect(names(heard(game('right'), 'phone'))).toEqual(
             expect.arrayContaining([

@@ -17,10 +17,11 @@ use Tests\Support\Rooms;
  * The winner's name at a room's final (docs/architecture.md §12 "Room
  * games", ADR 030): the big screen gets a member's first-name clip only
  * from `GET /rooms/{room}/members/{member}/voice`, by ids — never a public
- * file, never a name or a hash in a URL — while it may open the screen:
- * the host of an open room, in the host's own session. A name off the list
- * or without a clip, a removed row and a row without an account are 404; a
- * player's phone and a closed room are refused; the clip is the name
+ * file, never a name or a hash in a URL — and, in a room without a
+ * screen, every phone (ADR 030 as amended 2026-11-19): the host or a
+ * present player of an open room. A name off the list or without a clip, a
+ * removed row and a row without an account are 404; a player who left and
+ * a closed room are refused; the clip is the name
  * list's, matched as `NameVoices` matches it. The clips here are fakes over
  * a fixture list (Tests\Support\NameClips); the rest is the real content.
  */
@@ -119,15 +120,23 @@ it('answers 404 to an account outside the room and for another room\'s member', 
     memberVoice($other, $otherMember)->assertNotFound();
 });
 
-it('refuses a player\'s phone and a closed room: only the screen says a name', function (): void {
+it('gives a present player\'s phone the clips too, and refuses one who left and a closed room', function (): void {
+    // In a room without a screen every phone cheers the winner (ADR 030 as amended 2026-11-19).
     $this->actingAs($this->nihat->user);
+    expect(memberVoice($this->room, $this->nihat)->assertOk()->getContent())->toBe(memberClipOf($this->voices, 'Nihat'))
+        ->and(memberVoice($this->room, $this->hostRow)->assertOk()->getContent())->toBe(memberClipOf($this->voices, 'Aysel'));
+
+    // A player who left follows the room no more.
+    $this->actingAs($this->lale->user);
+    $this->post(route('rooms.leave', $this->room))->assertRedirect();
     memberVoice($this->room, $this->nihat)->assertForbidden();
-    memberVoice($this->room, $this->hostRow)->assertForbidden();
 
     app(CloseRoom::class)->handle($this->room);
 
     $this->actingAs($this->host);
     memberVoice($this->room->refresh(), $this->nihat)->assertForbidden();
+    $this->actingAs($this->nihat->user);
+    memberVoice($this->room, $this->nihat)->assertForbidden();
 });
 
 it('answers 404 with the switch off', function (): void {

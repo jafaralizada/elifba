@@ -454,7 +454,7 @@ it('sends the screen the room\'s sounds and a phone its own and the room\'s, and
     $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('sounds', null));
 });
 
-it('sends the screen the end phrases it says after the winner\'s name, and a phone none', function (): void {
+it('sends the screen and a phone of an open room the end phrases said after the winner\'s name, and a closed room none', function (): void {
     $room = Rooms::open($this->resad);
     Rooms::join($room, $this->aygun);
     $clips = app(VoiceClips::class);
@@ -466,10 +466,14 @@ it('sends the screen the end phrases it says after the winner\'s name, and a pho
         ->and($finish['one'])->toStartWith(asset('content/voice').'/')
         ->and($finish['many'])->toStartWith(asset('content/voice').'/');
 
-    // A phone says nothing of the final.
+    // A phone says them in a room without a screen (ADR 030 as amended 2026-11-19).
     foreach ([$this->resad, $this->aygun] as $account) {
-        expect(pagesProps($this->actingAs($account)->get(route('rooms.show', $room))))->not->toHaveKey('finish');
+        expect(pagesProps($this->actingAs($account)->get(route('rooms.show', $room)))['finish'])->toBe($finish);
     }
+
+    // A closed room says nothing.
+    $this->actingAs($this->resad)->post(route('rooms.close', $room))->assertRedirect();
+    $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('finish', null));
 });
 
 it('sends the rivalry icons to the room page of an open room and to the screen, and none to a closed room', function (): void {

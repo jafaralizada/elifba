@@ -12,10 +12,12 @@ use Illuminate\Http\Response;
  * `GET /rooms/{room}/members/{member}/voice` (docs/architecture.md §12
  * "Room games", ADR 030): the clip of a member's first name, which the big
  * screen says after the final's fanfare when the member holds the first
- * place — two ids in the URL, never a name or a hash. `{room}` binds only
- * a room the account is in, `{member}` only a row of it
- * (`scopeBindings()`), and the route passes `can:screen`: the host of an
- * open room, who may open the screen; a phone's session is refused. A
+ * place — and, in a room without a screen, every phone (ADR 030 as
+ * amended 2026-11-19) — two ids in the URL, never a name or a hash.
+ * `{room}` binds only a room the account is in, `{member}` only a row of
+ * it (`scopeBindings()`), and the route passes `can:hear`: the host or a
+ * present player of an open room; one who left or was removed, and a
+ * closed room, are refused. A
  * member without a clip (`RoomMemberVoice`) is a 404 before a file is
  * read. It writes nothing, not even a read of the room.
  *

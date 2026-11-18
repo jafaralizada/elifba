@@ -27,8 +27,9 @@ import type { RoomSoundName, RoomSpeaker } from '@/rooms/sound';
  * sent (`answered`, the same for every answer) and, from the reveal only,
  * its verdict (`reveal.mine`). Its taps play where they are made
  * (`LiveRound`), not here. In a room without a screen (`room.screen`
- * false, ADR 028 as amended 2026-11-19) a phone carries the room: it
- * plays the screen's cues as well as its own (`carriesRoom()`).
+ * false, ADR 028 and ADR 030 as amended 2026-11-19) a phone carries the
+ * room: it plays the screen's cues as well as its own, the cheer
+ * included, its final at a phone's pace (`carriesRoom()`).
  *
  * A taunt is said (ADR 029 as amended 2026-11-19, decisions 47 and 48) by
  * the devices that draw its reaction: the target's phone, for a taunt of
@@ -46,8 +47,9 @@ export type RoomEar = { state: RoomState | null; now: number | null };
 
 /**
  * A cue: `at` ms from now it starts — or, with `ends`, it ends there (the
- * countdown, the clock, the roll). `cheer` is the screen's one voice (ADR
- * 030), as a home board ends a game: from `at`, the first place's first
+ * countdown, the clock, the roll). `cheer` is the room's one voice (ADR
+ * 030; a carrying phone's too, as amended 2026-11-19), as a home board
+ * ends a game: from `at`, the first place's first
  * names (`players`, by `player_id`, none when more than `MAX_NAMES` share
  * it), then «Əla oynadın!», or «Əla oynadınız!» when the place is shared
  * (`many`).
@@ -131,11 +133,13 @@ function cheer(state: RoomState, at: number): RoomCue {
 
 /**
  * The final's cues: a hit as the third and the second open, the roll
- * ending where the first opens, the fanfare, and after it the cheer.
+ * ending where the first opens, the fanfare, and after it the cheer — at
+ * the pace of the final the page shows: the screen's, or a phone's, which
+ * is quicker (`finalTimeline()`).
  */
-function finalCues(state: RoomState): RoomCue[] {
+function finalCues(state: RoomState, pace: RoomSpeaker): RoomCue[] {
     const groups = standingGroups(state.ranking, []);
-    const timeline = finalTimeline(groups, 'screen');
+    const timeline = finalTimeline(groups, pace);
 
     if (timeline.winnerAt === null) {
         return [];
@@ -158,7 +162,12 @@ function finalCues(state: RoomState): RoomCue[] {
     ];
 }
 
-function hearScreen(state: RoomState | null, now: number | null): Heard {
+/** The room's moments, as the screen plays them — or a carrying phone, at its final's pace. */
+function hearScreen(
+    state: RoomState | null,
+    now: number | null,
+    pace: RoomSpeaker = 'screen',
+): Heard {
     const moment = momentKey(roomMoment(state), 'phase');
     const quiet: Heard = {
         moment,
@@ -180,7 +189,7 @@ function hearScreen(state: RoomState | null, now: number | null): Heard {
     }
 
     if (state.game.phase === 'over') {
-        return { ...quiet, cues: finalCues(state), players };
+        return { ...quiet, cues: finalCues(state, pace), players };
     }
 
     const round = state.round;
@@ -277,27 +286,24 @@ function hearPhone(state: RoomState | null): Heard {
 }
 
 /**
- * Whether a phone carries the room (ADR 028 as amended 2026-11-19): an open
- * room whose big screen is not on (`room.screen`), so the phone plays the
- * screen's cues as well as its own, at its own level — all but the cheer,
- * the screen's one voice (ADR 030), which a phone never says.
+ * Whether a phone carries the room (ADR 028 and ADR 030 as amended
+ * 2026-11-19): an open room whose big screen is not on (`room.screen`), so
+ * the phone plays the screen's cues as well as its own — the cheer
+ * included — at its own level, and its final at a phone's pace.
  */
 export function carriesRoom(state: RoomState | null): boolean {
     return state !== null && state.room.status === 'open' && !state.room.screen;
 }
 
-/** A carrying phone hears as the screen does, but for the cheer, and as itself. */
+/** A carrying phone hears as the screen does, at its own final's pace, and as itself. */
 function hearBoth(state: RoomState | null, now: number | null): Heard {
-    const room = hearScreen(state, now);
+    const room = hearScreen(state, now, 'phone');
     const own = hearPhone(state);
 
     return {
         moment: room.moment,
         began: room.began ?? own.began,
-        cues: [
-            ...room.cues.filter(({ sound }) => sound !== 'cheer'),
-            ...own.cues,
-        ],
+        cues: [...room.cues, ...own.cues],
         beats: { ...room.beats, ...own.beats },
         players: room.players,
     };

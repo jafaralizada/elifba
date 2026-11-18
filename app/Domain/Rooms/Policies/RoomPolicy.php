@@ -44,6 +44,16 @@ final class RoomPolicy
         return $this->host($user, $room) || $this->play($user, $room);
     }
 
+    /**
+     * `watch` of an open room: the cheer's name clips, which the screen says
+     * after the final's fanfare and, in a room without a screen, every
+     * phone (ADR 030 as amended 2026-11-19).
+     */
+    public function hear(User $user, Room $room): bool
+    {
+        return $room->isOpen() && $this->watch($user, $room);
+    }
+
     /** `host` of an open room: the big screen (B4). */
     public function screen(User $user, Room $room): bool
     {

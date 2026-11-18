@@ -763,7 +763,7 @@ describe("roomSoundPlayer and the winner's cheer (ADR 030)", () => {
         ]);
     });
 
-    it('fetches nothing while muted or locked, and never on a phone', async () => {
+    it('fetches nothing while muted or locked', async () => {
         const timers = manualLater();
 
         // Locked: the screen's sound was never turned on.
@@ -785,24 +785,33 @@ describe("roomSoundPlayer and the winner's cheer (ADR 030)", () => {
         muted.player.unlock();
         await settle();
         muted.player.say([nameUrl('m1')], PHRASE, 0);
-
-        // A phone, its sound on.
-        const phoneNames = nameLoader();
-        const phone = namingPlayer('phone', phoneNames, timers);
-        phone.player.unlock();
-        await settle();
-        phone.player.say([nameUrl('m1')], PHRASE, 0);
         timers.fire();
         await settle();
 
         expect(locked.asked).toEqual([]);
         expect(quiet.asked).toEqual([]);
-        expect(phoneNames.asked).toEqual([]);
-        for (const page of [lockedScreen, muted, phone]) {
+        for (const page of [lockedScreen, muted]) {
             expect(page.files.asked).not.toContain(PHRASE);
         }
         expect(timers.asked).toEqual([]);
-        expect(phone.audio.started).toEqual([]);
+    });
+
+    it("says the cheer on a phone too, at a phone's level: one in a room without a screen", async () => {
+        const names = nameLoader();
+        const timers = manualLater();
+        const { audio, player } = namingPlayer('phone', names, timers);
+
+        player.unlock();
+        await settle();
+        player.say([nameUrl('m1')], PHRASE, 2900);
+        await settle();
+        timers.fire();
+
+        expect(names.asked).toEqual([nameUrl('m1')]);
+        expect(audio.started.map(({ sound, gain }) => [sound, gain])).toEqual([
+            ['name:m1', SPEAKER_GAIN.phone * VOICE_GAIN],
+            ['finish', SPEAKER_GAIN.phone * VOICE_GAIN],
+        ]);
     });
 
     it('drops the cheer with its moment or a hidden page', async () => {

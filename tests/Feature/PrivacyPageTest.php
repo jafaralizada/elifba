@@ -201,7 +201,7 @@ it('says a taunt is seen and heard only by its target and the big screen', funct
     'en' => ['en', "each costs the thrower 1 point, and only the player it is aimed at and the host's big screen see it, and hear it in a prerecorded voice, for a few seconds."],
 ]);
 
-it('says that the screen may say the winner\'s name from the list, and sends it nowhere', function (?string $locale, string $winner, string $list, string $nowhere): void {
+it('says that the screen, or the phones without one, may say the winner\'s name from the list, and sends it nowhere', function (?string $locale, string $winner, string $list, string $nowhere, string $phones): void {
     Rooms::on();
     $request = $locale === null ? $this : $this->withSession(['locale' => $locale]);
 
@@ -213,11 +213,12 @@ it('says that the screen may say the winner\'s name from the list, and sends it 
             ->where('translations', fn ($translations): bool => str_contains($translations['privacy.rooms.voice'], $winner)
                 && str_contains($translations['privacy.rooms.voice'], $list)
                 && str_contains($translations['privacy.rooms.voice'], $nowhere)
+                && str_contains($translations['privacy.rooms.voice'], $phones)
                 // The screen's toggle, by the name it has there.
                 && str_contains($translations['privacy.rooms.voice'], $translations['rooms.sound.label'])));
 })->with([
-    'az' => [null, 'qalibin adını', 'hazır ad lüğətindədirsə', 'heç bir xidmətə göndərilmir və bunun üçün heç nə saxlanılmır'],
-    'en' => ['en', "the winner's first name", 'built-in name list', 'sent to no service and nothing is stored for it'],
+    'az' => [null, 'qalibin adını', 'hazır ad lüğətindədirsə', 'heç bir xidmətə göndərilmir və bunun üçün heç nə saxlanılmır', 'oyunçuların telefonları'],
+    'en' => ['en', "the winner's first name", 'built-in name list', 'sent to no service and nothing is stored for it', "the players' phones"],
 ]);
 
 it('says what the camera does with the picture', function (?string $locale, string $optional, string $asks, string $nowhere): void {

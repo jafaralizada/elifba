@@ -19,6 +19,7 @@ import InputError from '@/components/input-error';
 import { withGame } from '@/components/rooms/catalog';
 import type { GameSetupOptions } from '@/components/rooms/catalog';
 import { FinalStanding } from '@/components/rooms/final-standing';
+import { carriesRoom } from '@/components/rooms/sound-cues';
 import { GameDrawing } from '@/components/rooms/game-drawing';
 import {
     GameSettings,
@@ -62,6 +63,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import { close, destroy, entrance, leave } from '@/routes/rooms';
 import { destroy as endGame } from '@/routes/rooms/game';
+import { voice as memberVoice } from '@/routes/rooms/members';
 import { destroy as forget } from '@/routes/rooms/name';
 import type {
     RoomGame,
@@ -70,7 +72,7 @@ import type {
     RoomSetup,
     RoomState,
 } from '@/rooms/contract';
-import type { RoomSoundUrls } from '@/rooms/sound';
+import type { RoomFinishVoice, RoomSoundUrls } from '@/rooms/sound';
 import { roomRequest } from '@/rooms/http';
 
 /** A game of a closed room, with its ranking (`Rooms\Support\RoomResults`). */
@@ -102,6 +104,8 @@ type Props = {
     rivalry: RivalryIcons | null;
     /** The taunts a player may throw, each key with its emoji and its clip in the board's voice (ADR 029 as amended, T3); null when it follows no open room. */
     taunts: TauntList | null;
+    /** «Əla oynadın!» and «Əla oynadınız!», said after the final's fanfare in a room without a screen (ADR 030 as amended); null when it follows no open room. */
+    finish: RoomFinishVoice | null;
     can: Can;
 };
 
@@ -151,6 +155,7 @@ export default function RoomsShow({
     sounds,
     rivalry,
     taunts,
+    finish,
     can,
 }: Props) {
     const { t } = useTranslation();
@@ -162,12 +167,25 @@ export default function RoomsShow({
         () => ({ voices: tauntVoices(taunts), hidden: tauntsHidden }),
         [taunts, tauntsHidden],
     );
+    // In a room without a screen the phone cheers the winner too: the first name by ids, then «Əla oynadın!» (ADR 030 as amended).
+    const cheer = useMemo(
+        () =>
+            finish === null
+                ? undefined
+                : {
+                      nameUrl: (member: string) =>
+                          memberVoice.url({ room: room.id, member }),
+                      finish,
+                  },
+        [room.id, finish],
+    );
     const sound = useRoomSound({
         speaker: 'phone',
         sounds,
         state,
         clock,
         taunts: tauntSound,
+        cheer,
     });
     const voice = useRoomVoice({ roomId: room.id, state, onChanged: refresh });
     const voiceButton = <VoiceButton voice={voice} />;
@@ -753,6 +771,7 @@ function GameOver({
                 me={state.me.player_id}
                 placeLabels={placeLabels}
                 animate={motion.phase}
+                forRoom={carriesRoom(state)}
             />
         </section>
     );

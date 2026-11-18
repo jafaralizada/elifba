@@ -23,8 +23,9 @@ import type { RoomPlayer, RoomRankedPlayer } from '@/rooms/contract';
  * When the page saw the game end (`animate`), the labels stand from the
  * start and the names open from the last place to the first
  * (`finalTimeline()`), each total counting up from 0; when the first place
- * opens, confetti bursts — on the screen, and on a phone only for a player
- * who holds it. Opened on the final, or under reduced motion, it is
+ * opens, confetti bursts — on the screen, and on a phone for a player who
+ * holds it, or for everyone in a room without a screen (`forRoom`, ADR 025
+ * as amended 2026-11-19), where each phone is the room's final. Opened on the final, or under reduced motion, it is
  * complete and still. Nothing is ranked or added up here.
  */
 export function FinalStanding({
@@ -34,6 +35,7 @@ export function FinalStanding({
     placeLabels,
     animate,
     big = false,
+    forRoom = false,
 }: {
     ranking: RoomRankedPlayer[];
     players: RoomPlayer[];
@@ -43,13 +45,17 @@ export function FinalStanding({
     animate: boolean;
     /** The screen's size and pace. */
     big?: boolean;
+    /** A phone in a room without a screen: its confetti is the room's, whoever won. */
+    forRoom?: boolean;
 }) {
     const groups = standingGroups(ranking, placeLabels);
     const timeline = finalTimeline(groups, big ? 'screen' : 'phone');
     const names = new Map(players.map((player) => [player.id, player.name]));
     const winnerAt = timeline.winnerAt;
     const cheers =
-        animate && winnerAt !== null && (big || holdsFirst(ranking, me));
+        animate &&
+        winnerAt !== null &&
+        (big || forRoom || holdsFirst(ranking, me));
 
     useEffect(() => {
         if (!cheers || winnerAt === null) {

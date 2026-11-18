@@ -91,10 +91,10 @@ function allowedWithoutGesture(): boolean {
  * when the page is hidden; coming back wakes the sound where the browser
  * lets it and plays nothing that was missed.
  *
- * `cheer` is the screen's alone (ADR 030): the route of a member's
- * first-name clip, by ids, and the URLs of the end phrases, for what it
- * says after the final's fanfare. A page without it — a phone — says
- * nothing.
+ * `cheer` (ADR 030): the route of a member's first-name clip, by ids,
+ * and the URLs of the end phrases, for what it says after the final's
+ * fanfare — the screen's, and a phone's while it carries a room without
+ * a screen (as amended 2026-11-19). A page without it says nothing.
  *
  * `taunts` (ADR 029 as amended 2026-11-19): the taunts' clips and the
  * device's choice to hide them. The page says each taunt it draws and saw

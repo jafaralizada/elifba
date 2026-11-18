@@ -16,6 +16,7 @@ use App\Domain\Rooms\Data\RoomGameSetupData;
 use App\Domain\Rooms\Exceptions\RoomGameRunning;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Support\RoomClock;
+use App\Domain\Rooms\Support\RoomFinishVoice;
 use App\Domain\Rooms\Support\RoomJoinLink;
 use App\Domain\Rooms\Support\RoomList;
 use App\Domain\Rooms\Support\RoomPlaces;
@@ -108,7 +109,7 @@ final class RoomController extends Controller
         return to_route('rooms.show', $room);
     }
 
-    public function show(Room $room, #[CurrentUser] User $account, ContentRepository $content, TauntVoices $tauntVoices, RecordRoomRead $recordRead): Response
+    public function show(Room $room, #[CurrentUser] User $account, ContentRepository $content, TauntVoices $tauntVoices, RecordRoomRead $recordRead, RoomFinishVoice $finish): Response
     {
         $gate = Gate::forUser($account);
         $open = $room->isOpen();
@@ -128,6 +129,7 @@ final class RoomController extends Controller
             'sounds' => $open && $watches ? $content->roomSounds()->urls(RoomSpeaker::Phone, RoomSpeaker::Screen) : null,
             'rivalry' => $open && $watches ? $content->roomRivalry()->urls() : null,
             'taunts' => $open && $watches ? RoomTauntData::props($content->roomTaunts(), $tauntVoices) : null,
+            'finish' => $open && $watches ? $finish->urls() : null,
             'can' => [
                 'host' => $gate->allows('host', $room),
                 'leave' => $gate->allows('play', $room),

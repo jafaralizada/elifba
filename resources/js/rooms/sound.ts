@@ -23,13 +23,14 @@
  * A long cue placed to end at a moment (`ends`) starts from its middle when
  * the page is late, and not at all when less than `MIN_TAIL_MS` is left.
  *
- * The screen's one voice (ADR 030, `say()`), as a home board ends a game:
+ * The room's one voice (ADR 030, `say()`), as a home board ends a game:
  * the clips of the final's first place's first names, fetched by ids from
  * `GET /rooms/{room}/members/{member}/voice`, then the board's end phrase
  * («Əla oynadın!», «Əla oynadınız!»), fetched when the page hears the
  * final begin and its sound is on, kept decoded in memory only, and said
- * one after another after the fanfare — those that arrived in time; a
- * phone says none.
+ * one after another after the fanfare — those that arrived in time. A
+ * phone says it only while it carries a room without a screen (ADR 030 as
+ * amended 2026-11-19), at a phone's level.
  *
  * A taunt's voice (ADR 029 as amended 2026-11-19, decisions 44–48): the
  * board's voice saying a taunt's phrase, one clip per taunt (the prop
@@ -225,10 +226,11 @@ export type RoomSoundPlayer = {
     /** The page is gone: the context is closed; the decoded files stay for a next one. */
     release: () => void;
     /**
-     * The screen's cheer (ADR 030): fetches the clips of `names` and of
-     * `phrase` now and, `at` ms from now, says those that arrived — the
-     * names one after another, then the phrase; nothing on a phone, while
-     * muted, hidden or locked. They stop with the moment.
+     * The cheer (ADR 030): fetches the clips of `names` and of `phrase`
+     * now and, `at` ms from now, says those that arrived — the names one
+     * after another, then the phrase, at the speaker's level times
+     * `VOICE_GAIN`; nothing while muted, hidden or locked. They stop with
+     * the moment. A phone is asked only while it carries the room.
      */
     say: (names: string[], phrase: string | null, at: number) => void;
     /**
@@ -609,7 +611,6 @@ export function roomSoundPlayer({
             const urls = phrase === null ? names : [...names, phrase];
 
             if (
-                speaker !== 'screen' ||
                 urls.length === 0 ||
                 muted ||
                 hidden ||
