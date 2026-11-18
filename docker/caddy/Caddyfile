@@ -2,10 +2,16 @@
 # ELIFBA_SITE is `{scheme}://{domain}:{port}` from .env. With https Caddy gets
 # and renews a Let's Encrypt certificate for the domain itself and redirects
 # port 80 to it; with http it serves only that port, without certificates.
+# With https on an IP address (the LAN try-out for a phone's microphone, §10
+# "Live voice") it signs the certificate with its own authority.
 
 {
 	# Only the container's own health check uses the admin API.
 	admin 127.0.0.1:2019
+	# A browser sends no server name for an IP address, and behind Docker's
+	# port mapping the address it reached is not the site's: answer such a
+	# handshake with the site's certificate.
+	default_sni {$ELIFBA_DOMAIN}
 }
 
 {$ELIFBA_SITE} {
@@ -18,6 +24,19 @@
 	# The browser's WebSocket to Reverb (Pusher protocol, /app/{key}).
 	handle /app/* {
 		reverse_proxy reverb:8080
+	}
+
+	# The browser's WebSocket to our voice server (§10 "Live voice"), only
+	# while the instance's voice address is set. The ticket is in its query:
+	# this file has no `log` directive, so no request is access-logged. The
+	# voice server's API (/twirp/*) is not routed here: from outside it
+	# reaches the app, which has no such route.
+	@voice {
+		path /rtc /rtc/*
+		expression "{$ELIFBA_VOICE_ROUTE}" == "on"
+	}
+	handle @voice {
+		reverse_proxy voice:7880
 	}
 
 	# Everything else: nginx + PHP-FPM. Caddy sets X-Forwarded-For, -Proto

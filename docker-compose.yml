@@ -5,10 +5,12 @@
 #   docker compose up -d --build --wait
 #
 # One image (Dockerfile) runs as `app`, `reverb` and `scheduler`; Caddy is the
-# only service with published ports. `.env` is read twice: for the ${...}
-# values below and as the environment of the PHP containers. What follows from
-# the services themselves (database host, Reverb's internal address, APP_URL)
-# is set here and wins over .env.
+# only service with published ports, until the profile `voice`
+# (COMPOSE_PROFILES=voice in .env) adds our own voice server, `voice`, with two
+# media ports of its own. `.env` is read twice: for the ${...} values below and
+# as the environment of the PHP containers. What follows from the services
+# themselves (database host, Reverb's internal address, APP_URL) is set here
+# and wins over .env.
 
 name: elifba
 
@@ -46,6 +48,13 @@ x-laravel-env: &laravel-env
     # Caddy is the only peer that reaches `app` and it replaces any
     # X-Forwarded-* a browser sends; the session cookie follows its scheme.
     TRUSTED_PROXIES: ${TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+    # Live voice (§10 "Live voice"): the two addresses exist only while the
+    # instance's voice address is set, which goes with the profile `voice`.
+    # Without it they are empty, so the app neither offers voice nor calls a
+    # `voice` host that is not there. The browser's address is the site's own:
+    # the page's library opens wss (ws with http) at /rtc on it, through Caddy.
+    ELIFBA_ROOMS_VOICE_URL: ${ELIFBA_ROOMS_VOICE_IP:+${ELIFBA_SCHEME}://${ELIFBA_DOMAIN}:${ELIFBA_PORT}}
+    ELIFBA_ROOMS_VOICE_API_URL: ${ELIFBA_ROOMS_VOICE_IP:+http://voice:7880}
 
 x-laravel: &laravel
     image: elifba:local
@@ -62,6 +71,9 @@ services:
             - '${ELIFBA_REDIRECT_PORT:-80}:80'
         environment:
             ELIFBA_SITE: ${ELIFBA_SCHEME}://${ELIFBA_DOMAIN}:${ELIFBA_PORT}
+            ELIFBA_DOMAIN: ${ELIFBA_DOMAIN}
+            # `on` while the voice address is set: Caddy then sends /rtc to `voice`.
+            ELIFBA_VOICE_ROUTE: ${ELIFBA_ROOMS_VOICE_IP:+on}
         volumes:
             - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
             - caddy-data:/data
@@ -164,6 +176,38 @@ services:
         depends_on:
             db:
                 condition: service_healthy
+
+    # Live voice (§10 "Live voice", ADR 030), only with the profile `voice`.
+    # Signalling and the API on 7880 stay on the internal network (Caddy sends
+    # /rtc here; `app` and `scheduler` call /twirp/*); media cannot pass through
+    # a proxy, so its two ports are published and the firewall must allow them.
+    # docker/voice/start.sh refuses to start without the address, the key or
+    # the secret.
+    voice:
+        image: livekit/livekit-server:v1.13.11
+        profiles: ['voice']
+        restart: unless-stopped
+        entrypoint: ['/bin/sh', '/etc/elifba-voice/start.sh']
+        environment:
+            ELIFBA_ROOMS_VOICE_IP: ${ELIFBA_ROOMS_VOICE_IP:-}
+            ELIFBA_ROOMS_VOICE_KEY: ${ELIFBA_ROOMS_VOICE_KEY:-}
+            ELIFBA_ROOMS_VOICE_SECRET: ${ELIFBA_ROOMS_VOICE_SECRET:-}
+        volumes:
+            - ./docker/voice:/etc/elifba-voice:ro
+        ports:
+            - '7882:7882/udp'
+            - '7881:7881/tcp'
+        logging:
+            driver: json-file
+            options:
+                max-size: 5m
+                max-file: '3'
+        healthcheck:
+            test: ['CMD', 'wget', '-qO', '/dev/null', 'http://127.0.0.1:7880/']
+            interval: 10s
+            timeout: 3s
+            retries: 3
+            start_period: 5s
 
 volumes:
     db-data:

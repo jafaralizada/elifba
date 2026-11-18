@@ -127,7 +127,7 @@ A school, a teacher or an organisation can run its own Elifba with Docker. One `
 
 **DNS.** Point an `A` record (and an `AAAA` record if the server has IPv6) for the name, for example `elifba.example.az`, at the server, and open ports 80 and 443 in its firewall. Caddy gets and renews a Let's Encrypt certificate for the name by itself once the name reaches the server.
 
-**Configure.** Use a fresh clone, not your development folder: the stack reads its own `.env` in the repository's root. `scripts/docker-env.sh` writes that `.env` from [`.env.production.example`](.env.production.example) with your domain and fresh secrets (`APP_KEY`, Reverb's keys, the database password), and never overwrites an existing one.
+**Configure.** Use a fresh clone, not your development folder: the stack reads its own `.env` in the repository's root. `scripts/docker-env.sh` writes that `.env` from [`.env.production.example`](.env.production.example) with your domain and fresh secrets (`APP_KEY`, Reverb's keys, the database password, the voice server's key and secret), and never overwrites an existing one.
 
 ```bash
 git clone https://github.com/nijataliyev7/elifba.git
@@ -159,6 +159,16 @@ docker compose logs app | tr -d '\r' | grep -oE 'https?://[^] ()<]+/email/verify
 Phones open `https://elifba.example.az/pult`.
 
 **Changing `.env`.** After changing the operator, mail or `ELIFBA_ROOMS`, run `docker compose up -d --wait`; the containers are recreated with the new values. After changing `ELIFBA_DOMAIN`, `ELIFBA_SCHEME`, `ELIFBA_PORT` or `REVERB_APP_KEY`, run `docker compose up -d --build --wait`: the browser's Reverb address is built into the assets.
+
+**Live voice (optional).** Players in a room can talk while they play, through this instance's own voice server (the `voice` service, LiveKit; [ADR 030](docs/decisions/030-live-voice-in-rooms.md)): no audio goes to another company and nothing is recorded. It needs the games for adults (`ELIFBA_ROOMS=true`), at least 2 vCPU and 4 GB of memory, and two more ports open in the firewall: **UDP 7882** and **TCP 7881** (media cannot pass through Caddy). Then three lines in `.env` — the profile that starts the server, the server's public IPv4 address, the switch:
+
+```dotenv
+COMPOSE_PROFILES=voice
+ELIFBA_ROOMS_VOICE_IP=203.0.113.10
+ELIFBA_ROOMS_VOICE=true
+```
+
+and `docker compose up -d --wait`. `scripts/docker-env.sh` has written `ELIFBA_ROOMS_VOICE_KEY` and `ELIFBA_ROOMS_VOICE_SECRET`; an `.env` from before them needs both (`openssl rand -hex 8` and `openssl rand -hex 32`), or the voice server refuses to start and says which line is empty (`docker compose logs voice`). To turn voice off, set `ELIFBA_ROOMS_VOICE=false` and run `docker compose up -d --wait`; to stop the voice server as well, empty `COMPOSE_PROFILES` and `ELIFBA_ROOMS_VOICE_IP` and run `docker compose up -d --wait --remove-orphans`.
 
 **Backups.** The `backup` service dumps the database every night at 03:00 Baku time into the `backups` volume and keeps 14 days (`BACKUP_AT`, `BACKUP_KEEP_DAYS` in `.env`). Make a dump now, list the dumps, and copy them off the server's Docker volume:
 
@@ -196,6 +206,20 @@ docker compose up -d --build --wait
 ```
 
 Open `http://localhost:8088/register`; the confirmation link is in the log as above. For phones on the same Wi-Fi, give the computer's LAN address instead of `localhost` (`scripts/docker-env.sh 192.168.1.20 http 8088`) and open `http://192.168.1.20:8088/pult` on the phone. Browsers do not offer the share card's Share button over http; its Download button works. `docker compose down` stops the stack and keeps the data; `docker compose down --volumes` deletes the data and the backups too. To move on to a real domain, move this `.env` away and run `scripts/docker-env.sh` again.
+
+**Live voice on real phones.** A browser opens the microphone only over https, so for [live voice](#run-your-own-instance) on phones give the try-out https on the computer's LAN address. Caddy signs a certificate for an IP address with its own authority, and the script puts the redirect on the next port, so 80 and 443 stay free:
+
+```bash
+scripts/docker-env.sh 192.168.1.20 https 8443
+```
+
+Add `ELIFBA_ROOMS=true` and the three lines of live voice to `.env`, with the LAN address as `ELIFBA_ROOMS_VOICE_IP=192.168.1.20`, allow UDP 7882 and TCP 7881 in the computer's firewall, and run `docker compose up -d --build --wait`. Copy Caddy's authority out of the stack and install it on each phone once:
+
+```bash
+docker compose cp proxy:/data/caddy/pki/authorities/local/root.crt elifba-try-out-ca.crt
+```
+
+On an iPhone, send the file to the phone (AirDrop or mail), install it in Settings → General → VPN & Device Management, then switch it on in Settings → General → About → Certificate Trust Settings. On Android, Settings → Security → Encryption & credentials → Install a certificate → CA certificate. Then open `https://192.168.1.20:8443` on the phone. The authority belongs to this try-out alone: remove it from the phones when the try-out is over.
 
 ## Privacy
 

@@ -127,7 +127,7 @@ Məktəb, müəllim və ya təşkilat Elifba-nı Docker ilə öz serverində iş
 
 **DNS.** Ad üçün (məsələn, `elifba.example.az`) serverə yönələn `A` yazısı (serverin IPv6 ünvanı varsa, `AAAA` yazısı da) yaradın və serverin firewall-unda 80 və 443 portlarını açın. Ad serverə çatan kimi Caddy onun üçün Let's Encrypt sertifikatını özü alır və yeniləyir.
 
-**Ayarlar.** İnkişaf qovluğunuzu yox, yeni klonu istifadə edin: yığın repozitoriyanın kökündəki öz `.env` faylını oxuyur. `scripts/docker-env.sh` həmin `.env` faylını [`.env.production.example`](.env.production.example) əsasında sizin domen və yeni sirlərlə (`APP_KEY`, Reverb-in açarları, bazanın parolu) yazır və mövcud faylın üzərinə heç vaxt yazmır.
+**Ayarlar.** İnkişaf qovluğunuzu yox, yeni klonu istifadə edin: yığın repozitoriyanın kökündəki öz `.env` faylını oxuyur. `scripts/docker-env.sh` həmin `.env` faylını [`.env.production.example`](.env.production.example) əsasında sizin domen və yeni sirlərlə (`APP_KEY`, Reverb-in açarları, bazanın parolu, səs serverinin açarı və sirri) yazır və mövcud faylın üzərinə heç vaxt yazmır.
 
 ```bash
 git clone https://github.com/nijataliyev7/elifba.git
@@ -159,6 +159,16 @@ docker compose logs app | tr -d '\r' | grep -oE 'https?://[^] ()<]+/email/verify
 Telefonlar `https://elifba.example.az/pult` ünvanını açır.
 
 **`.env` dəyişəndə.** Operatoru, poçtu və ya `ELIFBA_ROOMS`-u dəyişəndən sonra `docker compose up -d --wait` işə salın; konteynerlər yeni dəyərlərlə yenidən yaradılır. `ELIFBA_DOMAIN`, `ELIFBA_SCHEME`, `ELIFBA_PORT` və ya `REVERB_APP_KEY` dəyişəndən sonra isə `docker compose up -d --build --wait` lazımdır: brauzerin Reverb ünvanı build zamanı fayllara yazılır.
+
+**Canlı səs (istəyə görə).** Otaqdakı oyunçular oynaya-oynaya bu serverin öz səs serveri vasitəsilə danışa bilər (`voice` xidməti, LiveKit; [ADR 030](docs/decisions/030-live-voice-in-rooms.md)): səs başqa şirkətə getmir və heç nə yazılmır. Bunun üçün böyüklər üçün oyunlar açıq olmalıdır (`ELIFBA_ROOMS=true`), server ən azı 2 vCPU və 4 GB yaddaşa malik olmalıdır, firewall-da isə daha iki port açılmalıdır: **UDP 7882** və **TCP 7881** (media Caddy-dən keçə bilmir). Sonra `.env`-də üç sətir — serveri işə salan profil, serverin ictimai IPv4 ünvanı və açar:
+
+```dotenv
+COMPOSE_PROFILES=voice
+ELIFBA_ROOMS_VOICE_IP=203.0.113.10
+ELIFBA_ROOMS_VOICE=true
+```
+
+və `docker compose up -d --wait`. `ELIFBA_ROOMS_VOICE_KEY` və `ELIFBA_ROOMS_VOICE_SECRET` sətirlərini `scripts/docker-env.sh` artıq yazıb; onlardan əvvəlki `.env` faylına hər ikisi əlavə olunmalıdır (`openssl rand -hex 8` və `openssl rand -hex 32`), yoxsa səs serveri işə düşmür və hansı sətrin boş olduğunu deyir (`docker compose logs voice`). Canlı səsi söndürmək üçün `ELIFBA_ROOMS_VOICE=false` yazıb `docker compose up -d --wait` işə salın; səs serverini də dayandırmaq üçün `COMPOSE_PROFILES` və `ELIFBA_ROOMS_VOICE_IP` sətirlərini boşaldıb `docker compose up -d --wait --remove-orphans` işə salın.
 
 **Ehtiyat nüsxələr.** `backup` xidməti hər gecə Bakı vaxtı ilə saat 03:00-da bazanın nüsxəsini `backups` həcminə yazır və 14 gün saxlayır (`.env` faylında `BACKUP_AT`, `BACKUP_KEEP_DAYS`). İndi nüsxə çıxarmaq, nüsxələrin siyahısına baxmaq və onları Docker həcmindən kənara köçürmək:
 
@@ -196,6 +206,20 @@ docker compose up -d --build --wait
 ```
 
 `http://localhost:8088/register` ünvanını açın; təsdiq keçidi yuxarıdakı kimi logdadır. Eyni Wi-Fi-dakı telefonlar üçün `localhost` əvəzinə kompüterin yerli şəbəkə ünvanını verin (`scripts/docker-env.sh 192.168.1.20 http 8088`) və telefonda `http://192.168.1.20:8088/pult` ünvanını açın. Brauzerlər http-də qaliblər şəklinin «Paylaş» düyməsini göstərmir; «Şəkli yüklə» düyməsi işləyir. `docker compose down` yığını dayandırır və məlumatı saxlayır; `docker compose down --volumes` isə məlumatı və ehtiyat nüsxələri də silir. Əsl domenə keçmək üçün bu `.env` faylını başqa yerə köçürüb `scripts/docker-env.sh` skriptini yenidən işə salın.
+
+**Əsl telefonlarda canlı səs.** Brauzer mikrofonu yalnız https-də açır, ona görə telefonlarda [canlı səs](#öz-serverinizdə) üçün sınağa kompüterin yerli şəbəkə ünvanında https verin. IP ünvanının sertifikatını Caddy öz sertifikat mərkəzi ilə imzalayır, skript isə yönləndirməni növbəti porta qoyur, beləcə 80 və 443 portları boş qalır:
+
+```bash
+scripts/docker-env.sh 192.168.1.20 https 8443
+```
+
+`.env` faylına `ELIFBA_ROOMS=true` və canlı səsin üç sətrini əlavə edin (yerli ünvanla: `ELIFBA_ROOMS_VOICE_IP=192.168.1.20`), kompüterin firewall-unda UDP 7882 və TCP 7881-ə icazə verin və `docker compose up -d --build --wait` işə salın. Caddy-nin sertifikat mərkəzini yığından çıxarıb hər telefona bir dəfə quraşdırın:
+
+```bash
+docker compose cp proxy:/data/caddy/pki/authorities/local/root.crt elifba-try-out-ca.crt
+```
+
+iPhone-da faylı telefona göndərin (AirDrop və ya e-poçt), Ayarlar → Ümumi → VPN və cihaz idarəetməsi bölməsində quraşdırın, sonra Ayarlar → Ümumi → Haqqında → Sertifikat etibarı ayarları bölməsində onu yandırın. Android-də: Ayarlar → Təhlükəsizlik → Şifrələmə və etimadnamələr → Sertifikat quraşdır → CA sertifikatı. Sonra telefonda `https://192.168.1.20:8443` ünvanını açın. Bu sertifikat mərkəzi yalnız bu sınaq üçündür: sınaq bitəndə onu telefonlardan silin.
 
 ## Məxfilik
 

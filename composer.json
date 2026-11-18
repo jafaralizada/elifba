@@ -78,6 +78,10 @@
             "Composer\\Config::disableProcessTimeout",
             "@php scripts/dev-lan.php"
         ],
+        "dev:voice": [
+            "Composer\\Config::disableProcessTimeout",
+            "sh scripts/dev-voice.sh"
+        ],
         "lint": [
             "pint --parallel"
         ],

@@ -125,3 +125,11 @@ jobs:
         run: scripts/docker-smoke.sh
         env:
           ELIFBA_SMOKE_DOWN: '1'
+
+      # The same image, with the profile `voice` (docs/architecture.md §10 "Live voice").
+      - name: Check the stack with live voice
+        run: scripts/docker-smoke.sh
+        env:
+          ELIFBA_SMOKE_VOICE: '1'
+          ELIFBA_SMOKE_BUILD: '0'
+          ELIFBA_SMOKE_DOWN: '1'

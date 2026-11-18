@@ -1,0 +1,38 @@
+# The `voice` service: our own voice server for live voice in a room
+# (docker-compose.yml, profile `voice`; docs/architecture.md §10 "Live voice",
+# docs/decisions/030-live-voice-in-rooms.md). docker/voice/start.sh writes
+# the instance's address (ELIFBA_ROOMS_VOICE_IP) where this file says
+# __ELIFBA_ROOMS_VOICE_IP__ and starts the server with the copy; the key and the
+# secret come as LIVEKIT_KEYS, never in a file.
+#
+# It calls nobody: no webhook, no TURN, no Redis, no tracing, no STUN server
+# of anyone else. LiveKit's own deployment guide sets `use_external_ip: true`,
+# which asks Twilio's and Google's STUN servers for the address: never copy it.
+
+# Signalling (/rtc, the browser's WebSocket through Caddy) and the API
+# (/twirp/*, for `app` and `scheduler` only) on the internal network.
+port: 7880
+
+rtc:
+    # Media goes straight to the instance: UDP first, ICE over TCP where a
+    # network blocks UDP. Both are published by docker-compose.yml; no range.
+    udp_port: 7882
+    tcp_port: 7881
+    # The address browsers are told, given rather than asked for.
+    use_external_ip: false
+    node_ip: __ELIFBA_ROOMS_VOICE_IP__
+    # What a join response offers browsers. An empty list would mean Twilio's
+    # and Google's, so it names the instance itself. Elifba's page uses no ICE
+    # server at all (rtcConfig.iceServers = []).
+    stun_servers:
+        - __ELIFBA_ROOMS_VOICE_IP__:7882
+
+room:
+    # Only the app makes a voice room (ADR 030 decision 21); a ticket for a room
+    # it did not make joins nothing.
+    auto_create: false
+    # Nobody but the player turns a player's microphone on (decision 10).
+    enable_remote_unmute: false
+
+logging:
+    level: info

@@ -1,0 +1,27 @@
+# The voice server for development: `composer dev:voice` (scripts/dev-voice.sh)
+# runs the image docker-compose.yml pins with this file, on this machine only
+# (docs/architecture.md §10 "Live voice"). Never the bare `--dev`, which asks
+# Twilio's and Google's STUN servers for the address.
+
+port: 7880
+
+rtc:
+    udp_port: 7882
+    tcp_port: 7881
+    use_external_ip: false
+    node_ip: 127.0.0.1
+    stun_servers:
+        - 127.0.0.1:7882
+
+room:
+    auto_create: false
+    enable_remote_unmute: false
+
+logging:
+    level: info
+
+# A fixed development key, known to everyone who reads this file: it signs
+# tickets on a laptop and nowhere else. A real instance gets its own from
+# scripts/docker-env.sh.
+keys:
+    elifba-dev: elifba-dev-secret-for-this-laptop-only-0123456789
