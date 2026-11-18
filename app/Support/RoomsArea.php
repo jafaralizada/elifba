@@ -26,6 +26,30 @@ final class RoomsArea
         return Config::boolean('elifba.rooms.enabled', false);
     }
 
+    /**
+     * Live voice in a room (§12 "Live voice", ADR 031 decision 28): the one
+     * reader of `elifba.rooms.voice.enabled`. True only while the area is
+     * on, the switch is set and the voice server is fully named — its key,
+     * its secret, the address a browser opens and the one the app calls.
+     */
+    public static function voice(): bool
+    {
+        return self::enabled()
+            && Config::boolean('elifba.rooms.voice.enabled', false)
+            && self::filled('elifba.rooms.voice.key')
+            && self::filled('elifba.rooms.voice.secret')
+            && self::filled('elifba.rooms.voice.url')
+            && self::filled('elifba.rooms.voice.api_url');
+    }
+
+    /** Whether a config value is a string with something in it. */
+    private static function filled(string $key): bool
+    {
+        $value = Config::get($key);
+
+        return is_string($value) && trim($value) !== '';
+    }
+
     /** Whether a route is in the player area: the only group that names the player role. */
     public static function holds(Route $route): bool
     {

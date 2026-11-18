@@ -30,6 +30,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * tells a round whether to wait for them (`RoomWaits`); a device never
  * gets it.
  *
+ * `voice_admitted_at` and `voice_muted_at` are what the host decided about
+ * the player's live voice (§12 "Live voice", ADR 031 decisions 8–12): let
+ * in, and muted until the host lifts it. The standing they give is
+ * derived (`RoomVoice::standingOf()`); a device never gets them.
+ *
  * @property string $id
  * @property string $room_id
  * @property int|null $user_id null = no account any more, or the name was taken out
@@ -37,6 +42,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $left_at
  * @property CarbonImmutable|null $removed_at
  * @property int|null $seen_ms Unix ms; null = the page has not read a running game's state
+ * @property CarbonImmutable|null $voice_admitted_at let into the room's voice; null: waiting
+ * @property CarbonImmutable|null $voice_muted_at muted by the host; null: may speak
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Room $room
@@ -90,6 +97,8 @@ class RoomPlayer extends Model
             'left_at' => 'datetime',
             'removed_at' => 'datetime',
             'seen_ms' => 'integer',
+            'voice_admitted_at' => 'datetime',
+            'voice_muted_at' => 'datetime',
         ];
     }
 

@@ -168,6 +168,8 @@ it('answers a bearer like a visitor on every route but its own board routes', fu
 
 it('answers a bearer like a visitor on every room route and changes nothing', function (): void {
     $world = bearerWorld();
+    // The live voice on too (C3): its three routes answer as every room route.
+    Rooms::voiceOn();
     $before = bearerSnapshot();
     $checked = 0;
 

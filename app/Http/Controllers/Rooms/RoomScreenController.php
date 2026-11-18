@@ -15,6 +15,7 @@ use App\Domain\Rooms\Support\RoomScreen;
 use App\Domain\Rooms\Support\RoomState;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\RoomsArea;
 use Illuminate\Container\Attributes\CurrentUser;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -61,7 +62,7 @@ final class RoomScreenController extends Controller
 
         return Inertia::render('rooms/screen', [
             'room' => ['id' => $room->id, 'status' => $room->status()->value],
-            'state' => RoomState::for($room, $account, screen: true)->toArray(),
+            'state' => RoomState::for($room, $account, screen: true, voice: RoomsArea::voice())->toArray(),
             'place_labels' => RoomPlaces::labels($room, app()->getLocale()),
             'join' => RoomJoinLink::of($room),
             'catalog' => RoomGameSetupData::options(),

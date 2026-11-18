@@ -10,11 +10,14 @@ use App\Http\Controllers\Rooms\RoomLeaveController;
 use App\Http\Controllers\Rooms\RoomMemberController;
 use App\Http\Controllers\Rooms\RoomMemberVoiceController;
 use App\Http\Controllers\Rooms\RoomNameController;
+use App\Http\Controllers\Rooms\RoomPlayerVoiceController;
 use App\Http\Controllers\Rooms\RoomPlaysController;
 use App\Http\Controllers\Rooms\RoomScreenController;
 use App\Http\Controllers\Rooms\RoomSetupController;
 use App\Http\Controllers\Rooms\RoomStateController;
 use App\Http\Controllers\Rooms\RoomTauntController;
+use App\Http\Controllers\Rooms\RoomVoiceController;
+use App\Http\Controllers\Rooms\RoomVoiceTicketController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -133,6 +136,28 @@ Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::mid
         ->whereUlid('room')
         ->can('host', 'room')
         ->name('rooms.taunts.update');
+
+    // Live voice (C3, ADR 031): behind `rooms.voice` as well, a 404 to everyone
+    // while the instance's voice is off (it runs right after `rooms.enabled`).
+    Route::middleware('rooms.voice')->group(function () {
+        // The host's switch «Canlı səs», at any moment in an open room.
+        Route::put('rooms/{room}/voice', RoomVoiceController::class)
+            ->whereUlid('room')
+            ->can('voice', 'room')
+            ->name('rooms.voice.update');
+        // The host admits, mutes or lets speak one player — never the host's own row.
+        Route::put('rooms/{room}/members/{member}/voice', RoomPlayerVoiceController::class)
+            ->whereUlid(['room', 'member'])
+            ->scopeBindings()
+            ->can('voice', ['room', 'member'])
+            ->name('rooms.members.voice.update');
+        // A ticket to the room's voice room: the host, or a present player let in.
+        Route::post('rooms/{room}/voice/tickets', RoomVoiceTicketController::class)
+            ->whereUlid('room')
+            ->middleware('throttle:room-voice')
+            ->can('listen', 'room')
+            ->name('rooms.voice.tickets.store');
+    });
 
     // A game: the room's choice started in an open room with none running, ended while it runs (B3, G2).
     Route::post('rooms/{room}/games', [RoomGameController::class, 'store'])

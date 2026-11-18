@@ -5,6 +5,7 @@ namespace App\Domain\Rooms\Policies;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomPlayer;
 use App\Domain\Rooms\Support\RoomClock;
+use App\Domain\Rooms\Support\RoomVoice;
 use App\Models\User;
 
 /**
@@ -67,6 +68,38 @@ final class RoomPolicy
         return $this->host($user, $room)
             && $member->room_id === $room->id
             && $member->user_id !== $room->user_id;
+    }
+
+    /**
+     * `host` of an open room (§12 "Live voice", ADR 031 decision 9): the
+     * room's voice; with a member, a row of this room that is not the
+     * host's own — admitting, muting, letting speak. Only the voice routes
+     * ask it, and `rooms.voice` has answered 404 before while the
+     * instance's voice is off.
+     */
+    public function voice(User $user, Room $room, ?RoomPlayer $member = null): bool
+    {
+        return $this->host($user, $room)
+            && $room->isOpen()
+            && ($member === null || ($member->room_id === $room->id && $member->user_id !== $room->user_id));
+    }
+
+    /**
+     * A ticket to the room's voice (ADR 031 decision 18): the host — playing
+     * or not — or a present player the host let in, of an open room whose
+     * voice is on. Never a newcomer who waits, a player who left or was
+     * removed, a closed or idle room, a room whose voice is off. Behind
+     * `rooms.voice`, as `voice` is.
+     */
+    public function listen(User $user, Room $room): bool
+    {
+        if (! $room->isOpen() || ! $room->voiceIsOn()) {
+            return false;
+        }
+
+        $row = $room->rowOf($user);
+
+        return $row !== null && RoomVoice::mayListen($room, $row);
     }
 
     /** `host`, once the room is closed. */

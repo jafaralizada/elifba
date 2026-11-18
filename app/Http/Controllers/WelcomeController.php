@@ -68,13 +68,16 @@ final class WelcomeController extends Controller
      * The facts of the section for the adults' rooms (docs/frontend.md rule
      * 10, architecture §12): the families with their games — each mechanic
      * that has levels in `content/rooms/levels.json`, in the enum's order —
-     * the difficulties those levels have, and the limits of a room.
+     * the difficulties those levels have, and the limits of a room; and,
+     * only while the instance's live voice is on, `voice: true`, so the
+     * section says it (ADR 031 decision 15).
      *
      * @return array{
      *     families: list<array{key: string, mechanics: list<string>}>,
      *     difficulties: list<int>,
      *     maxPlayers: int,
      *     rounds: array{min: int, max: int},
+     *     voice?: true,
      * }
      */
     private function rooms(ContentRepository $content): array
@@ -108,6 +111,7 @@ final class WelcomeController extends Controller
                 'min' => Config::integer('elifba.rooms.rounds.min'),
                 'max' => Config::integer('elifba.rooms.rounds.max'),
             ],
+            ...(RoomsArea::voice() ? ['voice' => true] : []),
         ];
     }
 }

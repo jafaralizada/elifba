@@ -17,7 +17,9 @@ use Inertia\Response;
  * for a class's parents and — only while the rooms switch is on — the
  * section «Otaqlar» for adults who play in rooms (§12 "Adults' privacy",
  * ADR 024 decision 10). With the switch off the page gets nothing about
- * rooms (ADR 019 decision 4).
+ * rooms (ADR 019 decision 4). Only while the instance's live voice is on
+ * does that section get `voice: true`, so the page shows the part «Canlı
+ * səs» and the voice forms of three sentences (ADR 031 decisions 16–17).
  * Public, in every interface language.
  */
 final class PrivacyController extends Controller
@@ -37,8 +39,11 @@ final class PrivacyController extends Controller
                 'name' => is_string($name) && trim($name) !== '' ? trim($name) : null,
                 'email' => is_string($email) && trim($email) !== '' ? trim($email) : null,
             ],
-            // How long an idle room keeps its code (§12 "Rooms and joining").
-            ...(RoomsArea::enabled() ? ['rooms' => ['idleHours' => Config::integer('elifba.rooms.idle_hours')]] : []),
+            // How long an idle room keeps its code (§12 "Rooms and joining"); `voice` while the live voice is on (C3).
+            ...(RoomsArea::enabled() ? ['rooms' => [
+                'idleHours' => Config::integer('elifba.rooms.idle_hours'),
+                ...(RoomsArea::voice() ? ['voice' => true] : []),
+            ]] : []),
         ]);
     }
 }

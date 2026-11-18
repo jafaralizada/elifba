@@ -30,6 +30,15 @@ abstract class TestCase extends BaseTestCase
         // The rooms area is off, as an instance has it, whatever the shell or
         // `.env` say; a test of the area turns it on (`Tests\Support\Rooms::on()`).
         Config::set('elifba.rooms.enabled', false);
+
+        // Live voice is off and names no voice server, whatever the shell or
+        // `.env` say, so no room test can reach one; a test of the voice
+        // turns it on and fakes its server (`Tests\Support\Rooms::voiceOn()`).
+        Config::set('elifba.rooms.voice.enabled', false);
+
+        foreach (['key', 'secret', 'url', 'api_url'] as $key) {
+            Config::set("elifba.rooms.voice.{$key}", null);
+        }
     }
 
     /**

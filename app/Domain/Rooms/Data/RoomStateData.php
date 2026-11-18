@@ -23,6 +23,11 @@ use InvalidArgumentException;
  * one has none. A live game also has its taunts (`taunts`, T2, ADR 029
  * decision 15; version 3) as the viewer may see them; nothing else has.
  * Version 4 adds `room.screen` (ADR 028 as amended 2026-11-19).
+ * An open room's state says its live voice while the instance's voice is
+ * on (`voice`, C3, ADR 031 "The state"; version 5) — whether the host has
+ * it on and whether the viewer agreed — and each player's standing in it
+ * while it is on, for the host's row and the present players' only; a
+ * closed room, and every room while the instance's voice is off, has none.
  *
  * @phpstan-import-type RoomSummaryArray from RoomSummaryData
  * @phpstan-import-type RoomViewerArray from RoomViewerData
@@ -32,12 +37,13 @@ use InvalidArgumentException;
  * @phpstan-import-type RoomRankedPlayerArray from RoomRankedPlayerData
  * @phpstan-import-type RoomSetupArray from RoomSetupData
  * @phpstan-import-type RoomTauntsArray from RoomTauntsData
+ * @phpstan-import-type RoomVoiceArray from RoomVoiceData
  *
- * @phpstan-type RoomStateArray array{v: int, revision: int, server_ms: int, room: RoomSummaryArray, me: RoomViewerArray, players: list<RoomPlayerArray>, game: RoomGameArray|null, round: RoomRoundArray|null, ranking: list<RoomRankedPlayerArray>, setup: RoomSetupArray|null, taunts: RoomTauntsArray|null}
+ * @phpstan-type RoomStateArray array{v: int, revision: int, server_ms: int, room: RoomSummaryArray, me: RoomViewerArray, players: list<RoomPlayerArray>, game: RoomGameArray|null, round: RoomRoundArray|null, ranking: list<RoomRankedPlayerArray>, setup: RoomSetupArray|null, taunts: RoomTauntsArray|null, voice: RoomVoiceArray|null}
  */
 final readonly class RoomStateData
 {
-    public const int VERSION = 4;
+    public const int VERSION = 5;
 
     /**
      * @param  list<RoomPlayerData>  $players
@@ -54,6 +60,7 @@ final readonly class RoomStateData
         public array $ranking = [],
         public ?RoomSetupData $setup = null,
         public ?RoomTauntsData $taunts = null,
+        public ?RoomVoiceData $voice = null,
     ) {
         $live = $game?->phase === RoomGamePhase::Live;
 
@@ -71,6 +78,16 @@ final readonly class RoomStateData
 
         if ($round !== null && $round->total !== $game?->rounds) {
             throw new InvalidArgumentException('The round counts another game\'s rounds.');
+        }
+
+        if ($room->status === RoomStatus::Closed && $voice !== null) {
+            throw new InvalidArgumentException('A closed room has no voice.');
+        }
+
+        foreach ($players as $player) {
+            if (($voice?->on === true && ($player->host || $player->present)) !== ($player->voice !== null)) {
+                throw new InvalidArgumentException('A player has a voice standing exactly while the room\'s voice is on, for the host and the present players.');
+            }
         }
     }
 
@@ -95,6 +112,7 @@ final readonly class RoomStateData
             ranking: array_map(RoomRankedPlayerData::fromArray(...), $data['ranking']),
             setup: $data['setup'] === null ? null : RoomSetupData::fromArray($data['setup']),
             taunts: $data['taunts'] === null ? null : RoomTauntsData::fromArray($data['taunts']),
+            voice: $data['voice'] === null ? null : RoomVoiceData::fromArray($data['voice']),
         );
     }
 
@@ -115,6 +133,7 @@ final readonly class RoomStateData
             'ranking' => array_map(static fn (RoomRankedPlayerData $row): array => $row->toArray(), $this->ranking),
             'setup' => $this->setup?->toArray(),
             'taunts' => $this->taunts?->toArray(),
+            'voice' => $this->voice?->toArray(),
         ];
     }
 }

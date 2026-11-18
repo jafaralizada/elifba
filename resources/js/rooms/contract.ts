@@ -1,7 +1,8 @@
 /**
  * A room's contract (docs/architecture.md §12 "The state", "The race",
- * "Room games", "Games first", "Taunts (T2)", ADR 021 decision 6, ADR 023
- * decision 5, ADR 026 decision 11, ADR 029 decision 15): what
+ * "Room games", "Games first", "Taunts (T2)", "Live voice", ADR 021
+ * decision 6, ADR 023 decision 5, ADR 026 decision 11, ADR 029 decision
+ * 15, ADR 031 "The state"): what
  * `GET /rooms/{room}/state` answers (and the `state` of the room page's
  * props), what a device posts as its answer or its taunt and the receipt
  * it gets, and what `room.changed` carries. The schemas are the source; every
@@ -60,12 +61,31 @@ export const RoomViewer = z.strictObject({
     host: z.boolean(),
 });
 
+/**
+ * A player's standing in the room's live voice (C3, ADR 031 decision 8):
+ * `waiting` — not let in yet; `muted` — listens; `open` — listens and may
+ * open the microphone. Never whether they are in the voice or speak.
+ */
+export const RoomVoiceStanding = z.enum(['open', 'muted', 'waiting']);
+
 export const RoomPlayer = z.strictObject({
     id,
     /** The account's name as it is now; null for a row without an account («Oyunçu»). */
     name: z.string().min(1).nullable(),
     present: z.boolean(),
     host: z.boolean(),
+    /** While the room's voice is on, for the host and the present players; null otherwise. */
+    voice: RoomVoiceStanding.nullable(),
+});
+
+/**
+ * The room's live voice (C3, ADR 031 "The state"): whether the host has it
+ * on, and whether the viewer's own account accepted the voice's sentence.
+ * Null while the instance's voice is off, and in a closed room.
+ */
+export const RoomVoice = z.strictObject({
+    on: z.boolean(),
+    agreed: z.boolean(),
 });
 
 /** The mechanics a room plays: the six of §12 "Room games" (B3–B6). */
@@ -301,7 +321,7 @@ export const RoomTaunts = z.strictObject({
 });
 
 /** The state's version: a page that meets another reloads itself (`fetchState`). */
-export const ROOM_STATE_VERSION = 4;
+export const ROOM_STATE_VERSION = 5;
 
 const stateBase = {
     v: z.literal(ROOM_STATE_VERSION),
@@ -314,30 +334,60 @@ const stateBase = {
     ranking: z.array(RoomRankedPlayer),
     /** The host's choice of the next game; null in a closed room. */
     setup: RoomSetup.nullable(),
+    /** The room's live voice while the instance's voice is on (C3); null in a closed room. */
+    voice: RoomVoice.nullable(),
 };
 
-/** No game yet, a live game with its current round, or a game that is over. */
-export const RoomState = z.union([
-    z.strictObject({
-        ...stateBase,
-        game: z.null(),
-        round: z.null(),
-        taunts: z.null(),
-    }),
-    z.strictObject({
-        ...stateBase,
-        game: z.strictObject({ ...gameBase, phase: z.literal('live') }),
-        round: RoomRound,
-        /** A live game's taunts (T2); nothing else has any. */
-        taunts: RoomTaunts,
-    }),
-    z.strictObject({
-        ...stateBase,
-        game: z.strictObject({ ...gameBase, phase: z.literal('over') }),
-        round: z.null(),
-        taunts: z.null(),
-    }),
-]);
+/**
+ * No game yet, a live game with its current round, or a game that is over.
+ * A closed room has no voice, and a player has a voice standing exactly
+ * while the room's voice is on, for the host and the present players.
+ */
+export const RoomState = z
+    .union([
+        z.strictObject({
+            ...stateBase,
+            game: z.null(),
+            round: z.null(),
+            taunts: z.null(),
+        }),
+        z.strictObject({
+            ...stateBase,
+            game: z.strictObject({ ...gameBase, phase: z.literal('live') }),
+            round: RoomRound,
+            /** A live game's taunts (T2); nothing else has any. */
+            taunts: RoomTaunts,
+        }),
+        z.strictObject({
+            ...stateBase,
+            game: z.strictObject({ ...gameBase, phase: z.literal('over') }),
+            round: z.null(),
+            taunts: z.null(),
+        }),
+    ])
+    .superRefine((state, context) => {
+        if (state.room.status === 'closed' && state.voice !== null) {
+            context.addIssue({
+                code: 'custom',
+                message: 'A closed room has no voice.',
+                path: ['voice'],
+            });
+        }
+
+        state.players.forEach((player, index) => {
+            const standing =
+                state.voice?.on === true && (player.host || player.present);
+
+            if (standing !== (player.voice !== null)) {
+                context.addIssue({
+                    code: 'custom',
+                    message:
+                        'A voice standing only while the voice is on, for the host and the present players.',
+                    path: ['players', index, 'voice'],
+                });
+            }
+        });
+    });
 
 /** `POST /rooms/{room}/answers`: the device's own event id, the round, the items in the order tapped. Never a player. */
 export const RoomAnswer = z.strictObject({
@@ -382,6 +432,8 @@ export type RoomStatus = z.infer<typeof RoomStatus>;
 export type RoomSummary = z.infer<typeof RoomSummary>;
 export type RoomViewer = z.infer<typeof RoomViewer>;
 export type RoomPlayer = z.infer<typeof RoomPlayer>;
+export type RoomVoiceStanding = z.infer<typeof RoomVoiceStanding>;
+export type RoomVoice = z.infer<typeof RoomVoice>;
 export type RoomMechanic = z.infer<typeof RoomMechanic>;
 export type RoomItem = z.infer<typeof RoomItem>;
 export type RoomStudy = z.infer<typeof RoomStudy>;

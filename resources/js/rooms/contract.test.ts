@@ -87,6 +87,8 @@ describe('room fixtures', () => {
             'state.screen-taunted',
             'taunt',
             'taunt-receipt',
+            'state.voice',
+            'state.voice.off',
         ]) {
             expect(fixture(name), name).toBeDefined();
         }
@@ -550,6 +552,108 @@ describe('taunts', () => {
             RoomTauntReceipt.safeParse({ status: 'refused', revision: 5 })
                 .success,
         ).toBe(false);
+    });
+});
+
+describe('the live voice (C3)', () => {
+    const voice = fixture('state.voice') as State;
+    const off = fixture('state.voice.off') as State;
+    const quiet = (state: State): State => ({
+        ...state,
+        players: state.players.map((player) => ({ ...player, voice: null })),
+    });
+
+    it("reads every state at v 5, with the voice and each player's standing", () => {
+        expect(ROOM_STATE_VERSION).toBe(5);
+
+        for (const [path, value] of payloads) {
+            if (!path.includes('/state.')) {
+                continue;
+            }
+
+            const state = value as State;
+
+            expect(state.v, path).toBe(5);
+            expect('voice' in state, path).toBe(true);
+            expect(
+                state.players.every((player) => 'voice' in player),
+                path,
+            ).toBe(true);
+        }
+
+        expect(voice.voice).toEqual({ on: true, agreed: true });
+        expect(voice.players.map((player) => player.voice)).toEqual([
+            'open',
+            'open',
+            'muted',
+            null,
+            'waiting',
+        ]);
+        expect(off.voice).toEqual({ on: false, agreed: false });
+        expect(off.players.every((player) => player.voice === null)).toBe(true);
+    });
+
+    it('refuses a key of voice in a closed room', () => {
+        const closed = {
+            ...quiet(voice),
+            room: { ...voice.room, status: 'closed' as const, code: null },
+            setup: null,
+        };
+
+        expect(RoomState.safeParse(closed).success).toBe(false);
+        expect(RoomState.safeParse({ ...closed, voice: null }).success).toBe(
+            true,
+        );
+    });
+
+    it('gives a standing exactly while the voice is on, to the host and the present players', () => {
+        expect(
+            RoomState.safeParse({
+                ...voice,
+                voice: { on: false, agreed: true },
+            }).success,
+        ).toBe(false);
+        expect(RoomState.safeParse({ ...voice, voice: null }).success).toBe(
+            false,
+        );
+        expect(RoomState.safeParse(quiet(voice)).success).toBe(false);
+        expect(
+            RoomState.safeParse({
+                ...voice,
+                players: voice.players.map((player, index) =>
+                    index === 3 ? { ...player, voice: 'open' } : player,
+                ),
+            }).success,
+        ).toBe(false);
+    });
+
+    it('says nothing of who is in the voice, whose microphone is open or who speaks', () => {
+        expect(
+            RoomState.safeParse({
+                ...voice,
+                voice: { ...voice.voice, speaking: [voice.players[0].id] },
+            }).success,
+        ).toBe(false);
+        expect(
+            RoomState.safeParse({
+                ...voice,
+                players: voice.players.map((player) => ({
+                    ...player,
+                    microphone: true,
+                })),
+            }).success,
+        ).toBe(false);
+        expect(
+            RoomState.safeParse({
+                ...voice,
+                players: voice.players.map((player) =>
+                    player.voice === 'open'
+                        ? { ...player, voice: 'speaking' }
+                        : player,
+                ),
+            }).success,
+        ).toBe(false);
+        expect(RoomState.safeParse({ ...voice, v: 4 }).success).toBe(false);
     });
 });
 

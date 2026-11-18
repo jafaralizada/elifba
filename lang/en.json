@@ -818,6 +818,8 @@
     "rooms.tools.lock_line": "Lock it and no new player can join.",
     "rooms.tools.plays": "I play too",
     "rooms.tools.plays_line": "Turn it off to host only: you choose and start the games.",
+    "rooms.voice.errors.agreement": "Joining needs your agreement.",
+    "rooms.voice.errors.busy": "There is no room for another live voice right now. Try again a little later.",
     "settings.appearance.dark": "Dark",
     "settings.appearance.description": "Update the appearance settings for your account",
     "settings.appearance.light": "Light",

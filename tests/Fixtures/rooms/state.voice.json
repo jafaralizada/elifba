@@ -1,0 +1,68 @@
+{
+    "v": 5,
+    "revision": 7,
+    "server_ms": 1795534200000,
+    "room": {
+        "id": "01kaqrx1zd7w4n5v6b8c9defgh",
+        "status": "open",
+        "locked": false,
+        "code": "482913",
+        "taunts": true,
+        "screen": false
+    },
+    "me": {
+        "player_id": "01kaqrx3mn4p5q6r7s8t9vwxyz",
+        "host": false
+    },
+    "players": [
+        {
+            "id": "01kaqrx2ab3c4d5e6f7g8h9jkm",
+            "name": "Rəşad Quliyev",
+            "present": true,
+            "host": true,
+            "voice": "open"
+        },
+        {
+            "id": "01kaqrx3mn4p5q6r7s8t9vwxyz",
+            "name": "Aygün Məmmədova",
+            "present": true,
+            "host": false,
+            "voice": "open"
+        },
+        {
+            "id": "01kaqrx4bc5d6e7f8g9h0jkmnp",
+            "name": "Tural Əliyev",
+            "present": true,
+            "host": false,
+            "voice": "muted"
+        },
+        {
+            "id": "01kaqrx5cd6e7f8g9h0jkmnpqr",
+            "name": null,
+            "present": false,
+            "host": false,
+            "voice": null
+        },
+        {
+            "id": "01kaqrx6de7f8g9h0jkmnpqrst",
+            "name": "Leyla Həsənova",
+            "present": true,
+            "host": false,
+            "voice": "waiting"
+        }
+    ],
+    "game": null,
+    "round": null,
+    "ranking": [],
+    "setup": {
+        "mechanic": "recall_order",
+        "difficulty": 2,
+        "rounds": 10,
+        "played": false
+    },
+    "taunts": null,
+    "voice": {
+        "on": true,
+        "agreed": true
+    }
+}

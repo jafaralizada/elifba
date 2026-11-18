@@ -8,6 +8,8 @@ use App\Domain\Family\Models\Child;
 use App\Domain\Play\Models\GameSession;
 use App\Domain\Rooms\Actions\CloseRoom;
 use App\Domain\Rooms\Actions\RemoveRoomPlayer;
+use App\Domain\Rooms\Actions\SetRoomVoice;
+use App\Domain\Rooms\Data\RoomVoiceSwitchData;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomGame;
 use App\Domain\Rooms\Models\RoomPlayer;
@@ -55,7 +57,8 @@ function isolationWorld(): array
 {
     // A's student Aysel and child Aysel have a name the board says (ADR 016).
     NameClips::fake(['Aysel']);
-    Rooms::on();
+    // The area and its live voice (C3): the voice routes are isolated as every room route.
+    Rooms::voiceOn();
     $a = User::factory()->teacherAndParent()->create(['player_agreed_at' => now()]);
     $b = User::factory()->teacherAndParent()->create(['player_agreed_at' => now()]);
     // A player's name is shown in the room, like a child's on the board.
@@ -64,6 +67,8 @@ function isolationWorld(): array
     Rooms::join($closedRoomA, $guest);
     app(CloseRoom::class)->handle($closedRoomA);
     $roomA = Rooms::open($a);
+    app(SetRoomVoice::class)->handle($roomA, new RoomVoiceSwitchData(true));
+    $roomA->refresh();
     $roomB = Rooms::open($b);
     $playingRoomA = Room::factory()->for($a, 'host')->create();
     $roomGameA = RoomGame::factory()->for($playingRoomA)->withRounds(5)->create();
@@ -193,6 +198,10 @@ function isolationCases(): array
             'taunt' => 'turtle',
         ]],
         'PUT rooms/{room}/taunts' => ['rooms.taunts.update', $roomA, static fn (array $w): array => ['on' => false]],
+        // Live voice (C3): the host's switch, the host's word on a player, a ticket (A's room has its voice on).
+        'PUT rooms/{room}/voice' => ['rooms.voice.update', $roomA, static fn (array $w): array => ['on' => false]],
+        'PUT rooms/{room}/members/{member}/voice' => ['rooms.members.voice.update', static fn (array $w): array => ['room' => $w['roomA']->id, 'member' => $w['memberA']->id], static fn (array $w): array => ['standing' => 'muted']],
+        'POST rooms/{room}/voice/tickets' => ['rooms.voice.tickets.store', $roomA, static fn (array $w): array => ['agree' => true]],
         // A closed room: the host deletes it, a player takes their name out.
         'DELETE rooms/{room}' => ['rooms.destroy', $closedRoomA, $none],
         'DELETE rooms/{room}/name' => ['rooms.name.destroy', $closedRoomA, $none],

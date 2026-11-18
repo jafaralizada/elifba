@@ -6,6 +6,7 @@ use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Support\RoomClock;
 use App\Domain\Rooms\Support\RoomLock;
 use App\Domain\Rooms\Support\RoomSignal;
+use App\Domain\Rooms\Support\RoomVoiceCut;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -15,6 +16,11 @@ use Illuminate\Support\Facades\DB;
  * results. A game still running in it ends now (`EndRoomGame::end()`), so
  * the round it cuts off gives nothing and is never revealed. Raises the
  * revision once and signals the room.
+ *
+ * A room whose voice is on has it turned off with the close (§12 "Live
+ * voice", ADR 031 decision 22): `voice_at` cleared, the epoch raised, and
+ * once committed and signalled the voice room of the epoch before is
+ * deleted (`RoomVoiceCut`) — `CloseIdleRooms`' close too.
  */
 final readonly class CloseRoom
 {
@@ -43,6 +49,18 @@ final readonly class CloseRoom
 
         $locked->closed_at = now();
         $locked->code = null;
+
+        $voiceBefore = $locked->voiceIsOn() ? $locked->voice_epoch : null;
+
+        if ($voiceBefore !== null) {
+            $locked->voice_at = null;
+            $locked->voice_epoch = $voiceBefore + 1;
+        }
+
         RoomSignal::raise($locked);
+
+        if ($voiceBefore !== null) {
+            RoomVoiceCut::close($locked, $voiceBefore);
+        }
     }
 }

@@ -16,6 +16,7 @@ use App\Domain\Rooms\Data\RoomSummaryData;
 use App\Domain\Rooms\Data\RoomTauntsData;
 use App\Domain\Rooms\Data\RoomTauntSeenData;
 use App\Domain\Rooms\Data\RoomViewerData;
+use App\Domain\Rooms\Data\RoomVoiceData;
 use App\Domain\Rooms\Enums\RoomGamePhase;
 use App\Domain\Rooms\Enums\RoomPhase;
 use App\Domain\Rooms\Models\Room;
@@ -65,13 +66,21 @@ use Illuminate\Support\Facades\Config;
  * (`$screen`, `?for=screen`), every taunt of that window with its target.
  * No other phone gets a taunt, and nothing of one is left once the game is
  * over. A reveal lists the taunts counted at its close (`spent`).
+ *
+ * While the instance's voice is on (`$voice`: the caller reads the switch), an open room's
+ * state says its live voice (§12 "The state's voice", ADR 031): whether
+ * the host has it on, whether the viewer's account agreed, and each
+ * player's standing while it is on (`RoomVoice::stateOf()`). Reading it
+ * asks the voice server nothing: who is in the voice, whose microphone is
+ * open and who speaks are never in it.
  */
 final class RoomState
 {
     /**
      * @param  bool  $screen  the big screen's request (`?for=screen`, `RoomPolicy::screen`): the taunts with their targets
+     * @param  bool  $voice  whether the instance's live voice is on — the switch, which the caller reads (§12 "Live voice")
      */
-    public static function for(Room $room, User $viewer, bool $screen = false): RoomStateData
+    public static function for(Room $room, User $viewer, bool $screen = false, bool $voice = false): RoomStateData
     {
         $nowMs = RoomClock::nowMs();
         $rows = RoomRanking::players($room);
@@ -80,6 +89,7 @@ final class RoomState
         $moment = $game === null || ! $room->isOpen() ? RoomMomentData::over() : $game->timetable()->moment($nowMs);
         $live = $game !== null && ! $moment->isOver();
         $setup = $room->isOpen() ? $room->setup() : null;
+        $voiceData = $voice && $room->isOpen() ? new RoomVoiceData($room->voiceIsOn(), $viewer->voice_agreed_at !== null) : null;
 
         return new RoomStateData(
             revision: $room->revision,
@@ -91,6 +101,7 @@ final class RoomState
                 name: $row->user?->name,
                 present: $row->isPresent(),
                 host: $row->user_id !== null && $row->user_id === $room->user_id,
+                voice: $voiceData === null ? null : RoomVoice::stateOf($room, $row),
             ))->all()),
             game: $game === null ? null : RoomGameData::of($game, $live ? RoomGamePhase::Live : RoomGamePhase::Over),
             round: $live ? self::round($game, $moment, $rows, $mine) : null,
@@ -109,6 +120,7 @@ final class RoomState
                     && $game->rounds->count() === $setup->rounds,
             ),
             taunts: $live ? self::taunts($room, $game, $mine, $nowMs, $screen) : null,
+            voice: $voiceData,
         );
     }
 

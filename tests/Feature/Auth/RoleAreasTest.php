@@ -328,7 +328,7 @@ it('places classes, rankings, teacher words and class games in the teacher area,
     // Every room route, and nothing else, is the player's: `/rooms…`, `/oyun…` and the old `/otaq…` (G2).
     $rooms = array_filter($routes, static fn (RoutingRoute $route): bool => preg_match('#^(rooms|oyun|otaq)(/|$)#', $route->uri()) === 1);
     expect(array_keys($rooms))->toBe(array_keys(playerAreaRoutes()))
-        ->and(array_keys($rooms))->toContain('rooms.index', 'rooms.store', 'rooms.past', 'rooms.entrance', 'rooms.join', 'rooms.join.store', 'rooms.entrance.old', 'rooms.join.old', 'rooms.show', 'rooms.state', 'rooms.leave', 'rooms.update', 'rooms.members.destroy', 'rooms.close', 'rooms.destroy', 'rooms.name.destroy', 'rooms.setup.update', 'rooms.plays.update', 'rooms.games.store', 'rooms.game.destroy', 'rooms.answers.store', 'rooms.screen', 'rooms.taunts.store', 'rooms.taunts.update');
+        ->and(array_keys($rooms))->toContain('rooms.index', 'rooms.store', 'rooms.past', 'rooms.entrance', 'rooms.join', 'rooms.join.store', 'rooms.entrance.old', 'rooms.join.old', 'rooms.show', 'rooms.state', 'rooms.leave', 'rooms.update', 'rooms.members.destroy', 'rooms.close', 'rooms.destroy', 'rooms.name.destroy', 'rooms.setup.update', 'rooms.plays.update', 'rooms.games.store', 'rooms.game.destroy', 'rooms.answers.store', 'rooms.screen', 'rooms.taunts.store', 'rooms.taunts.update', 'rooms.voice.update', 'rooms.members.voice.update', 'rooms.voice.tickets.store');
 
     foreach (['children.index', 'children.store', 'children.order', 'children.show', 'children.update', 'children.destroy', 'children.learned-letters.update', 'children.games.create', 'children.games.store'] as $name) {
         expect(areaGroupsOf($routes[$name]))->toBe(['parent'], $name);
@@ -523,7 +523,8 @@ it('shares the roles and the area with every page', function (): void {
 });
 
 it('refuses an account without the player role on every room route', function (string $state, string $rolesPage): void {
-    Rooms::on();
+    // The area and its live voice (C3): the voice routes refuse as every room route.
+    Rooms::voiceOn();
     $user = User::factory()->{$state}()->create();
     $values = roomRowsOf($user);
     $before = areaSnapshot();

@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\FakeVoiceServer;
 use Tests\Support\Games;
 use Tests\Support\GuestBoards;
 use Tests\Support\Rooms;
@@ -127,6 +128,79 @@ it('sends nothing about rooms to a class, child, ranking, words, setup, board, r
     });
 
     expect($student->refresh()->display_name)->toBe('Aysel');
+});
+
+// Live voice (C3, ADR 031 decision 33): a class game, a home game, a board,
+// a student and a child never get voice, and nothing of a room's voice
+// reaches their pages — with the voice switch on, a room talking and the
+// account's own agreement stamped.
+it('sends nothing about voice to a class, child, ranking, words, setup, board, remote, pult or guest board page', function (): void {
+    $voice = Rooms::voiceOn();
+    $this->travelTo('2026-11-24 10:00:00');
+    $account = User::factory()->teacherAndParent()->create(['player_agreed_at' => now(), 'voice_agreed_at' => now()]);
+    $class = SchoolClass::factory()->for($account, 'teacher')->create();
+    $student = Student::factory()->for($class)->create(['display_name' => 'Aysel']);
+    $child = Child::factory()->for($account, 'parent')->create(['display_name' => 'Firuzə']);
+    $game = Games::start($class, seed: 1);
+    $home = Games::start($child, seed: 2);
+    $board = GuestBoards::showing($game);
+    $room = Rooms::open($account);
+    $member = Rooms::join($room, User::factory()->player()->create(['name' => 'Aygün Məmmədova']));
+    $this->actingAs($account)->putJson(route('rooms.voice.update', $room), ['on' => true])->assertNoContent();
+    $this->actingAs($account)->putJson(route('rooms.members.voice.update', ['room' => $room, 'member' => $member]), ['standing' => 'muted'])->assertNoContent();
+    $this->actingAs($account)->postJson(route('rooms.voice.tickets.store', $room))->assertOk();
+    $calls = count($voice->sent);
+    $secrets = [
+        $room->id, $member->id, $room->refresh()->voiceRoom(), 'Aygün',
+        'voice_at', 'voice_epoch', 'voice_agreed_at', 'voice_admitted_at', 'voice_muted_at',
+        'voice/tickets', '"agreed"', 'canPublish', 'livekit', 'Canlı səs',
+        FakeVoiceServer::URL, FakeVoiceServer::API_URL, FakeVoiceServer::KEY, FakeVoiceServer::SECRET,
+    ];
+    $silent = static function (string $wire, string $where) use ($secrets): void {
+        foreach ($secrets as $secret) {
+            expect($wire)->not->toContain($secret, $where);
+        }
+    };
+
+    $this->actingAs($account);
+
+    foreach ([
+        route('classes.index'),
+        route('classes.show', $class),
+        route('classes.rankings', $class),
+        route('classes.podium', $class),
+        route('words.index'),
+        route('classes.games.create', $class),
+        route('children.index'),
+        route('children.show', $child),
+        route('children.games.create', $child),
+        route('games.board', $game),
+        route('games.remote', $game),
+        route('games.board', $home),
+        route('pult', ['list' => 1]),
+        route('play-settings.edit'),
+        route('guest-boards.game.edit', $board['board']),
+    ] as $url) {
+        $this->get($url)
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use ($url, $silent): void {
+                $props = $page->toArray()['props'];
+                unset($props['translations']);
+
+                $silent((string) json_encode($props, JSON_UNESCAPED_UNICODE), $url);
+            });
+    }
+
+    $silent((string) $this->getJson(route('games.state', $game))->assertOk()->getContent(), 'games.state');
+    $this->app['auth']->guard('web')->forgetUser();
+    $bearer = GuestBoards::bearer($board['token']);
+    $silent((string) $this->getJson(route('games.state', $game), $bearer)->assertOk()->getContent(), 'games.state (bearer)');
+    $silent((string) $this->getJson(route('guest-boards.show', $board['board']), $bearer)->assertOk()->getContent(), 'guest-boards.show');
+    // A guest board's bearer gets no ticket either: it is a visitor to every room route.
+    $this->postJson(route('rooms.voice.tickets.store', $room), ['agree' => true], $bearer)->assertUnauthorized();
+
+    expect($voice->sent)->toHaveCount($calls)
+        ->and($student->refresh()->display_name)->toBe('Aysel');
 });
 
 it('leaves the game tables untouched by a whole room game', function (): void {

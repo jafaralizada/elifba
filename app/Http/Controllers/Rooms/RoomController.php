@@ -22,6 +22,7 @@ use App\Domain\Rooms\Support\RoomResults;
 use App\Domain\Rooms\Support\RoomState;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\RoomsArea;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -116,7 +117,7 @@ final class RoomController extends Controller
 
         return Inertia::render('rooms/show', [
             'room' => ['id' => $room->id, 'status' => $room->status()->value],
-            'state' => $watches || ! $open ? RoomState::for($room, $account)->toArray() : null,
+            'state' => $watches || ! $open ? RoomState::for($room, $account, voice: RoomsArea::voice())->toArray() : null,
             'place_labels' => RoomPlaces::labels($room, app()->getLocale()),
             'catalog' => $open && $gate->allows('host', $room) ? RoomGameSetupData::options() : null,
             'join' => $open && $watches ? RoomJoinLink::of($room) : null,

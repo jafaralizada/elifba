@@ -2,14 +2,20 @@
 
 namespace App\Domain\Rooms\Data;
 
+use App\Domain\Rooms\Enums\RoomVoiceStanding;
+
 /**
  * A player in a room's state (docs/architecture.md §12 "The state",
  * "Adults' privacy"; zod `RoomPlayer`): the row's id — the only id of a
  * player a device gets — the account's name as it is now, null for a row
  * without an account («Oyunçu»), whether the player is in the room now and
- * whether it is the host. Never an account id or an address.
+ * whether it is the host. Never an account id or an address. `voice` is
+ * the player's standing in the room's live voice (C3, ADR 031) — exactly
+ * for the host's row and the present players' while the room's voice is
+ * on, null otherwise; never whether they are in it, their microphone or
+ * whether they speak.
  *
- * @phpstan-type RoomPlayerArray array{id: string, name: string|null, present: bool, host: bool}
+ * @phpstan-type RoomPlayerArray array{id: string, name: string|null, present: bool, host: bool, voice: string|null}
  */
 final readonly class RoomPlayerData
 {
@@ -18,6 +24,7 @@ final readonly class RoomPlayerData
         public ?string $name,
         public bool $present,
         public bool $host,
+        public ?RoomVoiceStanding $voice = null,
     ) {}
 
     /**
@@ -25,7 +32,7 @@ final readonly class RoomPlayerData
      */
     public static function fromArray(array $data): self
     {
-        return new self($data['id'], $data['name'], $data['present'], $data['host']);
+        return new self($data['id'], $data['name'], $data['present'], $data['host'], $data['voice'] === null ? null : RoomVoiceStanding::from($data['voice']));
     }
 
     /**
@@ -38,6 +45,7 @@ final readonly class RoomPlayerData
             'name' => $this->name,
             'present' => $this->present,
             'host' => $this->host,
+            'voice' => $this->voice?->value,
         ];
     }
 }

@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureRoleChosen;
 use App\Http\Middleware\EnsureRoomsAreEnabled;
+use App\Http\Middleware\EnsureRoomVoiceIsEnabled;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SetLocale;
@@ -39,17 +40,21 @@ return Application::configure(basePath: dirname(__DIR__))
         // The areas of docs/architecture.md §1 "Accounts and roles" (ADR 010):
         // `role` is the package's, with an App\Enums\Role name or two;
         // `rooms.enabled` closes the player area while it is switched off
-        // (§12, ADR 019).
+        // (§12, ADR 019), and `rooms.voice` its live voice (ADR 031).
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'role.chosen' => EnsureRoleChosen::class,
             'rooms.enabled' => EnsureRoomsAreEnabled::class,
+            'rooms.voice' => EnsureRoomVoiceIsEnabled::class,
         ]);
 
         // A switched-off rooms area answers as an unknown address does: the
         // switch runs first, before the cookies, the session, the CSRF check
         // or the login could say that a room route exists.
         $middleware->prependToPriorityList(before: EncryptCookies::class, prepend: EnsureRoomsAreEnabled::class);
+        // The voice's switch right after it, for the voice routes (§12 "Live
+        // voice"): each is put before the cookies in turn, so the area's first.
+        $middleware->prependToPriorityList(before: EncryptCookies::class, prepend: EnsureRoomVoiceIsEnabled::class);
 
         $middleware->web(append: [
             SetLocale::class,

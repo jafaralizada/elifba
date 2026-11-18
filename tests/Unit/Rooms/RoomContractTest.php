@@ -69,6 +69,8 @@ it('has every phase\'s fixture, the answer and the receipt', function (): void {
         'state.chosen',
         // T2: a target's phone and the screen with taunts, a taunt and its receipt.
         'state.taunted', 'state.screen-taunted', 'taunt', 'taunt-receipt',
+        // C3: the start screen with the voice on, a player of each standing; the host's view with it off.
+        'state.voice', 'state.voice.off',
     ]);
 });
 
@@ -202,4 +204,46 @@ it('carries a live game\'s taunts, and nothing of them anywhere else', function 
         ->and(fn () => RoomStateData::fromArray([...$answer, 'taunts' => [...$taunted['taunts'], 'received' => $screen['taunts']['shown']]]))->toThrow(InvalidArgumentException::class, 'target')
         ->and(fn () => RoomStateData::fromArray([...$answer, 'taunts' => [...$screen['taunts'], 'shown' => $taunted['taunts']['received']]]))->toThrow(InvalidArgumentException::class, 'target')
         ->and(fn () => RoomStateData::fromArray([...$answer, 'taunts' => [...$answer['taunts'], 'balance' => -1]]))->toThrow(InvalidArgumentException::class, 'below 0');
+});
+
+it('says the room\'s voice at v 5, each player\'s standing only while it is on, and nothing of it in a closed room', function (): void {
+    foreach (array_filter(array_keys(roomPayloads()), static fn (string $name): bool => str_starts_with($name, 'state.')) as $name) {
+        $state = roomFixture($name);
+
+        expect($state['v'])->toBe(5, $name)
+            ->and(RoomStateData::VERSION)->toBe(5)
+            ->and(array_key_last($state))->toBe('voice', $name);
+
+        foreach ($state['players'] as $player) {
+            // A standing, never whether they are in the voice, their microphone or whether they speak.
+            expect(array_keys($player))->toBe(['id', 'name', 'present', 'host', 'voice'], $name)
+                ->and($player['voice'] !== null)->toBe(($state['voice']['on'] ?? false) && ($player['host'] || $player['present']), $name);
+        }
+
+        if ($state['voice'] !== null) {
+            expect(array_keys($state['voice']))->toBe(['on', 'agreed'], $name)
+                ->and($state['room']['status'])->toBe('open', $name);
+        }
+    }
+
+    $voice = roomFixture('state.voice');
+    $off = roomFixture('state.voice.off');
+
+    expect($voice['voice'])->toBe(['on' => true, 'agreed' => true])
+        ->and(array_column($voice['players'], 'voice'))->toBe(['open', 'open', 'muted', null, 'waiting'])
+        ->and($off['voice'])->toBe(['on' => false, 'agreed' => false])
+        ->and($off['me']['host'])->toBeTrue()
+        ->and(array_unique(array_column($off['players'], 'voice')))->toBe([null]);
+
+    // A key of voice in a closed room fails, as does a standing while the voice is off, or none while it is on.
+    $closed = [...$voice, 'room' => [...$voice['room'], 'status' => 'closed', 'code' => null], 'setup' => null];
+    $quiet = static fn (array $state): array => [...$state, 'players' => array_map(static fn (array $player): array => [...$player, 'voice' => null], $state['players'])];
+
+    expect(fn () => RoomStateData::fromArray($quiet($closed)))->toThrow(InvalidArgumentException::class, 'closed room has no voice')
+        ->and(fn () => RoomStateData::fromArray([...$quiet($closed), 'voice' => null])->voice)->not->toThrow(InvalidArgumentException::class)
+        ->and(fn () => RoomStateData::fromArray([...$voice, 'voice' => ['on' => false, 'agreed' => true]]))->toThrow(InvalidArgumentException::class, 'voice standing')
+        ->and(fn () => RoomStateData::fromArray([...$voice, 'voice' => null]))->toThrow(InvalidArgumentException::class, 'voice standing')
+        ->and(fn () => RoomStateData::fromArray($quiet($voice)))->toThrow(InvalidArgumentException::class, 'voice standing')
+        ->and(fn () => RoomStateData::fromArray([...$voice, 'v' => 4]))->toThrow(InvalidArgumentException::class, 'version')
+        ->and(fn () => RoomStateData::fromArray([...$voice, 'players' => [...array_slice($voice['players'], 0, 3), [...$voice['players'][3], 'voice' => 'open'], $voice['players'][4]]]))->toThrow(InvalidArgumentException::class, 'voice standing');
 });

@@ -818,6 +818,8 @@
     "rooms.tools.lock_line": "Kilidləsəniz, yeni oyunçu qoşula bilməz.",
     "rooms.tools.plays": "Mən də oynayıram",
     "rooms.tools.plays_line": "Söndürsəniz, yalnız aparırsınız: oyunu seçir və başladırsınız.",
+    "rooms.voice.errors.agreement": "Qoşulmaq üçün razılıq lazımdır.",
+    "rooms.voice.errors.busy": "Hazırda canlı səs üçün yer yoxdur. Bir az sonra yenidən cəhd edin.",
     "settings.appearance.dark": "Qaranlıq",
     "settings.appearance.description": "Hesabınızın görünüşünü seçin",
     "settings.appearance.light": "İşıqlı",

@@ -93,7 +93,7 @@ it('gives the lobby its players by name and never an account id or an address', 
     // The name is the account's as it is now.
     $player->forceFill(['name' => 'Aygün Həsənova'])->save();
     $this->actingAs($host)->getJson(route('rooms.state', $room))
-        ->assertJsonPath('players.1', ['id' => $row->id, 'name' => 'Aygün Həsənova', 'present' => true, 'host' => false]);
+        ->assertJsonPath('players.1', ['id' => $row->id, 'name' => 'Aygün Həsənova', 'present' => true, 'host' => false, 'voice' => null]);
 });
 
 it('names no one who took their name out', function (): void {
@@ -116,7 +116,7 @@ it('names no one who took their name out', function (): void {
     // The others see the row without a name.
     $this->actingAs($host)->get(route('rooms.show', $room))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('state.players.1', ['id' => $row->id, 'name' => null, 'present' => false, 'host' => false])
+            ->where('state.players.1', ['id' => $row->id, 'name' => null, 'present' => false, 'host' => false, 'voice' => null])
             ->where('state.me.player_id', RoomPlayer::query()->where('user_id', $host->id)->value('id'))
             // A closed room has no choice of a next game (G2).
             ->where('state.setup', null));
@@ -236,4 +236,58 @@ it('records the screen without raising the revision, signalling or touching the 
     $this->getJson(route('rooms.state', [$room, 'for' => 'screen']))->assertOk();
 
     expect($room->refresh()->screen_seen_ms)->toBe($first + 1000);
+});
+
+it('builds the voice fixtures from rows: a player of each standing with the voice on, and the host\'s view with it off', function (): void {
+    Rooms::voiceOn();
+    $fixture = static fn (string $name): array => json_decode((string) file_get_contents(__DIR__."/../../Fixtures/rooms/{$name}.json"), true, 64, JSON_THROW_ON_ERROR);
+    $voice = $fixture('state.voice');
+    $off = $fixture('state.voice.off');
+    $this->travelTo(CarbonImmutable::createFromTimestampMs($voice['server_ms']));
+
+    $host = User::factory()->player()->create(['name' => 'Rəşad Quliyev']);
+    $viewer = User::factory()->player()->create(['name' => 'Aygün Məmmədova', 'voice_agreed_at' => now()]);
+    $tural = User::factory()->player()->create(['name' => 'Tural Əliyev']);
+    $leyla = User::factory()->player()->create(['name' => 'Leyla Həsənova']);
+    $room = Room::factory()->for($host, 'host')->create([
+        'id' => $voice['room']['id'],
+        'code' => $voice['room']['code'],
+        'revision' => $voice['revision'],
+    ]);
+    $room->forceFill(['voice_at' => now(), 'voice_epoch' => 2])->save();
+    [$hostRow, $viewerRow, $turalRow, $namelessRow, $leylaRow] = array_column($voice['players'], 'id');
+    $at = static fn (int $minutes): CarbonImmutable => CarbonImmutable::now()->subMinutes(10 - $minutes);
+
+    RoomPlayer::factory()->for($room)->for($host)->create(['id' => $hostRow, 'joined_at' => $at(0), 'voice_admitted_at' => now()]);
+    RoomPlayer::factory()->for($room)->for($viewer)->create(['id' => $viewerRow, 'joined_at' => $at(1), 'voice_admitted_at' => now()]);
+    RoomPlayer::factory()->for($room)->for($tural)->create(['id' => $turalRow, 'joined_at' => $at(2), 'voice_admitted_at' => now(), 'voice_muted_at' => now()]);
+    // Let in once, but without an account now: no standing.
+    RoomPlayer::factory()->for($room)->create(['id' => $namelessRow, 'user_id' => null, 'joined_at' => $at(3), 'voice_admitted_at' => now()]);
+    // Came after the voice was turned on: waits.
+    RoomPlayer::factory()->for($room)->for($leyla)->create(['id' => $leylaRow, 'joined_at' => $at(4)]);
+    RoomPlayer::factory()->for($room)->removed()->create(['joined_at' => $at(5), 'voice_admitted_at' => now()]);
+
+    $this->actingAs($viewer)->getJson(route('rooms.state', $room))
+        ->assertOk()
+        ->assertExactJson($voice);
+    expect(RoomStateData::fromArray($voice)->toArray())->toBe($voice);
+
+    // The host's view of the lobby with the voice off: `on` false, no standing anywhere.
+    RoomPlayer::query()->where('room_id', $room->id)->delete();
+    $room->forceFill(['voice_at' => null, 'revision' => $off['revision']])->save();
+    $left = User::factory()->player()->create(['name' => 'Tural Əliyev']);
+    [$hostRow, $aygunRow, $leftRow, $namelessRow] = array_column($off['players'], 'id');
+    RoomPlayer::factory()->for($room)->for($host)->create(['id' => $hostRow, 'joined_at' => $at(0), 'voice_admitted_at' => now()]);
+    RoomPlayer::factory()->for($room)->for($viewer)->create(['id' => $aygunRow, 'joined_at' => $at(1), 'voice_admitted_at' => now()]);
+    RoomPlayer::factory()->for($room)->for($left)->left()->create(['id' => $leftRow, 'joined_at' => $at(2)]);
+    RoomPlayer::factory()->for($room)->create(['id' => $namelessRow, 'user_id' => null, 'joined_at' => $at(3)]);
+
+    $this->actingAs($host)->getJson(route('rooms.state', $room))
+        ->assertOk()
+        ->assertExactJson($off);
+
+    // A closed room says nothing of voice, whatever its rows hold.
+    $room->forceFill(['voice_at' => now(), 'closed_at' => now(), 'code' => null])->save();
+    expect($this->getJson(route('rooms.state', $room))->assertOk()->json('voice'))->toBeNull();
+    $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('state.voice', null));
 });

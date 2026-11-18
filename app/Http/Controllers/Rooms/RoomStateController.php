@@ -8,6 +8,7 @@ use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Support\RoomState;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\RoomsArea;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -51,7 +52,7 @@ final class RoomStateController extends Controller
             $recordRead->handle($room, $account);
         }
 
-        return new JsonResponse(RoomState::for($room, $account, $forScreen)->toArray(), 200, ['Cache-Control' => 'no-store, private']);
+        return new JsonResponse(RoomState::for($room, $account, $forScreen, RoomsArea::voice())->toArray(), 200, ['Cache-Control' => 'no-store, private']);
     }
 
     private static function fromTheScreen(Request $request, Room $room): bool

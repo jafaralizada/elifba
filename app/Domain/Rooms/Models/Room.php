@@ -40,6 +40,11 @@ use Illuminate\Support\Facades\Config;
  * through `setup()`. `taunts` is the host's switch for taunts (T2, ADR
  * 029 decision 12), on by default, written only by `SetRoomTaunts`.
  *
+ * `voice_at` and `voice_epoch` are the room's live voice (§12 "Live voice",
+ * ADR 031): on since that moment, and the number in its voice room's name
+ * (`voiceRoom()`), raised to close that voice room for everyone. Only
+ * `SetRoomVoice`, a removal, a close and the sweep write them.
+ *
  * @property string $id
  * @property int $user_id the host
  * @property string|null $code six digits from `RoomCode` while open; null once closed
@@ -52,6 +57,8 @@ use Illuminate\Support\Facades\Config;
  * @property int|null $setup_rounds
  * @property bool $taunts the host's switch: players may throw taunts
  * @property int|null $screen_seen_ms when the big screen last read the state while shown, Unix ms (`RecordScreenRead`)
+ * @property CarbonImmutable|null $voice_at the host turned the room's voice on; null: off
+ * @property int $voice_epoch in the voice room's name; raised to close it for everyone
  * @property CarbonImmutable $created_at what the retention period counts from
  * @property CarbonImmutable $updated_at
  * @property-read User $host
@@ -71,6 +78,7 @@ class Room extends Model
     protected $attributes = [
         'revision' => 0,
         'taunts' => true,
+        'voice_epoch' => 0,
     ];
 
     /**
@@ -87,6 +95,21 @@ class Room extends Model
     public function isOpen(): bool
     {
         return $this->closed_at === null && $this->last_activity_at->gt(self::idleSince());
+    }
+
+    /** Whether the host has the room's voice on (§12 "Live voice"); the instance's switch is `RoomsArea::voice()`'s. */
+    public function voiceIsOn(): bool
+    {
+        return $this->voice_at !== null;
+    }
+
+    /**
+     * The voice room's name at the voice server: `{id}.{voice_epoch}`, or
+     * with another epoch — the one before a raise (ADR 031 decision 21).
+     */
+    public function voiceRoom(?int $epoch = null): string
+    {
+        return $this->id.'.'.($epoch ?? $this->voice_epoch);
     }
 
     public function status(): RoomStatus
@@ -227,6 +250,8 @@ class Room extends Model
             'setup_rounds' => 'integer',
             'taunts' => 'boolean',
             'screen_seen_ms' => 'integer',
+            'voice_at' => 'datetime',
+            'voice_epoch' => 'integer',
         ];
     }
 

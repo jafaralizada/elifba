@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Http\Middleware\EnsureRoomsAreEnabled;
 use App\Models\User;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -105,6 +106,35 @@ it('answers 404 on every room route while the switch is off', function (): void 
     $this->actingAs($accounts['a player'])->get(route('rooms.index'))->assertOk();
     $this->get(route('rooms.show', $values['room']))->assertOk();
     $this->getJson(route('rooms.state', $values['room']))->assertOk();
+});
+
+it('closes the live voice\'s routes with the area, its own switch on', function (): void {
+    // The voice's switch on and its server named, the area off (C3, ADR 031).
+    $voice = Rooms::voiceOn();
+    Config::set('elifba.rooms.enabled', false);
+    $host = User::factory()->player()->create();
+    $values = roomsSwitchValues($host, User::factory()->player()->create());
+    Room::query()->whereKey($values['room'])->update(['voice_at' => now()]);
+    $before = roomsSwitchSnapshot();
+    $checked = 0;
+
+    foreach (Rooms::routes() as $key => $route) {
+        if (! in_array('rooms.voice', $route->gatherMiddleware(), true)) {
+            continue;
+        }
+
+        foreach (array_diff($route->methods(), ['HEAD']) as $method) {
+            $uri = Rooms::uri($route, $values);
+            $this->app['auth']->guard('web')->forgetUser();
+            expect($this->json($method, $uri, ['on' => true, 'standing' => 'muted', 'agree' => true])->status())->toBe(404, "{$method} {$key}, a visitor")
+                ->and($this->actingAs($host)->json($method, $uri, ['on' => true, 'standing' => 'muted', 'agree' => true])->status())->toBe(404, "{$method} {$key}, the host");
+            $checked++;
+        }
+    }
+
+    expect($checked)->toBe(3)
+        ->and(roomsSwitchSnapshot())->toBe($before)
+        ->and($voice->sent)->toBe([]);
 });
 
 it('runs the switch before anything else of a room route', function (): void {

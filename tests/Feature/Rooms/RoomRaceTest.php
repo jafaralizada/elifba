@@ -1309,3 +1309,59 @@ it('stores no text a player wrote', function (string $mechanic): void {
         ->and($stored)->not->toContain('Salam')
         ->and($stored)->not->toContain('Aygünəm');
 })->with(['anagram', 'spelling']);
+
+// Live voice (C3, ADR 031 decision 24): the voice is a second connection, and
+// nothing of a round asks the voice server anything — so one that is down
+// moves no round, no clock and no point.
+it('plays a whole game with the voice on without one request to the voice server from an answer, a read or the state', function (): void {
+    $voice = Rooms::voiceOn($this->reverb);
+    $this->actingAs($this->host)->putJson(route('rooms.voice.update', $this->room), ['on' => true])->assertNoContent();
+    $this->actingAs($this->aygun)->postJson(route('rooms.voice.tickets.store', $this->room), ['agree' => true])->assertOk();
+    $calls = $voice->sent;
+    $outcomes = [];
+
+    // One game with the voice server answering, the same game with it down.
+    foreach (['answering', 'down'] as $server) {
+        if ($server === 'down') {
+            $voice->down();
+        }
+
+        $this->actingAs($this->host)->putJson(route('rooms.setup.update', $this->room), ['mechanic' => 'recall_order', 'difficulty' => 1, 'rounds' => 5])->assertNoContent();
+        $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room))->assertNoContent();
+        $game = $this->room->refresh()->latestGame();
+        expect($game)->not->toBeNull();
+        /** @var RoomGame $game */
+        $outcome = [];
+
+        foreach (range(0, 4) as $index) {
+            $round = Rooms::round($game, $index);
+            $this->travelTo(Rooms::at($game, RoomPhase::Answer, $index));
+            raceRead($this->host, $this->room);
+            raceRead($this->aygun, $this->room);
+            $this->travelTo(RoomClock::at(RoomClock::nowMs() + 1200));
+
+            raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertOk()->assertJsonPath('status', 'accepted');
+            raceAnswer($this->host, $this->room, $round, Rooms::wrong($round))->assertOk()->assertJsonPath('status', 'accepted');
+
+            // Both answered: the round closes now, and its reveal is the one a game without voice shows.
+            $this->travelTo(Rooms::at($game, RoomPhase::Reveal, $index));
+            ['state' => $state] = raceRead($this->aygun, $this->room);
+            expect($state['round'])->toMatchArray(['index' => $index, 'phase' => 'reveal', 'answered_count' => 2, 'present_count' => 2])
+                ->and($state['voice'])->toBe(['on' => true, 'agreed' => true]);
+            $outcome[] = array_map(static fn (array $result): array => [$result['correct'], $result['points']], $state['round']['reveal']['results']);
+        }
+
+        $this->travelTo(Rooms::at($game, RoomPhase::Over));
+        ['state' => $state] = raceRead($this->aygun, $this->room);
+        expect($state['game']['phase'])->toBe('over');
+        $outcomes[$server] = $outcome;
+        $this->travel(1)->minutes();
+    }
+
+    // A game started and ended by the host asks nothing either.
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room))->assertNoContent();
+    $this->actingAs($this->host)->deleteJson(route('rooms.game.destroy', $this->room))->assertNoContent();
+
+    expect($voice->sent)->toBe($calls)
+        ->and($outcomes['down'])->toBe($outcomes['answering']);
+});

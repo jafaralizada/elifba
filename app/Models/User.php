@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Role;
+use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -32,6 +33,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $teacher_agreed_at when the account accepted the teacher role's sentence (§7 "Agreements")
  * @property Carbon|null $parent_agreed_at when the account accepted the parent role's sentence (§7 "Agreements")
  * @property Carbon|null $player_agreed_at when the account accepted the player role's sentence (§7 "Agreements", ADR 019)
+ * @property CarbonImmutable|null $voice_agreed_at when the account accepted the live voice's sentence (§7 "Agreements", §12 "Live voice", ADR 031 decision 14)
  * @property bool $phone_remote whether the teacher board offers the phone remote (§4 "Pairing"); on by default
  * @property array<string, string>|null $board_sounds the sounds chosen for the account's boards, a `content/sounds.json` key per moment (§3 "Sounds"); null = the packs' own
  * @property array{prompt?: bool, praise?: bool}|null $board_voice what the account's boards say (§3 "Voice", ADR 015); null = the prompt and the praise
@@ -40,7 +42,7 @@ use Spatie\Permission\Traits\HasRoles;
  */
 #[Fillable(['name', 'email', 'password', 'locale'])]
 // The roles and the area reach pages as `auth.roles` and `auth.area`, not inside `auth.user` (ADR 010).
-#[Hidden(['password', 'google_id', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'roles', 'permissions', 'area', 'teacher_agreed_at', 'parent_agreed_at', 'player_agreed_at', 'board_sounds', 'board_voice'])]
+#[Hidden(['password', 'google_id', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'roles', 'permissions', 'area', 'teacher_agreed_at', 'parent_agreed_at', 'player_agreed_at', 'voice_agreed_at', 'board_sounds', 'board_voice'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
@@ -76,6 +78,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'teacher_agreed_at' => 'datetime',
             'parent_agreed_at' => 'datetime',
             'player_agreed_at' => 'datetime',
+            'voice_agreed_at' => 'datetime',
         ];
     }
 

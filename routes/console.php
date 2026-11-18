@@ -6,6 +6,9 @@ use App\Domain\Play\Actions\PruneGuestBoards;
 use App\Domain\Play\Actions\PruneOldGames;
 use App\Domain\Rooms\Actions\CloseIdleRooms;
 use App\Domain\Rooms\Actions\PruneOldRooms;
+use App\Domain\Rooms\Actions\SweepRoomVoices;
+use App\Support\RoomsArea;
+use Illuminate\Console\Scheduling\Schedule as Scheduler;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -40,6 +43,10 @@ Artisan::command('rooms:prune', function (PruneOldRooms $prune) {
     $this->info("Deleted {$prune->handle()} rooms with their players.");
 })->purpose('Delete rooms created longer than elifba.retention_days ago');
 
+Artisan::command('rooms:voice-sweep', function (SweepRoomVoices $sweep) {
+    $this->info("Closed {$sweep->handle(RoomsArea::voice())} voice rooms.");
+})->purpose('Make the voice server match the rooms: close the voice rooms that should not be open');
+
 // One `scheduler` process runs these (docs/architecture.md §1, §10). Nothing
 // is scheduled for a round or a game of a room: its timetable is derived (§12).
 Schedule::command('classroom:prune-archived')->daily();
@@ -48,3 +55,5 @@ Schedule::command('play:prune-old-games')->daily();
 Schedule::command('play:prune-guest-boards')->hourly();
 Schedule::command('rooms:close-idle')->hourly();
 Schedule::command('rooms:prune')->daily();
+// Every 15 seconds, and only while a voice server is named (§12 "Live voice", ADR 031 decision 23).
+SweepRoomVoices::schedule(app(Scheduler::class));

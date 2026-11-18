@@ -115,6 +115,26 @@ return [
         'screen' => [
             'beat_ms' => 10_000,
         ],
+
+        // Live voice (§12 "Live voice", ADR 031 decision 28): the switch,
+        // false unless set, read only through `RoomsArea::voice()`; the voice
+        // server's API key and secret (also its `LIVEKIT_KEYS`), which sign
+        // the tickets and the app's own calls and never reach a page; the
+        // address a browser opens and the one the app calls. A ticket lets
+        // its holder join for `ticket_seconds`; a call to the voice server
+        // connects and answers within `timeout_ms`, or the write it follows
+        // goes on without it; at most `max_rooms` open rooms have their
+        // voice on at once.
+        'voice' => [
+            'enabled' => filter_var(env('ELIFBA_ROOMS_VOICE', false), FILTER_VALIDATE_BOOL),
+            'key' => env('ELIFBA_ROOMS_VOICE_KEY') ?: null,
+            'secret' => env('ELIFBA_ROOMS_VOICE_SECRET') ?: null,
+            'url' => env('ELIFBA_ROOMS_VOICE_URL') ?: null,
+            'api_url' => env('ELIFBA_ROOMS_VOICE_API_URL') ?: null,
+            'ticket_seconds' => 60,
+            'timeout_ms' => 1_500,
+            'max_rooms' => 5,
+        ],
     ],
 
     // Who runs this instance; shown on /privacy (§7).

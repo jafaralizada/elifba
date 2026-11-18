@@ -47,6 +47,27 @@ final class Rooms
     }
 
     /**
+     * Switches the area and its live voice on for the rest of the test
+     * (docs/architecture.md §12 "Live voice"), with a voice server named and
+     * faked — with `Config::set`, never the environment, which CI's `.env`
+     * beats — and gives the fake that answers in its place. With the test's
+     * `FakeReverb`, the fake also notes how many broadcasts went out before
+     * each call.
+     */
+    public static function voiceOn(?FakeReverb $reverb = null): FakeVoiceServer
+    {
+        self::on();
+
+        Config::set('elifba.rooms.voice.enabled', true);
+        Config::set('elifba.rooms.voice.key', FakeVoiceServer::KEY);
+        Config::set('elifba.rooms.voice.secret', FakeVoiceServer::SECRET);
+        Config::set('elifba.rooms.voice.url', FakeVoiceServer::URL);
+        Config::set('elifba.rooms.voice.api_url', FakeVoiceServer::API_URL);
+
+        return FakeVoiceServer::install($reverb);
+    }
+
+    /**
      * A room opened by `$host` (a new player when null) choosing `$mechanic`
      * through `OpenRoom`: a code, the choice, and the host as its first
      * player — stepped out through `SetHostPlays` when `$plays` is false.
