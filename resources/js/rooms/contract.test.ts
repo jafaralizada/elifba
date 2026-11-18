@@ -207,7 +207,7 @@ describe('what a state never carries', () => {
                 { reveal: revealed },
                 { solution: revealed.solution },
                 { reveal: { ...revealed, mine: null, results: [] } },
-                { closes_ms: round.bell_ms, next_ms: round.bell_ms + 5000 },
+                { closes_ms: round.bell_ms, next_ms: round.bell_ms + 3000 },
             ]) {
                 expect(
                     RoomState.safeParse({

@@ -23,9 +23,11 @@ use Inertia\Response;
  * host may) and the place labels — and `join`, the addresses of the QR and
  * the code field (`RoomJoinLink`), built on the server; and `sounds`, the
  * URLs of the room's moments it plays as the room's speaker (ADR 025
- * "Sound"), never a phone's own cues. It writes nothing,
- * and it is not the guest board: `/lovhe`, the `board` guard and its
- * bearer never show a room. The page is docs/frontend.md rule 15's.
+ * "Sound"), never a phone's own cues. It writes nothing — not even a
+ * read (`RecordRoomRead`): the screen is not the host's phone, and a
+ * round never waits for the host because the screen is on — and it is
+ * not the guest board: `/lovhe`, the `board` guard and its bearer never
+ * show a room. The page is docs/frontend.md rule 15's.
  */
 final class RoomScreenController extends Controller
 {

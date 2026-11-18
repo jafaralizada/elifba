@@ -25,6 +25,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\RoomPhones;
 use Tests\Support\Rooms;
 
 /*
@@ -130,6 +131,7 @@ function raceSnapshot(): array
 it('serves nothing of a round before it opens', function (): void {
     $game = Rooms::playing($this->room);
     $rounds = $game->rounds;
+    RoomPhones::read($this->room, $this->host, $this->aygun);
 
     // The countdown: round 0's number and moments, nothing of any round's content.
     foreach ([$this->host, $this->aygun] as $account) {
@@ -221,6 +223,7 @@ it('never serves the solution or a result before the round closes', function ():
     $game = Rooms::playing($this->room);
     $round = Rooms::round($game, 0);
     $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    RoomPhones::read($this->room, $this->aygun, $tural);
     $before = raceRead($this->host, $this->room)['state']['ranking'];
 
     raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertOk();
@@ -310,6 +313,7 @@ it('refuses an answer after the bell', function (): void {
 
     // A moment before the bell is still in time.
     $this->travelTo(RoomClock::at($timetable->bell(1) - 1));
+    RoomPhones::read($this->room, $this->host, $this->aygun);
     $last = Rooms::round($game, 1);
     raceAnswer($this->aygun, $this->room, $last, Rooms::right($last))->assertJsonPath('status', 'accepted');
     expect(RoomAnswer::query()->sole()->elapsed_ms)->toBe($last->answer_ms - 1);
@@ -376,6 +380,8 @@ it('measures the time on the server\'s clock', function (): void {
     $game = Rooms::playing($this->room);
     $round = Rooms::round($game, 0);
     $from = $game->timetable()->answerFrom(0);
+    $this->travelTo(RoomClock::at($from));
+    RoomPhones::read($this->room, $this->host, $this->aygun);
 
     // Whatever the device says of its own time is not read.
     $this->travelTo(RoomClock::at($from + 2345));
@@ -400,6 +406,7 @@ it('never says right or wrong in the receipt', function (): void {
     $game = Rooms::playing($this->room);
     $round = Rooms::round($game, 0);
     $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    RoomPhones::read($this->room, $this->host, $this->aygun, $tural);
 
     $right = raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertOk()->assertHeader('Cache-Control', 'no-store, private');
     $wrong = raceAnswer($this->host, $this->room, $round, Rooms::wrong($round))->assertOk()->assertHeader('Cache-Control', 'no-store, private');
@@ -413,6 +420,8 @@ it('never says right or wrong in the receipt', function (): void {
 it('closes the round when every present player has answered', function (): void {
     $game = Rooms::playing($this->room);
     $round = Rooms::round($game, 0);
+    $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    RoomPhones::read($this->room, $this->host, $this->aygun);
     $this->travelTo(RoomClock::at($game->timetable()->answerFrom(0) + 1000));
 
     raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertExactJson(['status' => 'accepted', 'revision' => 3]);
@@ -438,7 +447,9 @@ it('closes the round when every present player has answered', function (): void 
     $other = Rooms::playing($room);
     $first = Rooms::round($other, 0);
     $this->travelTo(Rooms::at($other, RoomPhase::Answer));
+    RoomPhones::read($room, $watcher, $a, $b);
     raceAnswer($a, $room, $first, Rooms::right($first));
+    expect($first->refresh()->closed_ms)->toBeNull();
     raceAnswer($b, $room, $first, Rooms::right($first));
     expect($first->refresh()->closed_ms)->toBe(RoomClock::nowMs());
 });
@@ -451,6 +462,7 @@ it('does not wait for a player who left or was removed', function (): void {
     $game = Rooms::playing($this->room);
     $round = Rooms::round($game, 0);
     $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    RoomPhones::read($this->room, $this->host, $this->aygun, $tural, $nigar);
 
     raceAnswer($this->host, $this->room, $round, Rooms::right($round));
     raceAnswer($this->aygun, $this->room, $round, Rooms::right($round));
@@ -467,7 +479,9 @@ it('does not wait for a player who left or was removed', function (): void {
     // Round 1: the host answers and Aygün leaves.
     $next = Rooms::round($game, 1);
     $this->travelTo(Rooms::at($game, RoomPhase::Answer, 1));
+    RoomPhones::read($this->room, $this->host, $this->aygun);
     raceAnswer($this->host, $this->room, $next, Rooms::right($next));
+    expect($next->refresh()->closed_ms)->toBeNull();
     $this->actingAs($this->aygun)->post(route('rooms.leave', $this->room));
     expect($next->refresh()->closed_ms)->toBe(RoomClock::nowMs());
 
@@ -482,6 +496,7 @@ it('closes the round when a player who answered comes back to it alone', functio
     $game = Rooms::playing($this->room);
     $round = Rooms::round($game, 0);
     $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    RoomPhones::read($this->room, $this->host, $this->aygun);
     raceAnswer($this->aygun, $this->room, $round, Rooms::right($round));
     $this->actingAs($this->aygun)->post(route('rooms.leave', $this->room));
     $this->actingAs($this->host)->post(route('rooms.leave', $this->room));
@@ -496,10 +511,12 @@ it('lets a late joiner answer the open round', function (): void {
     $game = Rooms::playing($this->room);
     [$first, $second] = [Rooms::round($game, 0), Rooms::round($game, 1)];
     $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    RoomPhones::read($this->room, $this->host, $this->aygun);
     raceAnswer($this->host, $this->room, $first, Rooms::right($first));
     raceAnswer($this->aygun, $this->room, $first, Rooms::right($first));
 
     $this->travelTo(Rooms::at($game, RoomPhase::Answer, 1));
+    RoomPhones::read($this->room, $this->host, $this->aygun);
     raceAnswer($this->host, $this->room, $second, Rooms::right($second));
 
     $tural = User::factory()->player()->create(['name' => 'Tural Əliyev']);
@@ -522,6 +539,194 @@ it('lets a late joiner answer the open round', function (): void {
         ->and($second->refresh()->closed_ms)->toBe(RoomClock::nowMs())
         // Nothing for the round before he came.
         ->and($turalRow->answers()->where('room_round_id', $first->id)->exists())->toBeFalse();
+});
+
+// A phone that is simply gone — a closed tab without «Çıx» — stays present,
+// but stops reading: the round it vanished in waits for it to the bell,
+// and no round after it does (§12 "Late, lost and gone", ADR 021 decision
+// 10). A player thinking on a live phone is always waited for.
+it('waits for a phone that is gone only in the round it vanished in', function (): void {
+    $tural = User::factory()->player()->create(['name' => 'Tural Əliyev']);
+    $turalRow = Rooms::join($this->room, $tural);
+    $game = Rooms::playing($this->room);
+    [$first, $second, $third] = [Rooms::round($game, 0), Rooms::round($game, 1), Rooms::round($game, 2)];
+
+    // Round 0: all three phones read the question; then Tural's is gone.
+    $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    foreach ([$this->host, $this->aygun, $tural] as $account) {
+        raceRead($account, $this->room);
+    }
+    raceAnswer($this->host, $this->room, $first, Rooms::right($first));
+    $this->travelTo(RoomClock::at(RoomClock::nowMs() + 2000));
+    raceAnswer($this->aygun, $this->room, $first, Rooms::right($first));
+
+    // The round he vanished in waits for him to its bell; reading it closes nothing.
+    expect($first->refresh()->closed_ms)->toBeNull()
+        ->and(raceRead($this->aygun, $this->room)['state']['round'])->toMatchArray(['phase' => 'answer', 'answered_count' => 2, 'present_count' => 3]);
+    $this->travelTo(RoomClock::at($game->timetable()->bell(0) - 1));
+    expect(raceRead($this->host, $this->room)['state']['round']['phase'])->toBe('answer')
+        ->and($first->refresh()->closed_ms)->toBeNull();
+
+    // The bell: the live phones read the reveal.
+    $this->travelTo(Rooms::at($game, RoomPhase::Reveal));
+    raceRead($this->host, $this->room);
+    expect(raceRead($this->aygun, $this->room)['state']['round'])->toMatchArray(['index' => 0, 'phase' => 'reveal', 'closes_ms' => $game->timetable()->bell(0), 'answered_count' => 2, 'present_count' => 3]);
+
+    // Round 1: Tural is still in the room, but his phone has not read since round 0 closed.
+    $this->travelTo(Rooms::at($game, RoomPhase::Answer, 1));
+    raceRead($this->host, $this->room);
+    ['state' => $state] = raceRead($this->aygun, $this->room);
+    expect(collect($state['players'])->firstWhere('id', $turalRow->id)['present'])->toBeTrue()
+        ->and($state['round'])->toMatchArray(['index' => 1, 'phase' => 'answer', 'answered_count' => 0, 'present_count' => 2]);
+
+    // Aygün, on a live phone, thinks: the host's answer does not close the round, however late it is.
+    raceAnswer($this->host, $this->room, $second, Rooms::wrong($second))->assertJsonPath('status', 'accepted');
+    $this->travelTo(RoomClock::at($game->timetable()->bell(1) - 1000));
+    expect($second->refresh()->closed_ms)->toBeNull()
+        ->and(raceRead($this->aygun, $this->room)['state']['round'])->toMatchArray(['phase' => 'answer', 'answered_count' => 1, 'present_count' => 2]);
+
+    // Her answer, the last live player's, closes it at once.
+    raceAnswer($this->aygun, $this->room, $second, Rooms::right($second))->assertJsonPath('status', 'accepted');
+    expect($second->refresh()->closed_ms)->toBe(RoomClock::nowMs())
+        ->and(raceRead($this->host, $this->room)['state']['round'])->toMatchArray(['index' => 1, 'phase' => 'reveal', 'answered_count' => 2, 'present_count' => 2]);
+    raceRead($this->aygun, $this->room);
+
+    // Round 2 does not wait for him either.
+    $this->travelTo(Rooms::at($game, RoomPhase::Answer, 2));
+    raceRead($this->host, $this->room);
+    raceRead($this->aygun, $this->room);
+    raceAnswer($this->host, $this->room, $third, Rooms::right($third));
+    raceAnswer($this->aygun, $this->room, $third, Rooms::right($third));
+    expect($third->refresh()->closed_ms)->toBe(RoomClock::nowMs());
+
+    // Round 3: his phone comes back, and from its read the round waits for him again.
+    $fourth = Rooms::round($game, 3);
+    $this->travelTo(Rooms::at($game, RoomPhase::Answer, 3));
+    foreach ([$this->host, $this->aygun, $tural] as $account) {
+        raceRead($account, $this->room);
+    }
+    raceAnswer($this->host, $this->room, $fourth, Rooms::right($fourth));
+    raceAnswer($this->aygun, $this->room, $fourth, Rooms::right($fourth));
+    expect($fourth->refresh()->closed_ms)->toBeNull();
+
+    raceAnswer($tural, $this->room, $fourth, Rooms::wrong($fourth))->assertJsonPath('status', 'accepted');
+    expect($fourth->refresh()->closed_ms)->toBe(RoomClock::nowMs())
+        ->and($turalRow->answers()->pluck('room_round_id')->all())->toBe([$fourth->id]);
+});
+
+it('records a phone\'s read only when it changes what a round waits for', function (): void {
+    $seen = fn (): ?int => $this->aygunRow->refresh()->seen_ms;
+
+    // In the lobby a read records nothing: no round is waiting.
+    raceRead($this->aygun, $this->room);
+    expect($seen())->toBeNull();
+
+    // The countdown: the first read counts for round 0; the next ones in it change nothing.
+    $game = Rooms::playing($this->room);
+    $first = Rooms::round($game, 0);
+    $this->travelTo(Rooms::at($game, RoomPhase::Countdown));
+    $read = RoomClock::nowMs();
+    raceRead($this->aygun, $this->room);
+    foreach ([RoomPhase::Study, RoomPhase::Answer] as $phase) {
+        $this->travelTo(Rooms::at($game, $phase));
+        raceRead($this->aygun, $this->room);
+    }
+    expect($seen())->toBe($read);
+
+    // The round closes; the reveal's first read counts for round 1.
+    raceRead($this->host, $this->room);
+    raceAnswer($this->host, $this->room, $first, Rooms::right($first));
+    raceAnswer($this->aygun, $this->room, $first, Rooms::right($first));
+    $this->travelTo(RoomClock::at((int) $first->refresh()->closed_ms + 100));
+    raceRead($this->aygun, $this->room);
+    expect($seen())->toBe(RoomClock::nowMs());
+
+    // The last reveal and the end record nothing: no round is ahead.
+    $this->travelTo(Rooms::at($game, RoomPhase::Reveal, 4));
+    $before = $seen();
+    raceRead($this->aygun, $this->room);
+    $this->travelTo(Rooms::at($game, RoomPhase::Over));
+    raceRead($this->aygun, $this->room);
+    expect($seen())->toBe($before);
+});
+
+it('never takes the big screen for the host\'s phone', function (): void {
+    $game = Rooms::playing($this->room);
+    [$first, $second] = [Rooms::round($game, 0), Rooms::round($game, 1)];
+    $screen = route('rooms.screen', $this->room);
+    $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+
+    // The host's phone is gone; the screen follows the room in the host's session, with its page and every read.
+    $this->actingAs($this->host)->get($screen)->assertOk();
+    $state = $this->actingAs($this->host)->getJson(route('rooms.state', $this->room), ['Referer' => $screen])->assertOk()->json();
+    expect($this->hostRow->refresh()->seen_ms)->toBeNull()
+        ->and($state['round'])->toMatchArray(['phase' => 'answer', 'answered_count' => 0, 'present_count' => 0]);
+
+    // So the round waits for Aygün alone, and the screen shows a full count as it closes.
+    raceRead($this->aygun, $this->room);
+    raceAnswer($this->aygun, $this->room, $first, Rooms::right($first))->assertJsonPath('status', 'accepted');
+    expect($first->refresh()->closed_ms)->toBe(RoomClock::nowMs())
+        ->and($this->actingAs($this->host)->getJson(route('rooms.state', $this->room), ['Referer' => $screen])->json('round'))
+        ->toMatchArray(['phase' => 'reveal', 'answered_count' => 1, 'present_count' => 1]);
+
+    // The host's own room page reads — with its own address, or none — and round 1 waits for the host.
+    $this->travelTo(Rooms::at($game, RoomPhase::Answer, 1));
+    $this->actingAs($this->host)->getJson(route('rooms.state', $this->room), ['Referer' => route('rooms.show', $this->room)])->assertOk();
+    expect($this->hostRow->refresh()->seen_ms)->toBe(RoomClock::nowMs());
+    raceRead($this->aygun, $this->room);
+    raceAnswer($this->aygun, $this->room, $second, Rooms::right($second));
+    expect($second->refresh()->closed_ms)->toBeNull();
+
+    raceAnswer($this->host, $this->room, $second, Rooms::wrong($second));
+    expect($second->refresh()->closed_ms)->toBe(RoomClock::nowMs());
+});
+
+it('waits for a late joiner from the room page the join leads to', function (): void {
+    $game = Rooms::playing($this->room);
+    $round = Rooms::round($game, 0);
+    $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    RoomPhones::read($this->room, $this->host, $this->aygun);
+    raceAnswer($this->host, $this->room, $round, Rooms::right($round));
+
+    // Tural joins with the code and lands on the room page; he reads nothing else.
+    $tural = User::factory()->player()->create(['name' => 'Tural Əliyev']);
+    $this->actingAs($tural)->followingRedirects()->post(route('rooms.join.store', (string) $this->room->code))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('rooms/show')->where('state.round.present_count', 3));
+
+    // Aygün's answer no longer closes the round; his does.
+    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round));
+    expect($round->refresh()->closed_ms)->toBeNull();
+
+    $this->travelTo(RoomClock::at(RoomClock::nowMs() + 3000));
+    raceAnswer($tural, $this->room, $round, Rooms::right($round))->assertJsonPath('status', 'accepted');
+    expect($round->refresh()->closed_ms)->toBe(RoomClock::nowMs());
+});
+
+it('reveals a round for 3 s in a new game, and a started game keeps its own reveal', function (): void {
+    $default = config('elifba.rooms.reveal_ms');
+    expect($default)->toBe(3_000);
+
+    // A game started while the reveal was 5 s keeps it to its end.
+    config(['elifba.rooms.reveal_ms' => 5_000]);
+    $old = Rooms::playing($this->room);
+    config(['elifba.rooms.reveal_ms' => $default]);
+    $this->travelTo(Rooms::at($old, RoomPhase::Reveal, 0));
+    ['state' => $state] = raceRead($this->aygun, $this->room);
+
+    expect($old->refresh()->reveal_ms)->toBe(5_000)
+        ->and($state['round']['next_ms'] - $state['round']['closes_ms'])->toBe(5_000);
+
+    // The next game reveals each round for 3 s.
+    $this->travelTo(Rooms::at($old, RoomPhase::Over));
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), ['mechanic' => 'recall_order', 'difficulty' => 1, 'rounds' => 5])->assertNoContent();
+    $new = $this->room->refresh()->latestGame();
+    $this->travelTo(Rooms::at($new, RoomPhase::Reveal, 0));
+    ['state' => $state] = raceRead($this->aygun, $this->room);
+
+    expect($new?->reveal_ms)->toBe(3_000)
+        ->and($state['round']['next_ms'] - $state['round']['closes_ms'])->toBe(3_000)
+        ->and($new?->timetable()->opens(1))->toBe($new?->timetable()->bell(0) + 3_000);
 });
 
 it('runs to its end with nobody watching', function (): void {
@@ -549,10 +754,12 @@ it('ends when the host ends it', function (): void {
     $game = Rooms::playing($this->room);
     [$first, $second] = [Rooms::round($game, 0), Rooms::round($game, 1)];
     $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    RoomPhones::read($this->room, $this->host, $this->aygun);
     raceAnswer($this->host, $this->room, $first, Rooms::wrong($first));
     raceAnswer($this->aygun, $this->room, $first, Rooms::right($first));
 
     $this->travelTo(Rooms::at($game, RoomPhase::Answer, 1));
+    RoomPhones::read($this->room, $this->host, $this->aygun);
     raceAnswer($this->aygun, $this->room, $second, Rooms::right($second))->assertJsonPath('status', 'accepted');
 
     // Only the host, and only while it runs.
@@ -585,7 +792,7 @@ it('starts no second game while one is running', function (): void {
 
     $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), $setup)->assertNoContent();
     $game = $this->room->latestGame();
-    expect($game)->toMatchArray(['position' => 0, 'difficulty' => 1, 'reveal_ms' => 5000, 'started_ms' => RoomClock::nowMs() + 3000])
+    expect($game)->toMatchArray(['position' => 0, 'difficulty' => 1, 'reveal_ms' => 3000, 'started_ms' => RoomClock::nowMs() + 3000])
         ->and($game?->rounds)->toHaveCount(5);
 
     // Refused while it runs, by the policy and by the action under the lock.
@@ -810,6 +1017,7 @@ it('plays a row of shapes and judges it by their pictures', function (): void {
         ->and($study[0]['asset'])->toMatch('#/content/rooms/[a-z]+\.svg\?v=\d+$#');
 
     $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    RoomPhones::read($this->room, $this->host);
     ['state' => $state, 'wire' => $wire] = raceRead($this->aygun, $this->room);
     $asked = array_column($state['round']['ask']['items'], 'asset');
 

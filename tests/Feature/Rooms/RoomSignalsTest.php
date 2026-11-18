@@ -9,6 +9,7 @@ use App\Domain\Rooms\Support\RoomClock;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
+use Tests\Support\RoomPhones;
 use Tests\Support\Rooms;
 
 /*
@@ -71,6 +72,7 @@ it('signals a game\'s start, every answer and an early close', function (): void
 
     // Each accepted answer is a change (the count of answers): revisions 4 and 5. A refused one and the phases time brings: nothing.
     $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    RoomPhones::read($this->room, $this->host, $this->player, $tural);
     foreach ([$this->host, $this->player] as $account) {
         $this->actingAs($account)->postJson(route('rooms.answers.store', $this->room), Rooms::answer($first, Rooms::right($first)))->assertJsonPath('status', 'accepted');
     }
@@ -85,6 +87,7 @@ it('signals a game\'s start, every answer and an early close', function (): void
 
     // Round 1: two answer (revisions 7 and 8), the third leaves — the leave and the early close are one change, revision 9.
     $this->travelTo(Rooms::at($game, RoomPhase::Answer, 1));
+    RoomPhones::read($this->room, $this->host, $this->player, $tural);
     foreach ([$this->host, $this->player] as $account) {
         $this->actingAs($account)->postJson(route('rooms.answers.store', $this->room), Rooms::answer($second, Rooms::right($second)));
     }

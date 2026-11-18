@@ -14,6 +14,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\RoomPhones;
 use Tests\Support\Rooms;
 
 /*
@@ -51,6 +52,7 @@ function pagesPlay(Room $room, RoomMechanic $mechanic, int $difficulty, array $r
     foreach (range(0, 4) as $index) {
         $round = Rooms::round($game, $index);
         test()->travelTo(Rooms::at($game, RoomPhase::Answer, $index));
+        RoomPhones::read($room, ...$right, ...$wrong);
 
         foreach ($right as $account) {
             test()->actingAs($account)->postJson(route('rooms.answers.store', $room), Rooms::answer($round, Rooms::right($round)))->assertOk();
@@ -377,7 +379,7 @@ it('gives the screen only to the host', function (): void {
 
     expect(array_keys($props))->toContain('room', 'state', 'place_labels', 'join')
         ->and($props['room'])->toBe(['id' => $room->id, 'status' => 'open'])
-        ->and($props['state'])->toBe($this->getJson(route('rooms.state', $room))->json())
+        ->and($props['state'])->toBe($this->getJson(route('rooms.state', $room), ['Referer' => route('rooms.screen', $room)])->json())
         ->and($props['join']['url'])->toBe(rtrim((string) config('app.url'), '/').'/otaq/'.$room->code);
     $this->get(route('rooms.screen', $room))->assertInertia(fn (Assert $page) => $page->component('rooms/screen'));
 
@@ -388,7 +390,7 @@ it('gives the screen only to the host', function (): void {
     $props = pagesProps($this->actingAs($this->resad)->get(route('rooms.screen', $room)));
 
     expect($props['state']['round']['phase'])->toBe('study')
-        ->and($props['state'])->toBe($this->getJson(route('rooms.state', $room))->json())
+        ->and($props['state'])->toBe($this->getJson(route('rooms.state', $room), ['Referer' => route('rooms.screen', $room)])->json())
         ->and([DB::table('rooms')->get()->all(), DB::table('room_players')->get()->all(), DB::table('room_answers')->count(), RoomRound::query()->whereNotNull('closed_ms')->count()])->toEqual($before);
 
     // A player of the room, a host who does not play too: only the host.

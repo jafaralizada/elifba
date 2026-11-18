@@ -42,8 +42,10 @@ use Illuminate\Validation\ValidationException;
  *    `answer_from` — scored
  *    (`RoomPointsRule`) and stored, and the room is active → `accepted`;
  * 5. the revision rises and the room is signalled, since the count of
- *    answers the screen and the phones show has changed; if every present
- *    player has now answered, the round also closes at this moment
+ *    answers the screen and the phones show has changed; if every player
+ *    the round waits for has now answered — a present player whose page
+ *    has read the state since the round before closed, or who answered
+ *    (`RoomWaits`) — the round also closes at this moment
  *    (`RoomRoundClose`), in the same revision.
  *
  * `late` and 422 write nothing. The receipt is the same for a right and a
@@ -121,7 +123,7 @@ final readonly class RecordRoomAnswer
             $locked->last_activity_at = now();
 
             // 5. One more answer, and perhaps nobody left to wait for: one change.
-            RoomRoundClose::ifEveryoneAnswered($locked, $round, $receivedMs);
+            RoomRoundClose::ifEveryoneAnswered($locked, $game, $round, $receivedMs);
             RoomSignal::raise($locked);
 
             return $receipt(RoomAnswerStatus::Accepted);

@@ -7,6 +7,7 @@ use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Rooms\Actions\DeleteRoom;
 use App\Domain\Rooms\Actions\LockRoom;
 use App\Domain\Rooms\Actions\OpenRoom;
+use App\Domain\Rooms\Actions\RecordRoomRead;
 use App\Domain\Rooms\Data\LockRoomData;
 use App\Domain\Rooms\Data\OpenRoomData;
 use App\Domain\Rooms\Data\RoomGameSetupData;
@@ -35,7 +36,9 @@ use Inertia\Response;
  * closed one — its results; a player who left an open room sees the page
  * without it and comes back with the code. The state in the props is the
  * one `GET /rooms/{room}/state` answers, phase by phase, with nothing more
- * of a round. Places are labelled here (`place_labels`: the label of place
+ * of a round; like that endpoint, the page records a player's read first
+ * (`RecordRoomRead`), so a round waits for a player from the moment their
+ * room page opens — the page a join leads to. Places are labelled here (`place_labels`: the label of place
  * n at n − 1, `Ordinal::label()`), as many as the room has players or may
  * have, since a page never suffixes a number itself (`RoomPlaces`). The
  * host of an open room also gets `setup`, what a new game may be
@@ -65,11 +68,15 @@ final class RoomController extends Controller
         return to_route('rooms.show', $room);
     }
 
-    public function show(Room $room, #[CurrentUser] User $account, ContentRepository $content): Response
+    public function show(Room $room, #[CurrentUser] User $account, ContentRepository $content, RecordRoomRead $recordRead): Response
     {
         $gate = Gate::forUser($account);
         $open = $room->isOpen();
         $watches = $gate->allows('watch', $room);
+
+        if ($watches) {
+            $recordRead->handle($room, $account);
+        }
 
         return Inertia::render('rooms/show', [
             'room' => ['id' => $room->id, 'status' => $room->status()->value],

@@ -16,8 +16,8 @@ use Illuminate\Support\Facades\DB;
  * longer finds the room, cannot come back with the code, and its answers
  * leave the ranking. Never the host's own row (`RoomPolicy::remove`), and
  * nothing in a closed room, an idle one included. Raises the revision and
- * signals the room. A round open for answers that every player still
- * present has answered closes now (`RoomRoundClose`).
+ * signals the room. A round open for answers that everyone it still waits
+ * for has answered closes now (`RoomRoundClose`).
  */
 final readonly class RemoveRoomPlayer
 {

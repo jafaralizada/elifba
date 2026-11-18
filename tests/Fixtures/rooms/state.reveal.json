@@ -54,7 +54,7 @@
         "answer_from_ms": 1795534223700,
         "bell_ms": 1795534238700,
         "closes_ms": 1795534231900,
-        "next_ms": 1795534236900,
+        "next_ms": 1795534234900,
         "study": null,
         "ask": {
             "shape": "sequence",

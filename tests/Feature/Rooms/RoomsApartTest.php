@@ -156,6 +156,7 @@ it('leaves the game tables untouched by a whole room game', function (): void {
         $round = Rooms::round($game, $index);
         $this->travelTo(Rooms::at($game, RoomPhase::Answer, $index));
         $this->actingAs($account)->getJson(route('rooms.state', $room))->assertJsonPath('round.phase', 'answer');
+        $this->actingAs($friend)->getJson(route('rooms.state', $room))->assertJsonPath('round.phase', 'answer');
         $this->actingAs($account)->postJson(route('rooms.answers.store', $room), Rooms::answer($round, Rooms::right($round)))->assertJsonPath('status', 'accepted');
         $this->actingAs($friend)->postJson(route('rooms.answers.store', $room), Rooms::answer($round, Rooms::wrong($round)))->assertJsonPath('status', 'accepted');
         $this->actingAs($friend)->getJson(route('rooms.state', $room))->assertJsonPath('round.phase', 'reveal');

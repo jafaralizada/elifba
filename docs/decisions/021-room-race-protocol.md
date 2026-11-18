@@ -1,6 +1,6 @@
 # 021 — The race: every player writes their own answer, the server judges and keeps the clock
 
-- **Status:** Proposed, 2026-11-17 (roadmap step B1; accepted when the owner approves the design in B1-O; built in B2 and B3)
+- **Status:** Proposed, 2026-11-17 (roadmap step B1; accepted when the owner approves the design in B1-O; built in B2 and B3). Amended 2026-11-18, after the rooms went live on elifba.io and the owner reported that "after both of us, or I alone, have answered, we still have to wait": a round waits only for the players whose phone is still in the game — a present player who answered it, or whose room page has read the state since the round before closed (decisions 5, 7 and 10; "Amendment of 2026-11-18" below) — and the reveal lasts 3 s instead of 5 s (the owner's decision). The round rule does not change: everyone answers once, and no first right answer closes a round.
 - **Sections:** architecture.md §1 "Tables", §12 "The race"
 - **Amends:** the rule "The board is the only writer of results" ([002](002-live-play-client-events-board-writes.md) decision 2) now names its scope: class and home games. A room has no board and a rule of its own. Nothing of 002 changes for a class or a child.
 - **Why it is hard to reverse:** the tables, the state a phone receives, the clock and the anti-cheating rule all follow from who writes and who holds the solution. Moving the judge to a device, or the clock to a client, means rebuilding both sides and re-proving fairness.
@@ -17,7 +17,7 @@ Three things must hold: a phone must not be able to read the answer before the r
 2. **The server is the only judge and the only clock.** `Rooms\Support\RoomJudge` and `RoomPointsRule` ([022](022-room-scoring-and-history.md)) run in PHP only; there is no TypeScript judge for rooms. Time is the server's receipt of the request, read from `Rooms\Support\RoomClock`; a device's clock is used only to draw the countdown.
 3. **The solution never leaves the server before the round closes.** A round is stored as two snapshots: `room_rounds.payload` (what players see) and `room_rounds.solution` (hidden from every serialization). The receipt of an answer says `accepted`, `duplicate`, `answered` or `late` — never right or wrong, so a second account in the room cannot scout for the first. Solution, results and ranking are served only once the round is closed.
 4. **Moments that scoring reads are Unix milliseconds in `bigint` columns** (`room_games.started_ms`, `ended_ms`; `room_rounds.closed_ms`; durations as `int` milliseconds), because engines differ in sub-second timestamps.
-5. **The timetable is derived; only facts are written.** `Rooms\Support\RoomTimetable` is a pure function of the game's `started_ms`, each round's `study_ms` and `answer_ms`, the game's `reveal_ms`, and the facts `closed_ms` (a round every present player answered before the bell) and `ended_ms` (the host ended the game, or the room closed):
+5. **The timetable is derived; only facts are written.** `Rooms\Support\RoomTimetable` is a pure function of the game's `started_ms`, each round's `study_ms` and `answer_ms`, the game's `reveal_ms`, and the facts `closed_ms` (a round everyone it waits for answered before the bell, decision 7) and `ended_ms` (the host ended the game, or the room closed):
 
     ```
     opens(0)        = started_ms                       (StartRoomGame sets it countdown_ms ahead)
@@ -28,7 +28,7 @@ Three things must hold: a phone must not be able to read the answer before the r
     over            = ended_ms ?? closes(last) + reveal_ms
     ```
 
-    The current round and its phase are read from it at the moment of each request and never stored. **A time-driven change needs no trigger**: every device holds the same moments and asks for the state when one arrives; a request made after the bell is simply answered from the next phase. No job, no worker loop, no write in a `GET`, and a game nobody is watching still ends when its timetable says.
+    The current round and its phase are read from it at the moment of each request and never stored. **A time-driven change needs no trigger**: every device holds the same moments and asks for the state when one arrives; a request made after the bell is simply answered from the next phase. No job, no worker loop, no write of the round, the game or the room in a `GET` (it records only its reader's own read, decision 7), and a game nobody is watching still ends when its timetable says.
 
 6. **What each phase serves** (`GET /rooms/{room}/state`, `no-store`):
 
@@ -47,22 +47,27 @@ Three things must hold: a phone must not be able to read the answer before the r
     2. the round is not the game's current round in its `answer` phase by the server's clock (too early, after the bell or the early close, a foreign id, a game that is over, a closed room) → `late`, nothing written. There is no grace after the bell: the reveal is being served from that moment;
     3. `picked` is not made of the round's own item ids in the shape it asks for → 422, nothing written;
     4. otherwise the answer is judged, timed (`elapsed_ms` = receipt − `answer_from`), given its points and stored;
-    5. if every present player has now answered, the round's `closed_ms` is set to this moment — the one transition a fact causes. `LeaveRoom` and `RemoveRoomPlayer` make the same check, so a round never waits for someone who is gone.
+    5. if everyone the round waits for has now answered, the round's `closed_ms` is set to this moment — the one transition a fact causes. **A round waits for a present player who has answered it, or whose own room page has read the state since the round before it closed** — for round 0, since the game was started (`Rooms\Support\RoomWaits`). `LeaveRoom`, `RemoveRoomPlayer` and a return (`JoinRoom`) make the same check, so a round never waits for someone who left, and the state's `answered_count` and `present_count` count the same players, so a full count is a closed round.
+
+    **A page's read** is one stored moment, `room_players.seen_ms` (Unix ms), written by `Rooms\Actions\RecordRoomRead` when the room page's props or `GET /rooms/{room}/state` are served to a present player: only when it changes what a round waits for — at most once a round, never in the lobby or after the last close — and never for the big screen (decision 11), whose requests are the host's but are sent from `/rooms/{room}/screen`, which their `Referer` names; a request without a `Referer` counts as the room page's. A read raises no revision, sends no signal and closes nothing: it can only add a player to those a round waits for.
+
 8. **One private channel per room, signals only.** `private-room.{roomId}`, authorized for the `web` guard alone: the switch is on, the account holds the player role, the room is open, and the account is its host or a present player (`Rooms\Support\RoomChannel`). The server broadcasts one event, `room.changed` `{v: 1, revision}` (`Rooms\Events\RoomChanged`, `ShouldBroadcastNow`, after commit), when a fact changes what the room sees: a join, a leave, a removal, a lock, a game started or ended by the host, an accepted answer (the count of answers — added at B7-O, when the live check found the screen's «Cavab verib X / N» standing still), an early close, the room closed. A device that sees a higher revision than its own fetches the state. **Content, names, answers and results never travel on the channel**, and **no client event means anything in a room**: the pages send none and listen for none.
 9. **Without Reverb the race still runs.** A failed broadcast never fails the write (reported with ids only, as `SessionStatusNotBroadcast` is). A page that has no socket polls the state every 3 seconds in the lobby and after it has answered; the phase changes come from the timetable either way.
 10. **Late, lost and gone.**
     - _Late join_ (the room is not locked): the player gets the current state like everyone, may answer the round that is open with the time that is left, and has nothing for the rounds before.
     - _Reconnect or reload_: the state is everything; an answer sent twice is stored once.
-    - _A player who vanishes without leaving_ costs the room at most the rest of each round's time; the host can remove them.
+    - _A player who vanishes without leaving_ — a closed tab, a dead battery, a locked phone — costs the room the rest of one round: the round they vanished in runs to its bell, since their page had read for it (if they vanished during a reveal, the round after it), and no later round waits for them, since their page reads no more. They stay present, listed and ranked, until they come back — their page's first read makes the next check wait for them again — or the host removes them. A player thinking on a live phone is always waited for.
     - _The host leaves or loses the connection_: the game goes on by its timetable. Only a new game, the lock, a removal and closing wait for the host; a room nobody tends closes when it has been idle ([020](020-rooms-and-joining.md)). The host is never replaced.
     - There is no pause. The host may end a game (`EndRoomGame`); rounds that never closed give nothing.
-11. **The big screen is a page of the host's own session**, `GET /rooms/{room}/screen` (page `rooms/screen`): the code and its QR while the room waits, then what every player sees of a round, the count of answers, the reveal and the ranking. It reads the same state and writes nothing. It is **not** the guest board: `/lovhe`, the `board` guard and its bearer stay what they are, reach only a class or home game, and never show a room.
+11. **The big screen is a page of the host's own session**, `GET /rooms/{room}/screen` (page `rooms/screen`): the code and its QR while the room waits, then what every player sees of a round, the count of answers, the reveal and the ranking. It reads the same state and writes nothing — not even a read: it is not the host's phone, and no round waits for the host because the screen is on (decision 7). It is **not** the guest board: `/lovhe`, the `board` guard and its bearer stay what they are, reach only a class or home game, and never show a room.
 
 ## Consequences
 
 - Every phone asks the server at each phase change: about three requests per player per round, at most `max_players` at the same instant. That is the price of holding the content back, and it bounds the size of a room on one server.
 - Speed includes each phone's network time. The points rule counts speed in coarse steps for that reason ([022](022-room-scoring-and-history.md)).
 - A memory round's material is on the phone while it is studied, so a screenshot defeats it. The design removes the cheap cheat — reading a solution out of the page — not that one; a room is people who invited each other.
+- A live phone whose page cannot read the state for the whole reveal and the start of the next round (an outage of several seconds) is not waited for in that round until its read arrives, and the round may be revealed without its answer, as if its player had stepped away. That is the price of not running every round to its bell for a phone that is gone.
+- The reveal is 3 s (`elifba.rooms.reveal_ms`, copied to each game when it starts, so a running game keeps the reveal it began with). A page without a socket polls every 3 s once it has answered (decision 9) — as long as the reveal itself — so it may show a reveal only briefly, or not at all, when its poll falls badly; the timetable is unaffected, and the client's polling is the next thing to change.
 - The children's protocol is untouched: `RecordBoardEvents`, `board_epoch`, `RoundJudge`, `engine.ts`, `SolutionData` and the `game.*` channel have no new caller and no new case.
 
 ## Alternatives rejected
@@ -72,12 +77,20 @@ Three things must hold: a phone must not be able to read the answer before the r
 - **Rounds, reveals and rankings in broadcasts:** content and results on the socket, against "payloads carry ids only", and a phone that misses one message has a hole; the state over HTTP is whole every time.
 - **Client events between players** (whispers for answers or progress): Reverb relays them unjudged from any member.
 - **A queue with delayed jobs, or a worker that ticks the rooms:** a new service and a new failure mode on a one-server instance, for a change every device can compute.
-- **Settling on read** (the first request after the bell writes the close): a `GET` that writes, and a timetable that drifts with whoever looks late.
+- **Settling on read** (the first request after the bell writes the close): a `GET` that writes, and a timetable that drifts with whoever looks late. (The read recorded since 2026-11-18 writes only its reader's own moment and never closes a round.)
+- **Telling a gone phone by a heartbeat, a presence channel or a client event:** a new request, or a member list on the socket, for what the reads every live page makes at each moment of the timetable already say; decision 8 keeps the socket to signals and [020](020-rooms-and-joining.md) rejects a presence channel.
+- **Waiting a fixed time for a silent phone, or closing when most have answered:** either would cut off a player thinking on a live phone, against the owner's rule that everyone answers once.
 - **The device's clock for elapsed time:** trivially forged.
 - **A grace period after the bell:** the solution is already being served.
 - **The guest board as the big screen:** a bearer that today reaches one children's game would reach a room, and the board page would carry adults' games.
 - **A presence channel:** see [020](020-rooms-and-joining.md).
 
+## Amendment of 2026-11-18: a round waits for the phones that are still in the game
+
+The early close waited for every present player, and a phone that is simply gone — the tab closed without «Çıx», a battery dead — stays present: every round then ran to its bell (10–50 s) for someone who would never answer, while the others, all answered, watched the clock. The fix keeps the round rule and the derived timetable and adds one fact: when each player's room page last read the state. A live page reads it at every moment of the timetable, the close of each round among them (the signal, or its own timer at the bell), so a page that has not read since the previous round closed is a phone that is gone; the reveal gives a live one 3 s to read before the next round opens, and the study and the first answers more. The round in which a phone vanishes still runs to its bell once; the moment its page reads again, it is waited for again. The check stays where it was — after an answer, a leave, a removal, a return — and nothing is scheduled, queued or sent by a client for it.
+
+The big screen reads the same state with the host's account. Telling it apart needs no new route or parameter: its requests are sent from its own page, `/rooms/{room}/screen`, which the `Referer` header names; a browser that strips it makes the screen count as the host's phone, which only brings back the old wait for the host.
+
 ## What would make us revisit
 
-Rooms of hundreds (a server push per phase, and a queue or a second server), a game whose rounds cannot be built before it starts, or measured unfairness from network time that coarse steps do not hide.
+Rooms of hundreds (a server push per phase, and a queue or a second server), a game whose rounds cannot be built before it starts, or measured unfairness from network time that coarse steps do not hide. Players whose live phones are skipped by the early close, or a browser that sends the screen's requests without a `Referer` (then the screen gets an address of its own for the state).

@@ -25,7 +25,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * A player is present while the row has an account and has neither left
  * nor been removed. One who left may come back with the code to the same
- * row; one the host removed cannot.
+ * row; one the host removed cannot. `seen_ms` is when the player's own room
+ * page last read the state of a running game (`RecordRoomRead`), which
+ * tells a round whether to wait for them (`RoomWaits`); a device never
+ * gets it.
  *
  * @property string $id
  * @property string $room_id
@@ -33,6 +36,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable $joined_at
  * @property CarbonImmutable|null $left_at
  * @property CarbonImmutable|null $removed_at
+ * @property int|null $seen_ms Unix ms; null = the page has not read a running game's state
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Room $room
@@ -85,6 +89,7 @@ class RoomPlayer extends Model
             'joined_at' => 'datetime',
             'left_at' => 'datetime',
             'removed_at' => 'datetime',
+            'seen_ms' => 'integer',
         ];
     }
 

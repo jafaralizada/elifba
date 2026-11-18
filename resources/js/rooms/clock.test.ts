@@ -93,7 +93,7 @@ const T = {
     opens: 103_000,
     answerFrom: 106_000,
     bell: 116_000,
-    next: 121_000,
+    next: 119_000,
 };
 
 /** A fixture's state in its phase, moved onto the moments above. */

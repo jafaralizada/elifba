@@ -85,7 +85,7 @@ return [
             'max' => 20,
         ],
         'countdown_ms' => 3_000,
-        'reveal_ms' => 5_000,
+        'reveal_ms' => 3_000,
     ],
 
     // Who runs this instance; shown on /privacy (§7).

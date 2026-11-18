@@ -35,10 +35,15 @@ use Illuminate\Database\Eloquent\Collection;
  * reveal without anyone closing the round. A round serves only what its
  * phase allows (`RoomRoundData`): its material while it is studied, its
  * question from the answer phase, and the solution, the results and its
- * points only in the reveal. The ranking of a live game counts its closed
- * rounds only; once a game is over it is the room's standing; before the
- * first game there is none. A closed room — an idle one too, before the
- * scheduler writes it — has no live game.
+ * points only in the reveal. A round's `answered_count` of `present_count`
+ * counts the present players it waits for (`RoomWaits`), as the early
+ * close does, so a full count is a closed round; a player whose phone is
+ * gone is not in it after the round they vanished in. A player's page
+ * records its read first (`RecordRoomRead`), so the reader counts in the
+ * state they get; the big screen records none. The ranking of a live
+ * game counts its closed rounds only; once a game is over it is the
+ * room's standing; before the first game there is none. A closed room —
+ * an idle one too, before the scheduler writes it — has no live game.
  */
 final class RoomState
 {
@@ -89,7 +94,9 @@ final class RoomState
 
         /** @var Collection<string, RoomAnswer> $answers */
         $answers = $asked ? $round->answers()->get()->keyBy('room_player_id') : new Collection;
-        $present = $rows->filter(static fn (RoomPlayer $row): bool => $row->isPresent());
+        // Counted as the early close counts (`RoomWaits`): a full count is a closed round.
+        $since = RoomWaits::since($game, $index);
+        $waited = $rows->filter(static fn (RoomPlayer $row): bool => RoomWaits::waitsFor($row, $since, $answers->has($row->id)));
         $own = $mine === null ? null : $answers->get($mine->id);
 
         return new RoomRoundData(
@@ -105,8 +112,8 @@ final class RoomState
             study: $phase === RoomPhase::Study ? $round->studyData() : null,
             ask: $asked ? $round->askData() : null,
             answered: $own !== null,
-            answered_count: $present->filter(static fn (RoomPlayer $row): bool => $answers->has($row->id))->count(),
-            present_count: $present->count(),
+            answered_count: $waited->filter(static fn (RoomPlayer $row): bool => $answers->has($row->id))->count(),
+            present_count: $waited->count(),
             reveal: $revealed ? new RoomRevealData(
                 solution: $round->solutionData()->ids,
                 word: $round->solutionData()->word,
