@@ -87,8 +87,8 @@ it('removes a player for good', function (): void {
     $this->get(route('rooms.show', $this->room))->assertNotFound();
     $this->getJson(route('rooms.state', $this->room))->assertNotFound();
     $this->post(route('rooms.leave', $this->room))->assertNotFound();
-    $this->get(route('rooms.join', (string) $this->room->code))->assertNotFound();
-    $this->post(route('rooms.join.store', (string) $this->room->code))->assertNotFound();
+    Rooms::assertRefused($this->get(route('rooms.join', (string) $this->room->code)));
+    Rooms::assertRefused($this->post(route('rooms.join.store', (string) $this->room->code)));
     $this->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('open', [])->where('past', []));
     expect(hostSnapshot())->toBe($before);
 
@@ -148,7 +148,7 @@ it('closes the room and clears its code', function (): void {
     }
 
     // Its code opens nothing, and nothing in it changes any more.
-    $this->actingAs($this->player)->get(route('rooms.join', $code))->assertNotFound();
+    Rooms::assertRefused($this->actingAs($this->player)->get(route('rooms.join', $code)));
     $this->getJson(route('rooms.state', $this->room))->assertForbidden();
     $this->post(route('rooms.leave', $this->room))->assertForbidden();
 

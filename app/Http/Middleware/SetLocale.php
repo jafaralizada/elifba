@@ -25,7 +25,7 @@ final class SetLocale
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $locale = $this->resolve($request);
+        $locale = self::of($request);
 
         App::setLocale($locale);
         Carbon::setLocale($locale);
@@ -34,7 +34,12 @@ final class SetLocale
         return $next($request);
     }
 
-    private function resolve(Request $request): string
+    /**
+     * The request's interface language. Public for what answers before this
+     * middleware runs — a limit (`App\Support\CodeEntrance`) — and needs
+     * the same language for its sentence.
+     */
+    public static function of(Request $request): string
     {
         $user = $request->user();
 

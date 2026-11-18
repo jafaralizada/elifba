@@ -1,4 +1,4 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Head, Link, usePage } from '@inertiajs/react';
 import { LogIn, UserRound } from 'lucide-react';
 import InputError from '@/components/input-error';
 import { RoomActionBar } from '@/components/rooms/room-action-bar';
@@ -28,6 +28,10 @@ type Props = {
  */
 export default function RoomsJoin({ code, name }: Props) {
     const { t } = useTranslation();
+    // A link or a QR that opens nothing arrives here by a full page load:
+    // its refusal is in the page's errors, not in the form's own.
+    const { errors: arrived } = usePage<{ errors: Record<string, string> }>()
+        .props;
 
     if (code === null) {
         return (
@@ -42,34 +46,42 @@ export default function RoomsJoin({ code, name }: Props) {
                             {t('rooms.join.line')}
                         </p>
                     </header>
-                    <Form {...entrance.form()} className="flex flex-col gap-3">
-                        {({ errors, processing }) => (
-                            <>
-                                <Label htmlFor="code">
-                                    {t('rooms.join.code')}
-                                </Label>
-                                <Input
-                                    id="code"
-                                    name="code"
-                                    inputMode="numeric"
-                                    autoComplete="off"
-                                    maxLength={9}
-                                    placeholder="482 913"
-                                    autoFocus
-                                    aria-invalid={errors.code !== undefined}
-                                    className="h-16 text-center text-3xl font-bold tracking-[0.25em] tabular-nums placeholder:font-normal"
-                                />
-                                <InputError message={errors.code} />
-                                <Button
-                                    type="submit"
-                                    className="h-13 text-base"
-                                    disabled={processing}
-                                >
-                                    {processing && <Spinner />}
-                                    {t('rooms.join.next')}
-                                </Button>
-                            </>
-                        )}
+                    <Form
+                        {...entrance.form()}
+                        options={{ preserveState: 'errors' }}
+                        className="flex flex-col gap-3"
+                    >
+                        {({ errors, processing }) => {
+                            const refusal = errors.code ?? arrived.code;
+
+                            return (
+                                <>
+                                    <Label htmlFor="code">
+                                        {t('rooms.join.code')}
+                                    </Label>
+                                    <Input
+                                        id="code"
+                                        name="code"
+                                        inputMode="numeric"
+                                        autoComplete="off"
+                                        maxLength={9}
+                                        placeholder="482 913"
+                                        autoFocus
+                                        aria-invalid={refusal !== undefined}
+                                        className="h-16 text-center text-3xl font-bold tracking-[0.25em] tabular-nums placeholder:font-normal"
+                                    />
+                                    <InputError message={refusal} />
+                                    <Button
+                                        type="submit"
+                                        className="h-13 text-base"
+                                        disabled={processing}
+                                    >
+                                        {processing && <Spinner />}
+                                        {t('rooms.join.next')}
+                                    </Button>
+                                </>
+                            );
+                        }}
                     </Form>
                 </div>
             </>

@@ -17,8 +17,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Brings an account into a room with its code (docs/architecture.md §12
  * "Rooms and joining", ADR 020 decision 4). Under the room row's lock: a
- * closed room and an account the host removed are not found — the same
- * 404 as an unknown code; a present player stays as they are; a locked and
+ * closed room and an account the host removed are not found — refused as
+ * an unknown code is; a present player stays as they are; a locked and
  * a full room refuse (on `code`, with nothing else about the room); a
  * player who left comes back to the same row; anyone else gets a new row.
  * A change raises the revision, marks the room active and signals it; a

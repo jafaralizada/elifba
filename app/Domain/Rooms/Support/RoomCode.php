@@ -56,7 +56,7 @@ final class RoomCode
 
     /**
      * The open room a code opens, or null — unknown, malformed, or its room
-     * closed or idle — so the caller answers one 404 for all of them.
+     * closed or idle — so the caller refuses all of them alike.
      */
     public static function resolve(mixed $code): ?Room
     {

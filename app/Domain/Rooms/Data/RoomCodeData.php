@@ -10,7 +10,8 @@ use Illuminate\Validation\ValidationException;
  * A room code as a player typed it at `/otaq` (docs/architecture.md §12
  * "Rooms and joining"): spaces and dashes are dropped, and anything but six
  * digits is an error on `code`. Whether a room has the code is not this
- * check's to say: an unknown code is a 404 at `/otaq/{code}`.
+ * check's to say: the entrance refuses an unknown code with a sentence of
+ * its own (`rooms.errors.unknown`).
  */
 final readonly class RoomCodeData
 {

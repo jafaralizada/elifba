@@ -88,7 +88,7 @@ Route::middleware(['auth', 'role.chosen', 'verified', Role::middleware(Role::Tea
         ->can('update', 'game')
         ->name('games.replay');
 
-    // Pairing from the phone: 10 a minute per teacher, all three together.
+    // Pairing from the phone: 10 tries of a code a minute per teacher, the three ways together.
     Route::middleware('throttle:pult')->group(function () {
         Route::get('pult', [PultController::class, 'index'])->name('pult');
         Route::get('pult/{code}', [PultController::class, 'show'])

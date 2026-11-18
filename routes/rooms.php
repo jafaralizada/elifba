@@ -37,7 +37,7 @@ Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::mid
         ->middleware('throttle:rooms-open')
         ->name('rooms.store');
 
-    // The entrance with a code: 10 a minute per account, all three together.
+    // The entrance with a code: 10 tries of a code a minute per account, the three ways together.
     Route::middleware('throttle:room-join')->group(function () {
         Route::get('otaq', [RoomJoinController::class, 'entrance'])->name('rooms.entrance');
         Route::get('otaq/{code}', [RoomJoinController::class, 'show'])

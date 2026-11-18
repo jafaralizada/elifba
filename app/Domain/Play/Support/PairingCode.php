@@ -75,7 +75,7 @@ final class PairingCode
      * What a code opens for this teacher, in this order: their own live game
      * with that join code (→ its remote), else the open guest board showing
      * it (→ claim). Anything else — unknown, expired, another teacher's
-     * game, a finished one — is null, so the caller answers the same 404.
+     * game, a finished one — is null, so the caller refuses all of them alike.
      */
     public function resolve(string $code, User $teacher): GameSession|GuestBoard|null
     {

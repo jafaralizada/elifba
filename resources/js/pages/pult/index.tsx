@@ -1,4 +1,4 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Head, Link, usePage } from '@inertiajs/react';
 import { ChevronRight, Smartphone } from 'lucide-react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -25,10 +25,15 @@ type Props = { games: LiveGame[] };
  * `/pult` on the teacher's phone (docs/architecture.md §4): type the code
  * the board shows, or open one of the teacher's live games. With exactly
  * one live game the server opens its remote at once; `?list=1` (the
- * remote's back link) stays here.
+ * remote's back link) stays here. A code that opens nothing, or one tried
+ * too often, is refused under the field (docs/frontend.md rule 5).
  */
 export default function PultIndex({ games }: Props) {
     const { t } = useTranslation();
+    // A QR that opens nothing arrives here by a full page load: its refusal
+    // is in the page's errors, not in the form's own.
+    const { errors: arrived } = usePage<{ errors: Record<string, string> }>()
+        .props;
 
     return (
         <>
@@ -49,30 +54,38 @@ export default function PultIndex({ games }: Props) {
                     </div>
                 </header>
 
-                <Form {...pult.form()} className="flex flex-col gap-3">
-                    {({ errors, processing }) => (
-                        <>
-                            <Label htmlFor="code">{t('pult.code')}</Label>
-                            <Input
-                                id="code"
-                                name="code"
-                                inputMode="numeric"
-                                autoComplete="one-time-code"
-                                placeholder="482 913"
-                                aria-invalid={errors.code !== undefined}
-                                className="h-16 text-center text-3xl font-bold tracking-[0.3em] tabular-nums"
-                            />
-                            <InputError message={errors.code} />
-                            <Button
-                                type="submit"
-                                className="h-14 text-base"
-                                disabled={processing}
-                            >
-                                {processing && <Spinner />}
-                                {t('pult.open')}
-                            </Button>
-                        </>
-                    )}
+                <Form
+                    {...pult.form()}
+                    options={{ preserveState: 'errors' }}
+                    className="flex flex-col gap-3"
+                >
+                    {({ errors, processing }) => {
+                        const refusal = errors.code ?? arrived.code;
+
+                        return (
+                            <>
+                                <Label htmlFor="code">{t('pult.code')}</Label>
+                                <Input
+                                    id="code"
+                                    name="code"
+                                    inputMode="numeric"
+                                    autoComplete="one-time-code"
+                                    placeholder="482 913"
+                                    aria-invalid={refusal !== undefined}
+                                    className="h-16 text-center text-3xl font-bold tracking-[0.3em] tabular-nums"
+                                />
+                                <InputError message={refusal} />
+                                <Button
+                                    type="submit"
+                                    className="h-14 text-base"
+                                    disabled={processing}
+                                >
+                                    {processing && <Spinner />}
+                                    {t('pult.open')}
+                                </Button>
+                            </>
+                        );
+                    }}
                 </Form>
 
                 <section className="flex flex-col gap-3">

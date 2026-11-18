@@ -17,8 +17,9 @@ use Tests\Support\Rooms;
  * joining", ADR 020 decisions 3–4): `/otaq`, `/otaq/{code}` and «Qoşul»
  * admit a signed-in, confirmed account with the player role into that one
  * room. An unknown code, a closed room and an account the host removed get
- * the same 404; a locked or full room says so and nothing else. A room code
- * and a pairing code know nothing of each other.
+ * the same refusal, a sentence on the code field and never an error page; a
+ * locked or full room says so and nothing else. A room code and a pairing
+ * code know nothing of each other.
  */
 
 beforeEach(function (): void {
@@ -100,7 +101,7 @@ it('sends a visitor to the login and back to the code', function (): void {
     $this->post(route('rooms.join.store', $code))->assertRedirect(route('rooms.show', $this->room));
 });
 
-it('answers 404 for an unknown code, a closed room and a removed account alike', function (): void {
+it('refuses an unknown code, a closed room and a removed account alike, on the code field', function (): void {
     $closed = Rooms::open();
     $closedCode = (string) $closed->code;
     app(CloseRoom::class)->handle($closed);
@@ -121,14 +122,22 @@ it('answers 404 for an unknown code, a closed room and a removed account alike',
         'a removed account' => [$removed, (string) $this->room->code],
     ];
 
+    // A link or a QR, «Qoşul», and the code typed at the entrance: each ends
+    // at the code field with the one sentence, whatever the reason.
+    $refused = [200, ['code' => __('rooms.errors.unknown')]];
     $answers = [];
 
     foreach ($refusals as $case => [$account, $code]) {
-        $this->actingAs($account);
+        $this->actingAs($account)->from(route('rooms.entrance'));
 
         foreach ([['GET', route('rooms.join', $code)], ['POST', route('rooms.join.store', $code)], ['GET', route('rooms.entrance', ['code' => $code])]] as [$method, $url]) {
             $response = $this->followingRedirects()->call($method, $url);
-            $answers[$case][] = $response->status();
+            $response->assertInertia(fn (Assert $page) => $page
+                ->component('rooms/join')
+                ->where('code', null)
+                ->missing('room')
+                ->missing('players'));
+            $answers[$case][] = [$response->status(), $response->inertiaProps('errors')];
 
             expect($response->getContent())->not->toContain('Rəşad');
         }
@@ -138,23 +147,41 @@ it('answers 404 for an unknown code, a closed room and a removed account alike',
     }
 
     expect($answers)->toBe([
-        'an unknown code' => [404, 404, 404],
-        'a closed room' => [404, 404, 404],
-        'an idle room' => [404, 404, 404],
-        'a removed account' => [404, 404, 404],
+        'an unknown code' => [$refused, $refused, $refused],
+        'a closed room' => [$refused, $refused, $refused],
+        'an idle room' => [$refused, $refused, $refused],
+        'a removed account' => [$refused, $refused, $refused],
     ])->and(joinSnapshot())->toBe($before);
+
+    // Where each is refused: a link, a QR and «Qoşul» at the entrance; a
+    // typed code where it was typed, «Otaqlar» too.
+    foreach ($refusals as [$account, $code]) {
+        $this->actingAs($account)->from(route('rooms.index'));
+
+        Rooms::assertRefused($this->get(route('rooms.join', $code)));
+        Rooms::assertRefused($this->post(route('rooms.join.store', $code)));
+        $this->get(route('rooms.entrance', ['code' => $code]))
+            ->assertRedirect(route('rooms.index'))
+            ->assertSessionHasErrors(['code' => __('rooms.errors.unknown')]);
+
+        $this->travel(61)->seconds();
+    }
 
     // To a JSON client too, one body for every reason.
     $bodies = [];
 
     foreach ($refusals as $case => [$account, $code]) {
-        $bodies[$case] = $this->actingAs($account)->postJson(route('rooms.join.store', $code))->assertNotFound()->getContent();
+        $bodies[$case] = $this->actingAs($account)->postJson(route('rooms.join.store', $code))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['code' => __('rooms.errors.unknown')])
+            ->getContent();
         $this->travel(61)->seconds();
     }
 
-    expect(array_unique($bodies))->toHaveCount(1);
+    expect(array_unique($bodies))->toHaveCount(1)
+        ->and(joinSnapshot())->toBe($before);
 
-    // A malformed code is no room at all.
+    // A malformed code is no code at all: no route, and its own sentence when typed.
     $this->actingAs($this->player)->get('/otaq/48291')->assertNotFound();
     $this->get('/otaq/abcdef')->assertNotFound();
     $this->from(route('rooms.entrance'))->get(route('rooms.entrance', ['code' => '48-29']))
@@ -249,9 +276,11 @@ it('does not know a pairing code, and the pult does not know a room code', funct
     $boardCode = (string) $board->code;
 
     // A board's code at the room's entrance; the room's code at the pult.
-    $this->actingAs($teacher)->get(route('rooms.join', $boardCode))->assertNotFound();
-    $this->post(route('rooms.join.store', $boardCode))->assertNotFound();
-    $this->get(route('pult.code', (string) $this->room->code))->assertNotFound();
+    Rooms::assertRefused($this->actingAs($teacher)->get(route('rooms.join', $boardCode)));
+    Rooms::assertRefused($this->post(route('rooms.join.store', $boardCode)));
+    $this->get(route('pult.code', (string) $this->room->code))
+        ->assertRedirect(route('pult', ['list' => 1]))
+        ->assertSessionHasErrors(['code' => __('pult.errors.unknown')]);
 
     // The same six digits as a room and a board at once: each entrance finds its own.
     app()->instance(RoomCode::class, new RoomCode(static fn (): string => $boardCode));
@@ -265,27 +294,57 @@ it('does not know a pairing code, and the pult does not know a room code', funct
         ->and($board->refresh()->claimed_at)->toBeNull();
 });
 
-it('limits guessing per account', function (): void {
-    $this->actingAs($this->player);
+it('limits guessing per account, and says so on the code field', function (): void {
+    $code = (string) $this->room->code;
+    $unknown = ['code' => __('rooms.errors.unknown', [], 'az')];
+    $tooMany = ['code' => __('rooms.errors.too_many', [], 'az')];
 
+    $this->actingAs($this->player)->from(route('rooms.index'));
+
+    // Ten tries of a code a minute, the three ways together.
     foreach (range(1, 4) as $i) {
-        $this->get(route('rooms.join', str_pad((string) $i, 6, '9', STR_PAD_LEFT)))->assertNotFound();
-        $this->post(route('rooms.join.store', str_pad((string) $i, 6, '8', STR_PAD_LEFT)))->assertNotFound();
+        Rooms::assertRefused($this->get(route('rooms.join', str_pad((string) $i, 6, '9', STR_PAD_LEFT))));
+        Rooms::assertRefused($this->post(route('rooms.join.store', str_pad((string) $i, 6, '8', STR_PAD_LEFT))));
     }
 
-    $this->get(route('rooms.entrance'))->assertOk();
-    $this->get(route('rooms.entrance', ['code' => '777 777']))->assertRedirect();
+    $this->get(route('rooms.entrance', ['code' => '777 777']))->assertRedirect(route('rooms.index'))->assertSessionHasErrors($unknown);
+    Rooms::assertRefused($this->get(route('rooms.join', '666666')));
 
-    // Ten in a minute, the three routes together; then even the right code waits.
-    $this->get(route('rooms.join', (string) $this->room->code))->assertTooManyRequests();
-    $this->post(route('rooms.join.store', (string) $this->room->code))->assertTooManyRequests();
-    $this->get(route('rooms.entrance'))->assertTooManyRequests();
+    // Then even the right code waits: a link and «Qoşul» are answered at the
+    // entrance, a typed code where it was typed — a sentence, not an error page.
+    $this->get(route('rooms.join', $code))->assertRedirect(route('rooms.entrance'))->assertSessionHasErrors($tooMany);
+    $this->post(route('rooms.join.store', $code))->assertRedirect(route('rooms.entrance'))->assertSessionHasErrors($tooMany);
+    $this->get(route('rooms.entrance', ['code' => $code]))->assertRedirect(route('rooms.index'))->assertSessionHasErrors($tooMany);
+    $this->postJson(route('rooms.join.store', $code))->assertTooManyRequests()->assertExactJson(['message' => $tooMany['code']]);
     expect(RoomPlayer::query()->where('user_id', $this->player->id)->exists())->toBeFalse();
 
-    // Another account is not held back by this one.
-    $this->actingAs(User::factory()->player()->create())->get(route('rooms.join', (string) $this->room->code))->assertOk();
+    // The code field is no try: it opens however often, and shows the sentence.
+    foreach (range(1, 12) as $_) {
+        $this->get(route('rooms.entrance'))->assertOk();
+    }
+
+    $this->followingRedirects()->get(route('rooms.join', $code))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('rooms/join')
+            ->where('code', null)
+            ->where('errors', $tooMany));
+
+    // Another account is not held back by this one, and reads the sentence
+    // in its own language: the limit answers before the language is set.
+    $english = User::factory()->player()->create(['locale' => 'en']);
+    $this->actingAs($english)->get(route('rooms.join', $code))->assertOk();
+
+    foreach (range(2, 10) as $_) {
+        $this->get(route('rooms.join', $code))->assertOk();
+    }
+
+    app()->setLocale('az');
+    $this->get(route('rooms.join', $code))
+        ->assertRedirect(route('rooms.entrance'))
+        ->assertSessionHasErrors(['code' => 'Too many tries. Try again in a minute.']);
 
     // A minute later the account may try again.
     $this->travel(61)->seconds();
-    $this->actingAs($this->player)->post(route('rooms.join.store', (string) $this->room->code))->assertRedirect(route('rooms.show', $this->room));
+    $this->actingAs($this->player)->post(route('rooms.join.store', $code))->assertRedirect(route('rooms.show', $this->room));
 });

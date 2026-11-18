@@ -21,7 +21,9 @@ use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * The adults' rooms area for feature tests (docs/architecture.md §12 "The
@@ -48,6 +50,19 @@ final class Rooms
     public static function open(?User $host = null, bool $plays = true): Room
     {
         return app(OpenRoom::class)->handle($host ?? User::factory()->player()->create(), new OpenRoomData($plays));
+    }
+
+    /**
+     * The entrance's one refusal of a code that opens no room for the
+     * account (§12 "Rooms and joining"): to the code field at `/otaq`, with
+     * `rooms.errors.unknown` on `code` — never an error page.
+     *
+     * @param  TestResponse<Response>  $response
+     */
+    public static function assertRefused(TestResponse $response): void
+    {
+        $response->assertRedirect(route('rooms.entrance'))
+            ->assertSessionHasErrors(['code' => __('rooms.errors.unknown')]);
     }
 
     /**

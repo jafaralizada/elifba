@@ -96,7 +96,11 @@ export default function RoomsIndex({ open, past }: Props) {
                     <h2 id="join-heading" className="font-semibold">
                         {t('rooms.join.title')}
                     </h2>
-                    <Form {...entrance.form()} className="flex flex-col gap-3">
+                    <Form
+                        {...entrance.form()}
+                        options={{ preserveState: 'errors' }}
+                        className="flex flex-col gap-3"
+                    >
                         {({ errors: codeErrors, processing }) => (
                             <>
                                 <Label htmlFor="code" className="sr-only">

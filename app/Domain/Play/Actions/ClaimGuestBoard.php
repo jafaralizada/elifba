@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
  * (docs/architecture.md §4): the board is bound to the teacher, its code is
  * cleared — so nobody else can claim it — and `ShowGameOnGuestBoard` sends
  * it the chosen game, all in one transaction. A board claimed, closed or
- * expired a moment ago is not found (404, like an unknown code).
+ * expired a moment ago is not found, and refused as an unknown code is.
  */
 final readonly class ClaimGuestBoard
 {

@@ -7,6 +7,7 @@ use App\Domain\Play\Listeners\BroadcastSessionStatus;
 use App\Domain\Play\Models\GameSession;
 use App\Domain\Play\Support\GuestBoardGuard;
 use App\Models\User;
+use App\Support\CodeEntrance;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -87,9 +88,17 @@ class AppServiceProvider extends ServiceProvider
 
         $who = static fn (Request $request): string => (string) ($request->user()?->getAuthIdentifier() ?? $request->ip());
 
-        // `/pult` and `/pult/{code}`: 10 a minute per teacher, so a code
-        // cannot be guessed by trying.
-        RateLimiter::for('pult', static fn (Request $request): Limit => Limit::perMinute(10)->by($who($request)));
+        // A request that tries a pairing code — `GET /pult?code=`, `GET` and
+        // `POST /pult/{code}`: 10 a minute per teacher, so a code cannot be
+        // guessed by trying. Over it the phone is sent to the code field
+        // with a sentence, never an error page (§4 "Codes").
+        RateLimiter::for('pult', static fn (Request $request): Limit => CodeEntrance::limit(
+            $request,
+            10,
+            $who($request),
+            'pult.errors.too_many',
+            static fn (): string => route('pult', ['list' => 1]),
+        ));
 
         // Opening a guest board (`POST /guest-boards`): 6 a minute per IP.
         RateLimiter::for('guest-boards', static fn (Request $request): Limit => Limit::perMinute(6)->by((string) $request->ip()));
@@ -119,8 +128,17 @@ class AppServiceProvider extends ServiceProvider
         // Opening a room: 6 a minute.
         RateLimiter::for('rooms-open', static fn (Request $request): Limit => Limit::perMinute(6)->by($account($request)));
 
-        // `/otaq` and both `/otaq/{code}`: 10 a minute, so a code cannot be guessed by trying.
-        RateLimiter::for('room-join', static fn (Request $request): Limit => Limit::perMinute(10)->by($account($request)));
+        // A request that tries a room code — `GET /otaq?code=` and both
+        // `/otaq/{code}`: 10 a minute, so a code cannot be guessed by trying.
+        // Over it the answer is a sentence on the code field: where the code
+        // was typed, or at the entrance for a link or a QR.
+        RateLimiter::for('room-join', static fn (Request $request): Limit => CodeEntrance::limit(
+            $request,
+            10,
+            $account($request),
+            'rooms.errors.too_many',
+            static fn (Request $request): ?string => $request->route('code') === null ? null : route('rooms.entrance'),
+        ));
 
         // A room page's state, asked at each moment of the timetable and every 3 s without a socket.
         RateLimiter::for('room-state', static fn (Request $request): Limit => Limit::perMinute(120)->by($account($request)));

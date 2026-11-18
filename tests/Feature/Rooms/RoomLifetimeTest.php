@@ -84,7 +84,7 @@ it('treats an idle room as closed before the scheduler runs', function (): void 
         ->and(RoomCode::resolve($code))->toBeNull()
         ->and(Room::query()->open()->exists())->toBeFalse();
 
-    $this->actingAs($this->player)->get(route('rooms.join', $code))->assertNotFound();
+    Rooms::assertRefused($this->actingAs($this->player)->get(route('rooms.join', $code)));
     $this->getJson(route('rooms.state', $room))->assertForbidden();
     $this->get(route('rooms.show', $room))->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('room.status', 'closed')
@@ -92,7 +92,7 @@ it('treats an idle room as closed before the scheduler runs', function (): void 
         ->where('can.forget', true));
 
     // Nothing in it changes any more: no join, and the host's tools do nothing.
-    $this->post(route('rooms.join.store', $code))->assertNotFound();
+    Rooms::assertRefused($this->post(route('rooms.join.store', $code)));
     $row = RoomPlayer::query()->where('room_id', $room->id)->where('user_id', $this->player->id)->sole();
     $before = [$room->refresh()->toArray(), $row->toArray()];
     $this->reverb->sent = [];

@@ -10,15 +10,19 @@ use App\Domain\Play\Models\GuestBoard;
 use App\Domain\Play\Support\PairingCode;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\Support\Games;
 use Tests\Support\GuestBoards;
 
 /*
  * `/pult` on the teacher's phone (docs/architecture.md §4): the phone is
  * logged in as the teacher, and a code only says which board. An unknown or
- * expired code, another teacher's game and a game that has ended all give
- * the same 404; the three routes allow 10 requests a minute per teacher.
+ * expired code, another teacher's game and a game that has ended all get
+ * the same refusal, a sentence on the code field of `/pult?list=1` and never
+ * an error page; the three ways allow 10 tries of a code a minute per
+ * teacher, and the eleventh is answered in the same place.
  */
 
 beforeEach(function (): void {
@@ -26,6 +30,21 @@ beforeEach(function (): void {
     $this->class = SchoolClass::factory()->for($this->teacher, 'teacher')->create(['name' => '1A']);
     $this->game = Games::start($this->class);
 });
+
+/**
+ * Asserts the one refusal of a code that opens nothing for the teacher
+ * (§4 "Codes"): to the list with `pult.errors.unknown` on `code` — or, over
+ * the limit, `pult.errors.too_many` — and nothing else.
+ *
+ * @param  TestResponse<Response>  $response
+ */
+function assertPultRefused(TestResponse $response, string $key = 'pult.errors.unknown'): void
+{
+    $response->assertRedirect(route('pult', ['list' => 1]))
+        ->assertSessionHasErrors(['code' => __($key)]);
+
+    expect(session('errors')->all())->toBe([__($key)]);
+}
 
 /**
  * The game's join code, issued the way the pairing card asks for it.
@@ -51,13 +70,27 @@ describe('GET /pult/{code}', function (): void {
         expect(session('url.intended'))->toBe(route('pult.code', $code));
     });
 
-    it('answers the same 404 for every code that opens nothing', function (Closure $code): void {
+    it('refuses every code that opens nothing alike, on the code field', function (Closure $code): void {
         $teacher = $this->teacher;
-        $reference = $this->actingAs($teacher)->get(route('pult.code', '000001'))->assertNotFound()->getContent();
+        $code = $code($this);
 
-        $this->actingAs($teacher)->get('/pult/'.$code($this))
-            ->assertNotFound()
+        // A link or a QR, and the same digits typed: one sentence, at the list.
+        assertPultRefused($this->actingAs($teacher)->get('/pult/'.$code));
+        assertPultRefused($this->get(route('pult', ['code' => $code])));
+
+        // To a JSON client, one body whatever the reason.
+        $reference = $this->getJson(route('pult.code', '000001'))->assertUnprocessable()->getContent();
+        $this->getJson('/pult/'.$code)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['code' => __('pult.errors.unknown')])
             ->assertContent((string) $reference);
+
+        // The list stays a list, with the sentence under the code field.
+        $this->followingRedirects()->get('/pult/'.$code)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('pult/index')
+                ->where('errors', ['code' => __('pult.errors.unknown')]));
     })->with([
         'unknown' => [fn (): string => '999999'],
         'expired' => [function ($test): string {
@@ -99,25 +132,54 @@ describe('GET /pult/{code}', function (): void {
 
             return (string) $board['board']->code;
         }],
-        'five digits' => [fn (): string => '12345'],
-        'letters' => [fn (): string => 'abcdef'],
     ]);
 
-    it('allows 10 requests a minute per teacher', function (): void {
+    it('refuses digits that are not six as an unknown code, and has no route for anything else', function (): void {
+        assertPultRefused($this->actingAs($this->teacher)->get('/pult/12345'));
+        assertPultRefused($this->post('/pult/12345', ['game' => $this->game->id]));
+
+        $this->get('/pult/abcdef')->assertNotFound();
+        $this->post('/pult/abcdef')->assertNotFound();
+    });
+
+    it('allows 10 tries of a code a minute per teacher, and says so on the code field', function (): void {
+        $code = joinCode($this->game);
+        $board = (string) GuestBoards::open()['board']->code;
+
         $this->actingAs($this->teacher);
 
         foreach (range(1, 10) as $attempt) {
-            $this->get(route('pult.code', sprintf('%06d', $attempt)))->assertNotFound();
+            assertPultRefused($this->get(route('pult.code', sprintf('%06d', $attempt))));
         }
 
-        $this->get(route('pult.code', '000011'))->assertTooManyRequests();
-        $this->get(route('pult'))->assertTooManyRequests();
+        // Then even the right code waits, whichever way it comes: a
+        // sentence at the list, not an error page.
+        assertPultRefused($this->get(route('pult.code', '000011')), 'pult.errors.too_many');
+        assertPultRefused($this->get(route('pult.code', $code)), 'pult.errors.too_many');
+        assertPultRefused($this->get(route('pult', ['code' => $code])), 'pult.errors.too_many');
+        assertPultRefused($this->post(route('pult.claim', $board), ['game' => $this->game->id]), 'pult.errors.too_many');
+        $this->getJson(route('pult.code', $code))
+            ->assertTooManyRequests()
+            ->assertExactJson(['message' => __('pult.errors.too_many')]);
+        expect(GuestBoard::query()->whereNotNull('claimed_at')->exists())->toBeFalse();
+
+        // The list is no try: it opens however often, and shows the sentence.
+        foreach (range(1, 12) as $_) {
+            $this->get(route('pult', ['list' => 1]))->assertOk();
+        }
+
+        $this->get(route('pult'))->assertRedirect(route('games.remote', $this->game));
+        $this->followingRedirects()->get(route('pult.code', $code))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('pult/index')
+                ->where('errors', ['code' => __('pult.errors.too_many')]));
 
         // Another teacher has a limit of their own.
-        $this->actingAs(User::factory()->create())->get(route('pult.code', '000012'))->assertNotFound();
+        assertPultRefused($this->actingAs(User::factory()->create())->get(route('pult.code', '000012')));
 
         $this->travel(61)->seconds();
-        $this->actingAs($this->teacher)->get(route('pult.code', '000013'))->assertNotFound();
+        $this->actingAs($this->teacher)->get(route('pult.code', $code))->assertRedirect(route('games.remote', $this->game));
     });
 });
 
@@ -175,8 +237,10 @@ describe('GET /pult', function (): void {
     });
 
     it('takes a typed code, with spaces, and refuses a malformed one', function (): void {
-        $this->actingAs($this->teacher)->get(route('pult', ['code' => '482 913']))
-            ->assertRedirect(route('pult.code', '482913'));
+        $code = joinCode($this->game);
+
+        $this->actingAs($this->teacher)->get(route('pult', ['code' => substr($code, 0, 3).' '.substr($code, 3)]))
+            ->assertRedirect(route('pult.code', $code));
 
         $this->from(route('pult', ['list' => 1]))->get(route('pult', ['code' => '48291']))
             ->assertRedirect(route('pult', ['list' => 1]))
@@ -237,7 +301,7 @@ describe('a guest board\'s code', function (): void {
             ->and($claimed->game_session_id)->toBe($this->game->id);
 
         // The code is gone: nobody else can claim the board with it.
-        $this->actingAs(User::factory()->create())->post(route('pult.claim', $code), ['game' => $this->game->id])->assertNotFound();
+        assertPultRefused($this->actingAs(User::factory()->create())->post(route('pult.claim', $code), ['game' => $this->game->id]));
     });
 
     it('claims the board for a new game set up on the phone', function (): void {
