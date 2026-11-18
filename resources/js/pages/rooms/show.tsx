@@ -89,7 +89,7 @@ type Props = {
     join: JoinLink | null;
     /** A closed room's games, each with its ranking; null while the room is open. */
     games: RoomResultGame[] | null;
-    /** This phone's own quiet cues by name (ADR 025); null when it follows no open room. */
+    /** This phone's own quiet cues, and the room's for a room without a screen, by name (ADR 025, ADR 028 as amended); null when it follows no open room. */
     sounds: RoomSoundUrls | null;
     /** The rivalry strip's emoji (ADR 027); null when it follows no open room. */
     rivalry: RivalryIcons | null;
@@ -115,7 +115,8 @@ type Props = {
  * a solution, a point or whether the choice was played. A host's tap
  * posts and the page waits for the state (`useRoomChoice()`). A moment
  * moves only when the page saw it begin (`useRoomMotion()`, ADR 025). Its
- * sound is the viewer's own and quiet (`useRoomSound()`).
+ * sound is the viewer's own and quiet, and in a room without a screen the
+ * room's too (`useRoomSound()`, ADR 028 as amended 2026-11-19).
  */
 export default function RoomsShow({
     room,

@@ -1,9 +1,12 @@
 /**
  * A room game's sound (docs/architecture.md §12 "Room content", ADR 025
  * "Sound", ADR 028, docs/frontend.md rule 15 "Sound"): the screen is the room's
- * speaker and plays the moments everybody shares; a phone plays only quiet
- * cues of its own. A page is sent the URLs of its own speaker's files in
- * its props (`sounds`) and plays nothing else. When a cue plays is
+ * speaker and plays the moments everybody shares; a phone plays quiet cues
+ * of its own and, in a room without a screen (`room.screen` false, ADR 028
+ * as amended 2026-11-19), the room's moments too, at its own level. A page
+ * is sent the URLs of the files it may play in its props (`sounds`: the
+ * screen its own, a phone both sets) and plays nothing else; a phone
+ * fetches the room's only once it carries them (`carry()`). When a cue plays is
  * `roomCues()`'s (`components/rooms/sound-cues.ts`); this module only
  * plays one.
  *
@@ -194,6 +197,8 @@ export type RoomSoundPlayer = {
     snapshot: () => RoomSoundState;
     /** Called inside a gesture: makes and resumes the audio context, then fetches the files. */
     unlock: () => void;
+    /** A phone in a room without a screen: it fetches and plays the room's files too, from now on. */
+    carry: () => void;
     /** The mute toggle (a gesture: turning sound on also unlocks it). */
     setMuted: (muted: boolean) => void;
     play: (sound: RoomSoundName, when?: PlayAt) => void;
@@ -249,8 +254,10 @@ export function roomSoundPlayer({
     const scheduled = new Set<Scheduled>();
     /** The names waiting for their time: each one's cancel. */
     const sayings = new Set<() => void>();
+    // A file asked for once is not asked again: decoded, or silent if it failed.
+    const requested = new Set<RoomSoundName>();
     let context: AudioContextLike | null = null;
-    let loading = false;
+    let carrying = false;
     let hidden = false;
     let muted = readMuted(storage(), speaker);
     let state: RoomSoundState = { muted, locked: true };
@@ -266,20 +273,27 @@ export function roomSoundPlayer({
         }
     };
 
+    /** The files this page plays: its speaker's, and a carrying phone the room's too. */
+    const wanted = (): readonly RoomSoundName[] =>
+        speaker === 'phone' && carrying
+            ? [...ROOM_SOUNDS.phone, ...ROOM_SOUNDS.screen]
+            : ROOM_SOUNDS[speaker];
+
     const fetchAll = () => {
-        if (loading || context === null) {
+        if (context === null) {
             return;
         }
 
-        loading = true;
         const decoder = context;
 
-        for (const name of ROOM_SOUNDS[speaker] as readonly RoomSoundName[]) {
+        for (const name of wanted()) {
             const url = urls[name];
 
-            if (url === undefined || buffers.has(name)) {
+            if (url === undefined || buffers.has(name) || requested.has(name)) {
                 continue;
             }
+
+            requested.add(name);
 
             void load(url)
                 .then((bytes) => decoder.decodeAudioData(bytes))
@@ -388,6 +402,14 @@ export function roomSoundPlayer({
         },
         snapshot: () => state,
         unlock,
+        carry: () => {
+            if (speaker !== 'phone' || carrying) {
+                return;
+            }
+
+            carrying = true;
+            fetchAll();
+        },
         setMuted: (next) => {
             muted = next;
             writeMuted(storage(), speaker, next);
@@ -534,7 +556,7 @@ export function roomSoundPlayer({
             if (context !== null) {
                 const audio = context;
                 context = null;
-                loading = false;
+                requested.clear();
                 audio.onstatechange = null;
                 void audio.close().catch(() => null);
             }

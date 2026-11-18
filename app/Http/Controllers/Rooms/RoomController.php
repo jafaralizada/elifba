@@ -121,7 +121,7 @@ final class RoomController extends Controller
             'catalog' => $open && $gate->allows('host', $room) ? RoomGameSetupData::options() : null,
             'join' => $open && $watches ? RoomJoinLink::of($room) : null,
             'games' => $open ? null : RoomResults::games($room, RoomClock::nowMs()),
-            'sounds' => $open && $watches ? $content->roomSounds()->urls(RoomSpeaker::Phone) : null,
+            'sounds' => $open && $watches ? $content->roomSounds()->urls(RoomSpeaker::Phone, RoomSpeaker::Screen) : null,
             'rivalry' => $open && $watches ? $content->roomRivalry()->urls() : null,
             'taunts' => $open && $watches ? RoomTauntData::props($content->roomTaunts()) : null,
             'can' => [

@@ -47,6 +47,11 @@ export const RoomSummary = z.strictObject({
         .nullable(),
     /** The host's switch for taunts (T2). */
     taunts: z.boolean(),
+    /**
+     * Whether the room's big screen is on now (version 4, ADR 028 as
+     * amended 2026-11-19): without one, every phone plays the room's cues.
+     */
+    screen: z.boolean(),
 });
 
 export const RoomViewer = z.strictObject({
@@ -296,7 +301,7 @@ export const RoomTaunts = z.strictObject({
 });
 
 /** The state's version: a page that meets another reloads itself (`fetchState`). */
-export const ROOM_STATE_VERSION = 3;
+export const ROOM_STATE_VERSION = 4;
 
 const stateBase = {
     v: z.literal(ROOM_STATE_VERSION),

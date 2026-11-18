@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Rooms;
 
 use App\Domain\Rooms\Actions\RecordRoomRead;
+use App\Domain\Rooms\Actions\RecordScreenRead;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Support\RoomState;
 use App\Http\Controllers\Controller;
@@ -29,16 +30,21 @@ use Illuminate\Support\Facades\Gate;
  * The screen asks with `?for=screen` (T2, ADR 029 decision 15), which only
  * `RoomPolicy::screen` — the host of an open room — may: its state then
  * lists the taunts of the last `show_ms` with their targets (`taunts.
- * shown`), and the request records no read either.
+ * shown`), and the request records no read either. It records the
+ * screen's instead (`RecordScreenRead`, ADR 028 as amended 2026-11-19):
+ * the screen asks only while it is shown, at least every
+ * `elifba.rooms.screen.beat_ms`, and the state's `room.screen` says
+ * whether it still does.
  */
 final class RoomStateController extends Controller
 {
-    public function __invoke(Request $request, Room $room, #[CurrentUser] User $account, RecordRoomRead $recordRead): JsonResponse
+    public function __invoke(Request $request, Room $room, #[CurrentUser] User $account, RecordRoomRead $recordRead, RecordScreenRead $recordScreen): JsonResponse
     {
         $forScreen = $request->query('for') === 'screen';
 
         if ($forScreen) {
             Gate::forUser($account)->authorize('screen', $room);
+            $recordScreen->handle($room);
         }
 
         if (! $forScreen && ! self::fromTheScreen($request, $room)) {

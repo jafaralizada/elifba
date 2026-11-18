@@ -22,6 +22,7 @@ use InvalidArgumentException;
  * choice of the next game (G2, ADR 026 decision 11; version 2); a closed
  * one has none. A live game also has its taunts (`taunts`, T2, ADR 029
  * decision 15; version 3) as the viewer may see them; nothing else has.
+ * Version 4 adds `room.screen` (ADR 028 as amended 2026-11-19).
  *
  * @phpstan-import-type RoomSummaryArray from RoomSummaryData
  * @phpstan-import-type RoomViewerArray from RoomViewerData
@@ -36,7 +37,7 @@ use InvalidArgumentException;
  */
 final readonly class RoomStateData
 {
-    public const int VERSION = 3;
+    public const int VERSION = 4;
 
     /**
      * @param  list<RoomPlayerData>  $players

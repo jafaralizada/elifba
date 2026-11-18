@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Rooms;
 use App\Domain\Content\Data\RoomTauntData;
 use App\Domain\Content\Enums\RoomSpeaker;
 use App\Domain\Content\Support\ContentRepository;
+use App\Domain\Rooms\Actions\RecordScreenRead;
 use App\Domain\Rooms\Data\RoomGameSetupData;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Support\RoomFinishVoice;
 use App\Domain\Rooms\Support\RoomJoinLink;
 use App\Domain\Rooms\Support\RoomPlaces;
+use App\Domain\Rooms\Support\RoomScreen;
 use App\Domain\Rooms\Support\RoomState;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -31,13 +33,17 @@ use Inertia\Response;
  * room's speaker (ADR 025 "Sound"), never a phone's own cues;
  * `rivalry`, the URLs of the rivalry strip's three emoji (ADR 027); and
  * `taunts`, the list's keys with their emoji's URLs, for the taunts its
- * state shows (T2, ADR 029 decisions 21 and 28); and `finish`, the URLs of
+ * state shows (T2, ADR 029 decisions 21 and 28); `finish`, the URLs of
  * «Əla oynadın!» and «Əla oynadınız!» it says after the final's fanfare,
- * after the winner's name (`RoomFinishVoice`, ADR 030). Its state is the
+ * after the winner's name (`RoomFinishVoice`, ADR 030); and `beat_ms`, how
+ * often it reads the state at least while shown, which tells every phone
+ * that the room has its screen (`RoomScreen`, ADR 028 as amended
+ * 2026-11-19). Its state is the
  * screen's (`RoomState::for(…, screen: true)`): the taunts shown now with
  * their targets.
  *
- * Opening it writes nothing — not even a read (`RecordRoomRead`): the
+ * Opening it, and each of its state requests, writes only the screen's own
+ * read (`RecordScreenRead`) — never a player's (`RecordRoomRead`): the
  * screen is not the host's phone, and a round never waits for the host
  * because the screen is on. Before a game and after one the page sends
  * the host's own requests, `rooms.setup.update` and `rooms.games.store`,
@@ -49,8 +55,10 @@ use Inertia\Response;
  */
 final class RoomScreenController extends Controller
 {
-    public function __invoke(Room $room, #[CurrentUser] User $account, ContentRepository $content, RoomFinishVoice $finish): Response
+    public function __invoke(Room $room, #[CurrentUser] User $account, ContentRepository $content, RoomFinishVoice $finish, RecordScreenRead $recordScreen): Response
     {
+        $recordScreen->handle($room);
+
         return Inertia::render('rooms/screen', [
             'room' => ['id' => $room->id, 'status' => $room->status()->value],
             'state' => RoomState::for($room, $account, screen: true)->toArray(),
@@ -61,6 +69,7 @@ final class RoomScreenController extends Controller
             'rivalry' => $content->roomRivalry()->urls(),
             'taunts' => RoomTauntData::props($content->roomTaunts()),
             'finish' => $finish->urls(),
+            'beat_ms' => RoomScreen::beatMs(),
         ]);
     }
 }

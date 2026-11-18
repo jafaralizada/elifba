@@ -166,7 +166,7 @@ it('carries a live game\'s taunts, and nothing of them anywhere else', function 
         $state = roomFixture($name);
         $live = $state['game'] !== null && $state['game']['phase'] === 'live';
 
-        expect(array_keys($state['room']))->toBe(['id', 'status', 'locked', 'code', 'taunts'], $name)
+        expect(array_keys($state['room']))->toBe(['id', 'status', 'locked', 'code', 'taunts', 'screen'], $name)
             ->and($state['taunts'] === null)->toBe(! $live, $name);
 
         if ($live) {

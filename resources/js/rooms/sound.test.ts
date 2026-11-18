@@ -355,7 +355,7 @@ describe('roomSoundPlayer', () => {
         ]);
     });
 
-    it("plays only its own speaker's files: a phone has no room moment to play", async () => {
+    it("plays only its own speaker's files: a phone that carries no room has no room moment to play", async () => {
         const audio = fakeAudio();
         const player = roomSoundPlayer({
             speaker: 'phone',
@@ -374,6 +374,84 @@ describe('roomSoundPlayer', () => {
         expect(audio.started.map(({ sound, gain }) => [sound, gain])).toEqual([
             ['tap', SPEAKER_GAIN.phone],
         ]);
+    });
+
+    it("carries the room's files only once asked: a phone in a room without a screen", async () => {
+        const audio = fakeAudio();
+        const files = loader();
+        const player = roomSoundPlayer({
+            speaker: 'phone',
+            urls: { ...urls.phone, ...urls.screen },
+            storage: memoryStorage,
+            createContext: audio.create,
+            load: files.load,
+        });
+
+        player.unlock();
+        await settle();
+
+        expect(files.asked).toEqual(
+            ROOM_SOUNDS.phone.map((name) => `/content/${name}.mp3`),
+        );
+        player.play('countdown');
+        expect(audio.started).toEqual([]);
+
+        player.carry();
+        player.carry();
+        await settle();
+
+        expect(files.asked).toEqual(
+            [...ROOM_SOUNDS.phone, ...ROOM_SOUNDS.screen].map(
+                (name) => `/content/${name}.mp3`,
+            ),
+        );
+        player.play('countdown');
+        player.play('tap');
+        expect(audio.started.map(({ sound, gain }) => [sound, gain])).toEqual([
+            ['countdown', SPEAKER_GAIN.phone],
+            ['tap', SPEAKER_GAIN.phone],
+        ]);
+    });
+
+    it("fetches the room's files on the gesture when it was asked to carry them before one", async () => {
+        const audio = fakeAudio();
+        const files = loader();
+        const player = roomSoundPlayer({
+            speaker: 'phone',
+            urls: { ...urls.phone, ...urls.screen },
+            storage: memoryStorage,
+            createContext: audio.create,
+            load: files.load,
+        });
+
+        player.carry();
+        expect(files.asked).toEqual([]);
+
+        player.unlock();
+        await settle();
+
+        expect(files.asked).toHaveLength(
+            ROOM_SOUNDS.phone.length + ROOM_SOUNDS.screen.length,
+        );
+    });
+
+    it("never carries on the screen: it already is the room's speaker", async () => {
+        const files = loader();
+        const player = roomSoundPlayer({
+            speaker: 'screen',
+            urls: { ...urls.phone, ...urls.screen },
+            storage: memoryStorage,
+            createContext: fakeAudio().create,
+            load: files.load,
+        });
+
+        player.unlock();
+        player.carry();
+        await settle();
+
+        expect(files.asked).toEqual(
+            ROOM_SOUNDS.screen.map((name) => `/content/${name}.mp3`),
+        );
     });
 
     it('plays nothing while muted, makes no audio for a muted device, and mutes what was scheduled', async () => {

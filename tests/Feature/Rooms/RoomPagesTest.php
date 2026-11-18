@@ -12,6 +12,7 @@ use App\Domain\Rooms\Models\RoomAnswer;
 use App\Domain\Rooms\Models\RoomGame;
 use App\Domain\Rooms\Models\RoomPlayer;
 use App\Domain\Rooms\Models\RoomRound;
+use App\Domain\Rooms\Support\RoomClock;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
@@ -393,15 +394,18 @@ it('gives the screen only to the host', function (): void {
         ->and($props['join']['url'])->toBe(rtrim((string) config('app.url'), '/').'/oyun/'.$room->code);
     $this->get(route('rooms.screen', $room))->assertInertia(fn (Assert $page) => $page->component('rooms/screen'));
 
-    // In a game it follows the same state, and writes nothing.
+    // In a game it follows the same state, and writes nothing but its own read (`rooms.screen_seen_ms`).
     $game = Rooms::playing($room);
     $this->travelTo(Rooms::at($game, RoomPhase::Study, 0));
-    $before = [DB::table('rooms')->get()->all(), DB::table('room_players')->get()->all(), DB::table('room_answers')->count(), RoomRound::query()->whereNotNull('closed_ms')->count()];
+    $rooms = static fn (): array => DB::table('rooms')->get()->map(static fn (object $row): array => array_diff_key((array) $row, ['screen_seen_ms' => true]))->all();
+    $before = [$rooms(), DB::table('room_players')->get()->all(), DB::table('room_answers')->count(), RoomRound::query()->whereNotNull('closed_ms')->count()];
     $props = pagesProps($this->actingAs($this->resad)->get(route('rooms.screen', $room)));
 
     expect($props['state']['round']['phase'])->toBe('study')
+        ->and($props['state']['room']['screen'])->toBeTrue()
         ->and($props['state'])->toBe($this->getJson(route('rooms.state', [$room, 'for' => 'screen']), ['Referer' => route('rooms.screen', $room)])->json())
-        ->and([DB::table('rooms')->get()->all(), DB::table('room_players')->get()->all(), DB::table('room_answers')->count(), RoomRound::query()->whereNotNull('closed_ms')->count()])->toEqual($before);
+        ->and([$rooms(), DB::table('room_players')->get()->all(), DB::table('room_answers')->count(), RoomRound::query()->whereNotNull('closed_ms')->count()])->toEqual($before)
+        ->and($room->fresh()?->screen_seen_ms)->toBe(RoomClock::nowMs());
 
     // A player of the room, a host who does not play too: only the host.
     $this->actingAs($this->aygun)->get(route('rooms.screen', $room))->assertForbidden();
@@ -421,7 +425,7 @@ it('gives the screen only to the host', function (): void {
     $this->get(route('rooms.screen', $watched))->assertRedirect(route('login'));
 });
 
-it('sends the screen the room\'s sounds and a phone only its own, and a closed room none', function (): void {
+it('sends the screen the room\'s sounds and a phone its own and the room\'s, and a closed room none', function (): void {
     $room = Rooms::open($this->resad);
     Rooms::join($room, $this->aygun);
     $folder = asset('content/rooms/sounds').'/';
@@ -433,11 +437,12 @@ it('sends the screen the room\'s sounds and a phone only its own, and a closed r
     expect(array_keys($sounds))->toBe($screen)
         ->and($sounds)->each->toStartWith($folder);
 
-    // The host and a player on their phones: their own quiet cues, none of the room's moments.
+    // The host and a player on their phones: the room's moments, which a phone plays only while the
+    // room has no screen (ADR 028 as amended 2026-11-19), and their own quiet cues.
     foreach ([$this->resad, $this->aygun] as $account) {
         $sounds = pagesProps($this->actingAs($account)->get(route('rooms.show', $room)))['sounds'];
 
-        expect(array_keys($sounds))->toBe($phone)
+        expect(array_keys($sounds))->toBe([...$screen, ...$phone])
             ->and($sounds)->each->toStartWith($folder);
     }
 

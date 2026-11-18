@@ -67,11 +67,12 @@ function memberVoiceSnapshot(): array
 }
 
 it('gives the host\'s screen the clip of a member whose first name is listed', function (): void {
-    $before = memberVoiceSnapshot();
     $this->actingAs($this->host);
 
-    // The screen's own session reaches it: the host may open the screen.
+    // The screen's own session reaches it: the host may open the screen, which writes only its
+    // own read (`rooms.screen_seen_ms`, ADR 028 as amended 2026-11-19).
     $this->get(route('rooms.screen', $this->room))->assertOk();
+    $before = memberVoiceSnapshot();
 
     $response = memberVoice($this->room, $this->nihat)
         ->assertOk()

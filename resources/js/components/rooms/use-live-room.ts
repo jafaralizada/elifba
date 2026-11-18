@@ -35,6 +35,7 @@ export function useLiveRoom({
     initial,
     onClosed = () => router.reload(),
     answers = true,
+    beatMs = null,
 }: {
     room: { id: string; status: 'open' | 'closed' };
     initial: RoomState | null;
@@ -45,6 +46,13 @@ export function useLiveRoom({
      * (`?for=screen`: every taunt shown now with its target, T2).
      */
     answers?: boolean;
+    /**
+     * The screen's beat (`beat_ms`): while it is shown it reads the state at
+     * least this often, and it reads nothing while hidden, so the state's
+     * `room.screen` tells every phone whether the room has its screen (ADR
+     * 028 as amended 2026-11-19). Null on a phone.
+     */
+    beatMs?: number | null;
 }): {
     state: RoomState | null;
     clock: ServerClock;
@@ -98,9 +106,12 @@ export function useLiveRoom({
             echo = null;
         }
 
+        // A hidden screen asks nothing: then the room has no screen, and phones carry its sound.
+        const asleep = () => !answers && document.visibilityState === 'hidden';
+
         // A burst of answers is a burst of signals: one request at a time.
         const refresh = oneAtATime(() =>
-            (stopped
+            (stopped || asleep()
                 ? Promise.resolve(null)
                 : fetchState(
                       answers
@@ -157,6 +168,10 @@ export function useLiveRoom({
         // A phone woken from its lock, a tab brought back: read the room at once.
         const unshown = onShown(document, refresh);
 
+        // The screen's beat: a shown screen reads at least this often.
+        const beat =
+            beatMs === null ? null : window.setInterval(refresh, beatMs);
+
         watchRef.current = watch;
         followRef.current = follow;
         refreshRef.current = refresh;
@@ -173,11 +188,16 @@ export function useLiveRoom({
             watchRef.current = null;
             followRef.current = null;
             refreshRef.current = () => {};
+
+            if (beat !== null) {
+                window.clearInterval(beat);
+            }
+
             unshown();
             follow.stop();
             watch.stop();
         };
-    }, [live, room.id, room.status, clock, answers]);
+    }, [live, room.id, room.status, clock, answers, beatMs]);
 
     return { state, clock, refresh: () => refreshRef.current() };
 }

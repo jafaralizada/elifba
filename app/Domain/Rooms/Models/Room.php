@@ -51,6 +51,7 @@ use Illuminate\Support\Facades\Config;
  * @property int|null $setup_difficulty
  * @property int|null $setup_rounds
  * @property bool $taunts the host's switch: players may throw taunts
+ * @property int|null $screen_seen_ms when the big screen last read the state while shown, Unix ms (`RecordScreenRead`)
  * @property CarbonImmutable $created_at what the retention period counts from
  * @property CarbonImmutable $updated_at
  * @property-read User $host
@@ -225,6 +226,7 @@ class Room extends Model
             'setup_difficulty' => 'integer',
             'setup_rounds' => 'integer',
             'taunts' => 'boolean',
+            'screen_seen_ms' => 'integer',
         ];
     }
 

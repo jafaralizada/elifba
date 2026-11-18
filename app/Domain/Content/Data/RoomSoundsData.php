@@ -32,17 +32,21 @@ final readonly class RoomSoundsData
     }
 
     /**
-     * The URLs of one speaker's sounds by name: what `rooms/screen` or
-     * `rooms/show` plays, and nothing of the other device.
+     * The URLs of some speakers' sounds by name, in the enum's order: what
+     * `rooms/screen` plays (the screen's), or what `rooms/show` may play
+     * (a phone's own, and the screen's for a room without a screen, ADR
+     * 028 as amended 2026-11-19).
      *
      * @return array<value-of<RoomSound>, string>
      */
-    public function urls(RoomSpeaker $speaker): array
+    public function urls(RoomSpeaker ...$speakers): array
     {
         $urls = [];
 
-        foreach (RoomSound::of($speaker) as $sound) {
-            $urls[$sound->value] = ContentAssets::url($this->files[$sound->value], $this->version);
+        foreach (RoomSound::cases() as $sound) {
+            if (in_array($sound->speaker(), $speakers, true)) {
+                $urls[$sound->value] = ContentAssets::url($this->files[$sound->value], $this->version);
+            }
         }
 
         return $urls;

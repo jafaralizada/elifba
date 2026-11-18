@@ -81,6 +81,8 @@ type Props = {
     taunts: TauntList;
     /** «Əla oynadın!» and «Əla oynadınız!», said after the final's fanfare (ADR 030). */
     finish: RoomFinishVoice;
+    /** How often the shown screen reads the state at least, so phones know the room has its screen (ADR 028 as amended). */
+    beat_ms: number;
 };
 
 /**
@@ -122,6 +124,7 @@ export default function RoomsScreen({
     rivalry,
     taunts,
     finish,
+    beat_ms: beatMs,
 }: Props) {
     const { t } = useTranslation();
     // A closed room has no screen: its results are on the room's page.
@@ -131,6 +134,7 @@ export default function RoomsScreen({
         initial,
         onClosed: () => router.visit(show(room.id)),
         answers: false,
+        beatMs,
     });
     const motion = useRoomMotion(state);
     const [tauntsHidden, setTauntsHidden] = useTauntsHidden('screen');

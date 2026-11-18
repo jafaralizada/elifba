@@ -3,6 +3,9 @@
 use App\Domain\Rooms\Data\RoomStateData;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomPlayer;
+use App\Domain\Rooms\Support\RoomClock;
+use App\Domain\Rooms\Support\RoomScreen;
+use App\Domain\Rooms\Support\RoomState;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -148,4 +151,89 @@ it('limits the state to 120 a minute per account', function (): void {
     }
 
     $this->getJson(route('rooms.state', $room))->assertTooManyRequests();
+});
+
+/*
+ * A room without a screen (§12 "A room without a screen", ADR 028 as
+ * amended 2026-11-19): the state's `room.screen` says whether the room's
+ * big screen read the state within three beats; without one, every phone
+ * plays the room's cues too.
+ */
+
+it('says the room has its screen while the screen reads, and none three beats after its last read', function (): void {
+    $this->freezeTime();
+    $host = User::factory()->player()->create();
+    $player = User::factory()->player()->create();
+    $room = Rooms::open($host);
+    Rooms::join($room, $player);
+    $screen = static fn (Room $room): bool => test()->actingAs($player)->getJson(route('rooms.state', $room))->assertOk()->json('room.screen');
+
+    expect($screen($room))->toBeFalse();
+
+    $this->actingAs($host)->getJson(route('rooms.state', [$room, 'for' => 'screen']))
+        ->assertOk()
+        ->assertJsonPath('room.screen', true);
+
+    expect($screen($room))->toBeTrue();
+
+    $this->travel(RoomScreen::goneMs())->milliseconds();
+    expect($screen($room))->toBeTrue();
+
+    $this->travel(1)->milliseconds();
+    expect($screen($room))->toBeFalse();
+
+    // Opening the screen's page is a read too.
+    $this->actingAs($host)->get(route('rooms.screen', $room))->assertOk();
+    expect($screen($room))->toBeTrue();
+
+    // A closed room has no screen, whatever it read last.
+    $this->actingAs($host)->post(route('rooms.close', $room))->assertRedirect();
+    expect(RoomState::for($room->refresh(), $host)->room->screen)->toBeFalse();
+});
+
+it('records the screen only from its own requests: never a phone\'s, a player\'s or another room\'s', function (): void {
+    $host = User::factory()->player()->create();
+    $player = User::factory()->player()->create();
+    $room = Rooms::open($host);
+    $other = Rooms::open(User::factory()->player()->create());
+    Rooms::join($room, $player);
+
+    // The host's phone, and a request from the screen's page without `for=screen`.
+    $this->actingAs($host)->getJson(route('rooms.state', $room))->assertOk()->assertJsonPath('room.screen', false);
+    $this->actingAs($host)->get(route('rooms.show', $room))->assertOk();
+    $this->getJson(route('rooms.state', $room), ['Referer' => route('rooms.screen', $room)])->assertOk()->assertJsonPath('room.screen', false);
+
+    // A player may not ask as the screen, and the host of one room is not another's screen.
+    $this->actingAs($player)->getJson(route('rooms.state', [$room, 'for' => 'screen']))->assertForbidden();
+    $this->actingAs($player)->get(route('rooms.screen', $room))->assertForbidden();
+    $this->actingAs($host)->getJson(route('rooms.state', [$other, 'for' => 'screen']))->assertNotFound();
+
+    expect($room->refresh()->screen_seen_ms)->toBeNull()
+        ->and($other->refresh()->screen_seen_ms)->toBeNull();
+});
+
+it('records the screen without raising the revision, signalling or touching the room\'s activity, at most once a second', function (): void {
+    $host = User::factory()->player()->create();
+    $room = Rooms::open($host);
+    Rooms::join($room);
+    $room->refresh();
+    $before = [$room->revision, $room->last_activity_at->getTimestampMs(), $room->updated_at->getTimestampMs()];
+    $sent = count($this->reverb->sent);
+
+    $this->travel(5)->seconds();
+    $this->actingAs($host)->getJson(route('rooms.state', [$room, 'for' => 'screen']))->assertOk();
+    $first = RoomClock::nowMs();
+
+    $this->travel(999)->milliseconds();
+    $this->getJson(route('rooms.state', [$room, 'for' => 'screen']))->assertOk();
+    $room->refresh();
+
+    expect($room->screen_seen_ms)->toBe($first)
+        ->and([$room->revision, $room->last_activity_at->getTimestampMs(), $room->updated_at->getTimestampMs()])->toBe($before)
+        ->and(count($this->reverb->sent))->toBe($sent);
+
+    $this->travel(1)->milliseconds();
+    $this->getJson(route('rooms.state', [$room, 'for' => 'screen']))->assertOk();
+
+    expect($room->refresh()->screen_seen_ms)->toBe($first + 1000);
 });

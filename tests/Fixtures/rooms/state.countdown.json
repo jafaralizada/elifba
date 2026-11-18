@@ -1,5 +1,5 @@
 {
-    "v": 3,
+    "v": 4,
     "revision": 4,
     "server_ms": 1795534201200,
     "room": {
@@ -7,7 +7,8 @@
         "status": "open",
         "locked": false,
         "code": "482913",
-        "taunts": true
+        "taunts": true,
+        "screen": false
     },
     "me": {
         "player_id": "01kaqrx3mn4p5q6r7s8t9vwxyz",

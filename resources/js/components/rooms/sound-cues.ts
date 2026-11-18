@@ -25,7 +25,9 @@ import type { RoomSoundName, RoomSpeaker } from '@/rooms/sound';
  * depends on anyone's answer. A phone plays the viewer's own: the answer
  * sent (`answered`, the same for every answer) and, from the reveal only,
  * its verdict (`reveal.mine`). Its taps play where they are made
- * (`LiveRound`), not here.
+ * (`LiveRound`), not here. In a room without a screen (`room.screen`
+ * false, ADR 028 as amended 2026-11-19) a phone carries the room: it
+ * plays the screen's cues as well as its own (`carriesRoom()`).
  */
 
 /** What a page heard at one moment: the latest state and the server's clock as estimated. */
@@ -79,16 +81,15 @@ export const MAX_NAMES = 3;
 
 /**
  * What one ear means for a speaker: the moment (the game, the round and
- * its phase) with when it began and its cues; a beat within it — the
- * clock, the viewer's answer sent — with its own cues; and, between games
- * on the screen, the players the state lists.
+ * its phase) with when it began and its cues; the beats within it — the
+ * clock, the viewer's answer sent — each with its own cues; and, between
+ * games on the screen, the players the state lists.
  */
 type Heard = {
     moment: string;
     began: number | null;
     cues: RoomCue[];
-    beat: string | null;
-    beatCues: RoomCue[];
+    beats: Partial<Record<'clock' | 'sent', RoomCue[]>>;
     players: string[] | null;
 };
 
@@ -147,8 +148,7 @@ function hearScreen(state: RoomState | null, now: number | null): Heard {
         moment,
         began: null,
         cues: [],
-        beat: null,
-        beatCues: [],
+        beats: {},
         players: null,
     };
 
@@ -204,11 +204,10 @@ function hearScreen(state: RoomState | null, now: number | null): Heard {
                 ...quiet,
                 began: round.answer_from_ms,
                 cues: [now0(round.index === 0 && opening ? 'go' : 'question')],
-                beat: clock ? 'clock' : null,
-                beatCues:
+                beats:
                     clock && left !== null
-                        ? [{ sound: 'clock', at: left, ends: true }]
-                        : [],
+                        ? { clock: [{ sound: 'clock', at: left, ends: true }] }
+                        : {},
             };
         }
         case 'reveal':
@@ -229,8 +228,7 @@ function hearPhone(state: RoomState | null): Heard {
         moment,
         began: null,
         cues: [],
-        beat: null,
-        beatCues: [],
+        beats: {},
         players: null,
     };
     const round = state?.game?.phase === 'live' ? state.round : null;
@@ -244,8 +242,7 @@ function hearPhone(state: RoomState | null): Heard {
         return {
             ...quiet,
             began: round.answer_from_ms,
-            beat: round.answered ? 'sent' : null,
-            beatCues: [now0('sent')],
+            beats: round.answered ? { sent: [now0('sent')] } : {},
         };
     }
 
@@ -263,17 +260,55 @@ function hearPhone(state: RoomState | null): Heard {
     return quiet;
 }
 
+/**
+ * Whether a phone carries the room (ADR 028 as amended 2026-11-19): an open
+ * room whose big screen is not on (`room.screen`), so the phone plays the
+ * screen's cues as well as its own, at its own level — all but the cheer,
+ * the screen's one voice (ADR 030), which a phone never says.
+ */
+export function carriesRoom(state: RoomState | null): boolean {
+    return state !== null && state.room.status === 'open' && !state.room.screen;
+}
+
+/** A carrying phone hears as the screen does, but for the cheer, and as itself. */
+function hearBoth(state: RoomState | null, now: number | null): Heard {
+    const room = hearScreen(state, now);
+    const own = hearPhone(state);
+
+    return {
+        moment: room.moment,
+        began: room.began ?? own.began,
+        cues: [
+            ...room.cues.filter(({ sound }) => sound !== 'cheer'),
+            ...own.cues,
+        ],
+        beats: { ...room.beats, ...own.beats },
+        players: room.players,
+    };
+}
+
 /** What `ear` means for `speaker`. */
 function hear(ear: RoomEar, speaker: RoomSpeaker): Heard {
-    return speaker === 'screen'
-        ? hearScreen(ear.state, ear.now)
+    if (speaker === 'screen') {
+        return hearScreen(ear.state, ear.now);
+    }
+
+    return carriesRoom(ear.state)
+        ? hearBoth(ear.state, ear.now)
         : hearPhone(ear.state);
+}
+
+/** The cues of every beat in `heard`, or only of those `before` did not have. */
+function beatCues(heard: Heard, before: Heard | null): RoomCue[] {
+    return (Object.keys(heard.beats) as (keyof Heard['beats'])[])
+        .filter((beat) => before === null || before.beats[beat] === undefined)
+        .flatMap((beat) => heard.beats[beat] ?? []);
 }
 
 /**
  * The cues to play now, from what the page heard before (`previous`, null
  * for the first thing it heard) and what it hears now: a moment's cues —
- * with the beat it began on, if any — when a new moment began recently; a
+ * with the beats it began on, if any — when a new moment began recently; a
  * beat's when a new beat came within the same moment; `join` when a player
  * appeared between games; and nothing when nothing began.
  */
@@ -295,15 +330,10 @@ export function roomCues(
             current.now !== null &&
             current.now - heard.began > STALE_MS;
 
-        return late
-            ? []
-            : [...heard.cues, ...(heard.beat === null ? [] : heard.beatCues)];
+        return late ? [] : [...heard.cues, ...beatCues(heard, null)];
     }
 
-    const cues =
-        heard.beat !== null && heard.beat !== before.beat
-            ? [...heard.beatCues]
-            : [];
+    const cues = beatCues(heard, before);
 
     if (heard.players !== null && before.players !== null) {
         const known = new Set(before.players);

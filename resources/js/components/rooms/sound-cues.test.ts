@@ -5,6 +5,7 @@ import type { RoomSpeaker } from '@/rooms/sound';
 import { finalTimeline } from './final';
 import { REVEAL_MS } from './motion';
 import {
+    carriesRoom,
     CLOCK_MS,
     FANFARE_MS,
     LEAD_MS,
@@ -23,8 +24,12 @@ import { standingGroups } from './standing-groups';
  * page opened on; the countdown and the clock are one file each, placed to
  * end at `opens_ms` and `bell_ms`; the screen plays the room's moments and
  * the same whatever anyone answered; a phone plays its own answer sent,
- * one sound for every answer, and its verdict only from the reveal. After
- * the final's fanfare the screen alone cheers the first place (ADR 030).
+ * one sound for every answer, and its verdict only from the reveal — and,
+ * in a room without a screen (`room.screen` false, ADR 028 as amended
+ * 2026-11-19), the room's moments as the screen would, but never the
+ * winner's cheer. After the final's fanfare the screen alone cheers the
+ * first place (ADR 030). The fixtures' rooms have no screen; a phone's own
+ * tests put one in (`screened()`).
  */
 const fixtures = import.meta.glob<unknown>(
     '../../../../tests/Fixtures/rooms/state.*.json',
@@ -124,6 +129,19 @@ function game(mine: 'right' | 'wrong' | 'none'): RoomEar[] {
         { state: over, now: over.server_ms + 50 },
         { state: over, now: over.server_ms + 3000 },
     ];
+}
+
+/** The same state in a room whose big screen is on (`room.screen`), or off. */
+function withScreen(source: State, on = true): State {
+    return { ...source, room: { ...source.room, screen: on } } as State;
+}
+
+/** The same ears in a room with its big screen on. */
+function screened(ears: RoomEar[]): RoomEar[] {
+    return ears.map((ear) => ({
+        ...ear,
+        state: ear.state === null ? null : withScreen(ear.state),
+    }));
 }
 
 /** Every cue a page plays along `ears`, with the step it plays at. */
@@ -430,8 +448,8 @@ describe('roomCues on the screen', () => {
         ).toEqual([]);
         expect(
             roomCues(
-                { state: lobby, now: 1 },
-                { state: joined(lobby), now: 2 },
+                { state: withScreen(lobby), now: 1 },
+                { state: withScreen(joined(lobby)), now: 2 },
                 'phone',
             ),
         ).toEqual([]);
@@ -535,29 +553,43 @@ describe("roomCues and the winner's cheer (ADR 030)", () => {
             me: { ...over.me, player_id: winner },
         } as State;
 
-        expect(finalOf(over, 'phone')).toEqual([]);
-        expect(finalOf(mine, 'phone')).toEqual([]);
+        expect(finalOf(withScreen(over), 'phone')).toEqual([]);
+        expect(finalOf(withScreen(mine), 'phone')).toEqual([]);
         expect(
             names(heard(game('right'), 'phone')).filter(
                 (sound) => sound === 'cheer',
             ),
         ).toEqual([]);
+
+        // A phone that carries a room without a screen plays the final, never the cheer.
+        for (const final of [over, mine]) {
+            const played = finalOf(final, 'phone').map(({ sound }) => sound);
+
+            expect(played).toContain('fanfare');
+            expect(played).not.toContain('cheer');
+        }
     });
 });
 
-describe('roomCues on a phone', () => {
+describe('roomCues on a phone in a room with its screen', () => {
     it('plays the answer sent once, and the verdict only from the reveal', () => {
         expect(
-            heard(game('right'), 'phone').map(({ step, cue }) => [step, cue]),
+            heard(screened(game('right')), 'phone').map(({ step, cue }) => [
+                step,
+                cue,
+            ]),
         ).toEqual([
             [10, { sound: 'sent', at: 0 }],
             [17, { sound: 'right', at: 0 }],
         ]);
-        expect(names(heard(game('wrong'), 'phone'))).toEqual(['sent', 'wrong']);
+        expect(names(heard(screened(game('wrong')), 'phone'))).toEqual([
+            'sent',
+            'wrong',
+        ]);
     });
 
     it("plays none of the room's moments", () => {
-        const played = names(heard(game('right'), 'phone'));
+        const played = names(heard(screened(game('right')), 'phone'));
 
         for (const room of [
             'countdown',
@@ -577,7 +609,7 @@ describe('roomCues on a phone', () => {
     });
 
     it('plays nothing at a reveal without an answer, or for a host who does not play', () => {
-        expect(names(heard(game('none'), 'phone'))).toEqual([]);
+        expect(names(heard(screened(game('none')), 'phone'))).toEqual([]);
 
         const watching = (ear: RoomEar): RoomEar => ({
             ...ear,
@@ -585,7 +617,7 @@ describe('roomCues on a phone', () => {
                 ear.state === null
                     ? null
                     : ({
-                          ...ear.state,
+                          ...withScreen(ear.state),
                           me: { player_id: null, host: true },
                       } as State),
         });
@@ -604,6 +636,108 @@ describe('roomCues on a phone', () => {
             heard(game(mine), 'phone').filter(({ step }) => step < 17);
 
         expect(before('wrong')).toEqual(before('right'));
+        expect(
+            heard(screened(game('wrong')), 'phone').filter(
+                ({ step }) => step < 17,
+            ),
+        ).toEqual(
+            heard(screened(game('right')), 'phone').filter(
+                ({ step }) => step < 17,
+            ),
+        );
+    });
+});
+
+describe('roomCues on a phone in a room without a screen', () => {
+    it('carries the room only while it is open and its screen is off', () => {
+        expect(carriesRoom(lobby)).toBe(true);
+        expect(carriesRoom(withScreen(lobby))).toBe(false);
+        expect(
+            carriesRoom({
+                ...lobby,
+                room: { ...lobby.room, status: 'closed', code: null },
+            } as State),
+        ).toBe(false);
+        expect(carriesRoom(null)).toBe(false);
+    });
+
+    it("plays every one of the room's moments as the screen does but the cheer, and its own cues too", () => {
+        for (const mine of ['right', 'wrong', 'none'] as const) {
+            // All the screen plays but the cheer, the screen's one voice (ADR 030).
+            const merged = [
+                ...heard(game(mine), 'screen').filter(
+                    ({ cue }) => cue.sound !== 'cheer',
+                ),
+                ...heard(screened(game(mine)), 'phone'),
+            ].sort((a, b) => a.step - b.step);
+
+            expect(heard(game(mine), 'phone')).toEqual(merged);
+        }
+
+        expect(names(heard(game('right'), 'phone'))).toEqual(
+            expect.arrayContaining([
+                'countdown',
+                'clock',
+                'close',
+                'ranking',
+                'fanfare',
+                'sent',
+                'right',
+            ]),
+        );
+    });
+
+    it('plays «join» in the lobby', () => {
+        const joined = {
+            ...lobby,
+            players: [
+                ...lobby.players,
+                {
+                    id: '01kaqrx9zz9zz9zz9zz9zz9zz9',
+                    name: 'Yeni',
+                    present: true,
+                    host: false,
+                },
+            ],
+        } as State;
+
+        expect(
+            roomCues(
+                { state: lobby, now: 1 },
+                { state: joined, now: 2 },
+                'phone',
+            ),
+        ).toEqual([{ sound: 'join', at: 0 }]);
+    });
+
+    it('runs the clock and plays the answer sent when both come in one moment', () => {
+        expect(
+            roomCues(
+                { state: answer, now: bell - 6000 },
+                { state: answered, now: bell - 5400 },
+                'phone',
+            ),
+        ).toEqual([
+            { sound: 'clock', at: 5400, ends: true },
+            { sound: 'sent', at: 0 },
+        ]);
+    });
+
+    it('stops carrying once the screen comes on, and carries again when it goes', () => {
+        expect(
+            roomCues(
+                { state: withScreen(lobby), now: opens - 5000 },
+                { state: withScreen(countdown), now: opens - 2500 },
+                'phone',
+            ),
+        ).toEqual([]);
+        expect(
+            roomCues(
+                { state: withScreen(lobby), now: opens - 5000 },
+                { state: countdown, now: opens - 2500 },
+                'phone',
+            ),
+        ).toEqual([{ sound: 'countdown', at: 2500, ends: true }]);
     });
 });
 
@@ -708,8 +842,8 @@ describe('roomCues and the moment a page opened on', () => {
         ).toEqual([]);
         expect(
             roomCues(
-                { state: answered, now: bell - 100 },
-                { state: reveal, now: closes + STALE_MS },
+                { state: withScreen(answered), now: bell - 100 },
+                { state: withScreen(reveal), now: closes + STALE_MS },
                 'phone',
             ),
         ).toEqual([{ sound: 'right', at: 0 }]);

@@ -106,6 +106,15 @@ return [
             'show_ms' => 4_000,
             'forget_target_hours' => 24,
         ],
+
+        // The big screen (§12 "A room without a screen", ADR 028 as amended
+        // 2026-11-19): while it is shown it reads the state at least every
+        // `beat_ms`, and a room whose screen has not read within three
+        // beats (`RoomScreen::goneMs()`) has none — then every phone plays
+        // the room's cues too.
+        'screen' => [
+            'beat_ms' => 10_000,
+        ],
     ],
 
     // Who runs this instance; shown on /privacy (§7).

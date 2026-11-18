@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { roomCues, sameMoment } from '@/components/rooms/sound-cues';
+import {
+    carriesRoom,
+    roomCues,
+    sameMoment,
+} from '@/components/rooms/sound-cues';
 import type { RoomEar } from '@/components/rooms/sound-cues';
 import type { ServerClock } from '@/rooms/clock';
 import type { RoomState } from '@/rooms/contract';
@@ -69,7 +73,8 @@ function allowedWithoutGesture(): boolean {
  * A room page's sound (ADR 025 "Sound", ADR 028, docs/frontend.md rule 15
  * "Sound"): the player of its speaker's files (`sounds`, null for none),
  * fed with what the page hears — the state and the estimated server clock
- * every 200 ms — through `roomCues()`. The first gesture on the page
+ * every 200 ms — through `roomCues()`; a phone in a room without a screen
+ * carries the room's cues too (`carriesRoom()`). The first gesture on the page
  * unlocks sound unless the device muted it (at once where the document
  * already had one, as after «Qoşul»). Every cue stops when its moment
  * ends — one scheduled is dropped, one sounding fades out at once — and
@@ -125,6 +130,11 @@ export function useRoomSound({
         const listen = () => {
             const ear = { state: stateRef.current, now: clock.now() };
             const previous = heard.current;
+
+            // A phone in a room without a screen fetches the room's files too.
+            if (speaker === 'phone' && carriesRoom(ear.state)) {
+                player.carry();
+            }
 
             if (previous !== null && !sameMoment(previous, ear, speaker)) {
                 player.cancel();

@@ -84,7 +84,7 @@ final class RoomState
         return new RoomStateData(
             revision: $room->revision,
             server_ms: $nowMs,
-            room: RoomSummaryData::of($room),
+            room: RoomSummaryData::of($room, $nowMs),
             me: new RoomViewerData($mine?->id, $room->isHostedBy($viewer)),
             players: array_values($rows->map(static fn (RoomPlayer $row): RoomPlayerData => new RoomPlayerData(
                 id: $row->id,
