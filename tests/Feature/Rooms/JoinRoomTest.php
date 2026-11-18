@@ -359,9 +359,13 @@ it('joins at /oyun', function (): void {
         ->and(route('rooms.join.store', $code, false))->toBe('/oyun/'.$code);
 
     $this->actingAs($this->player);
-    $this->get('/oyun')->assertOk()->assertInertia(fn (Assert $page) => $page->component('rooms/join')->where('code', null));
+    // The code field's page knows its own address, whose origin its camera accepts (ADR 026 decision 15).
+    $this->get('/oyun')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('rooms/join')
+        ->where('code', null)
+        ->where('entrance', rtrim((string) config('app.url'), '/').'/oyun'));
     $this->get('/oyun?code='.$code)->assertRedirect('/oyun/'.$code);
-    $this->get('/oyun/'.$code)->assertOk()->assertInertia(fn (Assert $page) => $page->where('code', $code));
+    $this->get('/oyun/'.$code)->assertOk()->assertInertia(fn (Assert $page) => $page->where('code', $code)->where('entrance', null));
     $this->post('/oyun/'.$code)->assertRedirect(route('rooms.show', $this->room));
 
     expect($this->room->rowOf($this->player)?->isPresent())->toBeTrue();

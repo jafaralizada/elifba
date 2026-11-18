@@ -548,6 +548,8 @@ it('sends the home the catalog and the open rooms, and the past rooms to their o
             'games' => [['mechanic' => 'recall_cells', 'difficulty' => 2]],
             'mine' => ['points' => pagesPoints($game, pagesRow($past, $this->resad)), 'place' => Ordinal::label(1, 'az')],
         ]])
+        // How long its results are kept, for its one line (ADR 026 decision 14).
+        ->where('retention_days', config('elifba.retention_days'))
         ->missing('open')
         ->missing('catalog'));
 });

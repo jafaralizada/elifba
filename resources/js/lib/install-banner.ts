@@ -35,7 +35,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * An account's own pages: the welcome page, the auth pages and the shell of
  * each area (teacher, parent or player, architecture §1 "Accounts and roles"). Never the board (`games/board`, `lovhe`), the remote
  * (`games/remote`, `pult/*`) or the podium, which is made for the projector;
- * in the player area only «Otaqlar», since a banner would cover a join's
+ * in the player area only «Oyunlar», since a banner would cover a join's
  * «Qoşul» or a round (docs/frontend.md rule 15); an unknown page shows
  * nothing until it is listed here.
  */
@@ -53,6 +53,17 @@ const PAGES = [
 
 export function bannerAllowedOn(page: string): boolean {
     return PAGES.some((pattern) => pattern.test(page));
+}
+
+/**
+ * The pages whose action stands in a bar stuck to the bottom (`RoomActionBar`):
+ * «Oyunlar»'s code field and «Qoşul» (ADR 026 decision 13). The banner
+ * floats above that bar there, so it never covers the field.
+ */
+const ABOVE_BAR = [/^rooms\/index$/];
+
+export function bannerAboveBar(page: string): boolean {
+    return ABOVE_BAR.some((pattern) => pattern.test(page));
 }
 
 /** The stored dismissal time, or null when it is missing or not a time. */

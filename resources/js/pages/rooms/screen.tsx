@@ -1,9 +1,26 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Maximize, Minimize, Trophy, Users } from 'lucide-react';
-import { useSyncExternalStore } from 'react';
+import {
+    ArrowLeft,
+    Maximize,
+    Minimize,
+    Pencil,
+    Play,
+    RotateCcw,
+    Trophy,
+} from 'lucide-react';
+import { useState, useSyncExternalStore } from 'react';
 import AppLogoIcon from '@/components/app-logo-icon';
+import InputError from '@/components/input-error';
+import { withGame } from '@/components/rooms/catalog';
+import type { GameSetupOptions } from '@/components/rooms/catalog';
 import { FinalStanding } from '@/components/rooms/final-standing';
-import type { GameSetupOptions } from '@/components/rooms/game-setup';
+import { GameDrawing } from '@/components/rooms/game-drawing';
+import {
+    GameSettings,
+    useRoomChoice,
+    useRoomStart,
+} from '@/components/rooms/game-settings';
+import type { RoomChoice } from '@/components/rooms/game-settings';
 import { Countdown, Counted, RoundHead } from '@/components/rooms/live-round';
 import { MECHANIC_VIEWS } from '@/components/rooms/mechanics/views';
 import { REVEAL_MS } from '@/components/rooms/motion';
@@ -11,6 +28,7 @@ import { RoomQr, spacedCode, typedAddress } from '@/components/rooms/room-code';
 import type { JoinLink } from '@/components/rooms/room-code';
 import { SoundToggle } from '@/components/rooms/sound-toggle';
 import { Standing } from '@/components/rooms/standing';
+import { StandingCard, useChoiceLine } from '@/components/rooms/start-parts';
 import { useLiveRoom } from '@/components/rooms/use-live-room';
 import {
     usePreviousReveal,
@@ -20,6 +38,7 @@ import type { RoomMotion } from '@/components/rooms/use-motion';
 import { useRoomSound } from '@/components/rooms/use-room-sound';
 import { useServerNow } from '@/components/rooms/use-server-now';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import { show } from '@/routes/rooms';
@@ -28,6 +47,7 @@ import type {
     RoomGame,
     RoomPlayer,
     RoomRound,
+    RoomSetup,
     RoomState,
 } from '@/rooms/contract';
 import type { RoomSoundUrls } from '@/rooms/sound';
@@ -39,26 +59,26 @@ type Props = {
     place_labels: string[];
     /** Where a phone joins: the QR's address and the code field's. */
     join: JoinLink | null;
-    /**
-     * What the room's choice may be, as the host's phone gets it (G2): the
-     * screen sends the host's `rooms.setup.update` and `rooms.games.store`
-     * with it. G3 draws the strip that does (ADR 026 decision 17).
-     */
+    /** What the room's choice may be, as the host's phone gets it: the screen sends the host's choice and start with it. */
     catalog: GameSetupOptions;
     /** The room's moments it plays as the room's speaker, by name (ADR 025). */
     sounds: RoomSoundUrls;
 };
 
 /**
- * The big screen (docs/frontend.md rule 15, "The screen"; architecture §12
- * "The big screen"): the host's own session on a laptop or a television's
- * browser, without the app's shell. While the room waits, its QR, its
- * code and the players; in a game, what every player sees of the round —
- * the countdown, the material while it is studied, the question with the
- * count of answers — then the reveal with the ranking and each player's
- * result; after a game, the room's standing with the code for whoever
- * comes next. It follows the same state as the room page and writes
- * nothing: no control here changes the room.
+ * The big screen (docs/frontend.md rule 15 "Games first", "The screen";
+ * architecture §12 "The big screen", "Games first"; ADR 026 decision 17):
+ * the host's own session on a laptop or a television's browser, without
+ * the app's shell. Before a game the invitation as a poster — the QR, the
+ * code at its largest, the address, who has joined — over one strip with
+ * the room's choice, «Dəyiş» and «Başla»; in a game what every player sees
+ * of the round — the countdown, the material while it is studied, the
+ * question with the count of answers — then the reveal with the ranking
+ * and each player's result; after a game its final beside «Yenidən oyna»
+ * and the five other games. Before and after a game it sends the host's
+ * own requests for the choice and the start (`useRoomChoice()`,
+ * `useRoomStart()`), which the server lets through for the host; it holds
+ * no lock, removal, closing or ending, and in a game it writes nothing.
  *
  * It is the room's show (ADR 025): every moment it saw begin moves, larger
  * than on a phone, and a game's end is the final, with its confetti. A
@@ -72,12 +92,13 @@ export default function RoomsScreen({
     state: initial,
     place_labels: placeLabels,
     join,
+    catalog,
     sounds,
 }: Props) {
     const { t } = useTranslation();
     // A closed room has no screen: its results are on the room's page.
     // The screen answers nothing: it waits through every question as one who answered.
-    const { state, clock } = useLiveRoom({
+    const { state, clock, refresh } = useLiveRoom({
         room,
         initial,
         onClosed: () => router.visit(show(room.id)),
@@ -118,12 +139,16 @@ export default function RoomsScreen({
                 </Button>
             </header>
 
-            <main className="flex flex-1 flex-col px-[4vw] py-[3vh]">
-                {state === null || room.status === 'closed' ? (
+            {state === null ||
+            room.status === 'closed' ||
+            state.setup === null ? (
+                <main className="flex flex-1 flex-col px-[4vw] py-[3vh]">
                     <p className="text-[3vh] text-muted-foreground">
                         {t('rooms.show.closed')}
                     </p>
-                ) : playing ? (
+                </main>
+            ) : playing ? (
+                <main className="flex flex-1 flex-col px-[4vw] py-[3vh]">
                     <ScreenRound
                         state={state}
                         game={game}
@@ -132,67 +157,176 @@ export default function RoomsScreen({
                         placeLabels={placeLabels}
                         motion={motion}
                     />
-                ) : game !== null && game.phase === 'over' ? (
-                    <ScreenOver
-                        key={game.id}
-                        state={state}
-                        game={game}
-                        join={join}
-                        placeLabels={placeLabels}
-                        motion={motion}
-                    />
-                ) : (
-                    <ScreenLobby state={state} join={join} />
-                )}
-            </main>
+                </main>
+            ) : (
+                <ScreenHost
+                    roomId={room.id}
+                    state={state}
+                    setup={state.setup}
+                    over={game !== null && state.setup.played ? game : null}
+                    join={join}
+                    catalog={catalog}
+                    placeLabels={placeLabels}
+                    motion={motion}
+                    refresh={refresh}
+                />
+            )}
         </div>
     );
 }
 
-/** The players present, as chips. */
+/**
+ * The screen outside a game: the poster before one, the final after one.
+ * One choice, one start and one «Oyun ayarları» serve both, as on the
+ * host's phone.
+ */
+function ScreenHost({
+    roomId,
+    state,
+    setup,
+    over,
+    join,
+    catalog,
+    placeLabels,
+    motion,
+    refresh,
+}: {
+    roomId: string;
+    state: RoomState;
+    setup: RoomSetup;
+    over: RoomGame | null;
+    join: JoinLink | null;
+    catalog: GameSetupOptions;
+    placeLabels: string[];
+    motion: RoomMotion;
+    refresh: () => void;
+}) {
+    const choice = useRoomChoice({ roomId, choice: setup, onChanged: refresh });
+    const start = useRoomStart({ roomId, onChanged: refresh });
+    const [settings, setSettings] = useState(false);
+
+    return (
+        <>
+            {over !== null ? (
+                <ScreenOver
+                    key={over.id}
+                    state={state}
+                    game={over}
+                    current={setup.mechanic}
+                    join={join}
+                    catalog={catalog}
+                    choice={choice}
+                    start={start}
+                    placeLabels={placeLabels}
+                    motion={motion}
+                />
+            ) : (
+                <ScreenStart
+                    state={state}
+                    join={join}
+                    choice={choice}
+                    start={start}
+                    placeLabels={placeLabels}
+                    onChange={() => setSettings(true)}
+                />
+            )}
+            <GameSettings
+                options={catalog}
+                choice={choice}
+                open={settings}
+                onOpenChange={setSettings}
+                big
+            />
+        </>
+    );
+}
+
+type Start = ReturnType<typeof useRoomStart>;
+
+/** The present players as chips; one who joins after the screen first drew pops in. */
 function PlayerChips({ players }: { players: RoomPlayer[] }) {
     const { t } = useTranslation();
+    const present = players.filter((player) => player.present);
+    const [first] = useState(() => new Set(present.map((player) => player.id)));
+
+    if (present.length === 0) {
+        return (
+            <p className="text-[2.4vh] text-muted-foreground">
+                {t('rooms.start.nobody')}
+            </p>
+        );
+    }
 
     return (
         <ul className="flex flex-wrap gap-[1.2vh]">
-            {players
-                .filter((player) => player.present)
-                .map((player) => (
-                    <li
-                        key={player.id}
-                        className="max-w-[24vw] truncate rounded-full border bg-card px-[2vh] py-[0.9vh] text-[2.6vh]"
-                    >
-                        {player.name ?? t('rooms.show.nameless')}
-                    </li>
-                ))}
+            {present.map((player) => (
+                <li
+                    key={player.id}
+                    className={cn(
+                        'max-w-[24vw] truncate rounded-full border bg-card px-[2vh] py-[0.9vh] text-[max(1rem,2.6vh)]',
+                        !first.has(player.id) && 'motion-safe:animate-room-pop',
+                    )}
+                >
+                    {player.name ?? t('rooms.show.nameless')}
+                    {player.host && (
+                        <span className="ml-[1vh] text-[0.8em] text-muted-foreground">
+                            {t('rooms.show.host')}
+                        </span>
+                    )}
+                </li>
+            ))}
         </ul>
     );
 }
 
-/** While the room waits for its first game: the QR beside the code, how to join, and who is here. */
-function ScreenLobby({
+/**
+ * Before a game: the invitation as a poster — the QR beside «Oyun kodu»,
+ * the code at its largest, the address, a thin rule and who has joined —
+ * over one strip with the choice's drawing, name and line, «Dəyiş» and
+ * «Başla», the largest control on the page. After a first game the room's
+ * standing so far stands quietly above the code.
+ */
+function ScreenStart({
     state,
     join,
+    choice,
+    start,
+    placeLabels,
+    onChange,
 }: {
     state: RoomState;
     join: JoinLink | null;
+    choice: RoomChoice;
+    start: Start;
+    placeLabels: string[];
+    onChange: () => void;
 }) {
     const { t } = useTranslation();
+    const line = useChoiceLine();
     const present = state.players.filter((player) => player.present).length;
+    const shown = choice.shown;
 
     return (
-        <div className="flex flex-1 flex-col justify-center gap-[5vh]">
-            <div className="flex items-center justify-center gap-[5vw]">
+        <main className="flex flex-1 flex-col">
+            <div className="flex flex-1 items-center justify-center gap-[5vw] px-[4vw] py-[4vh]">
                 {join !== null && (
                     <RoomQr
                         url={join.url}
                         size={512}
                         fluid
-                        className="w-[min(44vh,34vw)] p-[1.4vh]"
+                        className="w-[min(52vh,30vw)] p-[1.4vh]"
                     />
                 )}
-                <div className="flex min-w-0 flex-col gap-[2vh]">
-                    <span className="text-[3vh] text-muted-foreground">
+                <div className="flex min-w-0 flex-col gap-[1.6vh]">
+                    {state.game !== null && (
+                        <div className="w-[min(40vw,36rem)] text-[max(0.875rem,1.8vh)]">
+                            <StandingCard
+                                state={state}
+                                placeLabels={placeLabels}
+                            />
+                        </div>
+                    )}
+                    <span className="text-[max(1rem,2.8vh)] text-muted-foreground">
                         {t('rooms.show.code')}
                     </span>
                     {state.room.code !== null && (
@@ -201,49 +335,109 @@ function ScreenLobby({
                         </span>
                     )}
                     {join !== null && (
-                        <span className="max-w-[40vw] text-[2.8vh] text-balance text-muted-foreground">
+                        <span className="max-w-[44vw] text-[max(0.9375rem,2.6vh)] text-balance text-muted-foreground">
                             {t('rooms.screen.join', {
                                 address: typedAddress(join.entry_url),
                             })}
                         </span>
                     )}
+                    <hr className="my-[0.6vh]" />
+                    <h2 className="text-[max(1rem,2.6vh)] font-semibold">
+                        {t('rooms.start.joined_count', { count: present })}
+                    </h2>
+                    <PlayerChips players={state.players} />
                 </div>
             </div>
 
-            <section className="flex flex-col gap-[1.6vh]">
-                <h2 className="flex items-center gap-[1vh] text-[2.8vh] font-semibold">
-                    <Users aria-hidden className="size-[3vh]" />
-                    {t('rooms.show.players_count', { count: present })}
-                </h2>
-                <PlayerChips players={state.players} />
-                <p className="text-[2.4vh] text-muted-foreground">
-                    {t('rooms.screen.waiting')}
-                </p>
+            <section className="flex min-h-[16vh] items-center gap-[2vw] border-t bg-muted px-[4vw] py-[2vh]">
+                <GameDrawing
+                    key={shown.mechanic}
+                    mechanic={shown.mechanic}
+                    className="bg-background text-[max(3rem,9vh)]"
+                />
+                <span className="flex min-w-0 flex-1 flex-col gap-[0.4vh]">
+                    <span className="truncate text-[max(1.125rem,3.4vh)] leading-tight font-bold">
+                        {t(`rooms.mechanics.${shown.mechanic}.name`)}
+                    </span>
+                    <span className="truncate text-[max(0.9375rem,2.4vh)] text-muted-foreground">
+                        {line(shown)}
+                    </span>
+                </span>
+                {(start.failed || choice.failed) && (
+                    <InputError
+                        className="max-w-[20vw] text-[max(0.875rem,1.8vh)]"
+                        message={
+                            start.failed
+                                ? t('rooms.setup.failed')
+                                : t('rooms.setup.change_failed')
+                        }
+                    />
+                )}
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="h-[max(2.75rem,7vh)] px-[2.4vh] text-[max(1rem,2.4vh)]"
+                    disabled={start.starting}
+                    onClick={onChange}
+                >
+                    <Pencil className="size-[max(1rem,2.4vh)]" />
+                    {t('rooms.start.change')}
+                </Button>
+                <Button
+                    type="button"
+                    className="h-[max(3.25rem,9vh)] px-[4vh] text-[max(1.125rem,3.2vh)]"
+                    disabled={
+                        present === 0 ||
+                        start.starting ||
+                        choice.pending !== null
+                    }
+                    onClick={start.start}
+                >
+                    {start.starting ? (
+                        <Spinner className="size-[max(1.25rem,3vh)]" />
+                    ) : (
+                        <Play className="size-[max(1.25rem,3vh)]" />
+                    )}
+                    {t('rooms.start.start', { count: present })}
+                </Button>
             </section>
-        </div>
+        </main>
     );
 }
 
-/** After a game: its end and its final (the room's standing, ADR 025), with the code for whoever comes next. */
+/**
+ * After a game: its end and its final (the room's standing, ADR 025) at
+ * the left, and a right column with «Yenidən oyna», «Başqa oyun:» over the
+ * five other games and the code for whoever comes next.
+ */
 function ScreenOver({
     state,
     game,
+    current,
     join,
+    catalog,
+    choice,
+    start,
     placeLabels,
     motion,
 }: {
     state: RoomState;
     game: RoomGame;
+    current: RoomSetup['mechanic'];
     join: JoinLink | null;
+    catalog: GameSetupOptions;
+    choice: RoomChoice;
+    start: Start;
     placeLabels: string[];
     motion: RoomMotion;
 }) {
     const { t } = useTranslation();
+    const busy = start.starting || choice.pending !== null;
 
     return (
-        <div
+        <main
             data-motion={motion.phase ? 'on' : undefined}
-            className="grid flex-1 grid-cols-[minmax(0,1fr)_auto] gap-[4vw]"
+            className="grid flex-1 grid-cols-[minmax(0,1fr)_27vw] gap-[4vw] px-[4vw] py-[3vh]"
         >
             <section className="flex min-w-0 flex-col gap-[2.4vh]">
                 <div className="flex items-center gap-[2vh] room-motion:animate-room-enter">
@@ -280,25 +474,75 @@ function ScreenOver({
                 />
             </section>
 
-            {state.room.code !== null && (
-                <aside className="flex w-[min(30vh,24vw)] flex-col items-center gap-[1.6vh] self-start rounded-2xl border bg-card p-[2vh] text-center">
-                    {join !== null && (
-                        <RoomQr
-                            url={join.url}
-                            size={256}
-                            fluid
-                            className="w-full p-[1vh]"
-                        />
+            <aside className="flex min-w-0 flex-col gap-[1.6vh] self-start">
+                <Button
+                    type="button"
+                    className="h-[max(3.25rem,9vh)] text-[max(1.125rem,3vh)]"
+                    disabled={busy}
+                    onClick={start.start}
+                >
+                    {start.starting ? (
+                        <Spinner className="size-[max(1.25rem,3vh)]" />
+                    ) : (
+                        <RotateCcw className="size-[max(1.25rem,3vh)]" />
                     )}
-                    <span className="text-[4.4vh] leading-none font-bold tracking-wider tabular-nums">
-                        {spacedCode(state.room.code)}
-                    </span>
-                    <span className="text-[1.8vh] text-muted-foreground">
-                        {t('rooms.screen.next_join')}
-                    </span>
-                </aside>
-            )}
-        </div>
+                    {t('rooms.start.replay')}
+                </Button>
+                {(start.failed || choice.failed) && (
+                    <InputError
+                        className="text-[max(0.875rem,1.8vh)]"
+                        message={
+                            start.failed
+                                ? t('rooms.setup.failed')
+                                : t('rooms.setup.change_failed')
+                        }
+                    />
+                )}
+                <span className="mt-[1vh] text-[max(0.9375rem,2.2vh)] font-medium text-muted-foreground">
+                    {t('rooms.start.other')}
+                </span>
+                <ul className="flex flex-col gap-[1vh]">
+                    {catalog.mechanics
+                        .filter((one) => one.mechanic !== current)
+                        .map((one) => (
+                            <li key={one.mechanic}>
+                                <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() =>
+                                        choice.choose(
+                                            withGame(choice.shown, one),
+                                            'mechanic',
+                                        )
+                                    }
+                                    className="flex min-h-[max(2.75rem,7vh)] w-full items-center gap-[1.4vh] rounded-xl border bg-card px-[1.4vh] py-[0.8vh] text-left text-[max(0.9375rem,2.2vh)] font-medium outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-wait disabled:opacity-60"
+                                >
+                                    <GameDrawing
+                                        mechanic={one.mechanic}
+                                        className="text-[max(2rem,5vh)]"
+                                    />
+                                    <span className="min-w-0 flex-1 truncate">
+                                        {t(
+                                            `rooms.mechanics.${one.mechanic}.name`,
+                                        )}
+                                    </span>
+                                    {choice.pending === 'mechanic' &&
+                                        choice.shown.mechanic ===
+                                            one.mechanic && <Spinner />}
+                                </button>
+                            </li>
+                        ))}
+                </ul>
+                {state.room.code !== null && (
+                    <p className="mt-[1vh] text-[max(0.875rem,2vh)] text-muted-foreground tabular-nums">
+                        {t('rooms.screen.code_short', {
+                            code: spacedCode(state.room.code),
+                        })}
+                        {join !== null && ` · ${typedAddress(join.entry_url)}`}
+                    </p>
+                )}
+            </aside>
+        </main>
     );
 }
 

@@ -41,14 +41,20 @@ export function isWithin(path: string, base: string): boolean {
     return path === trimmed || path.startsWith(`${trimmed}/`);
 }
 
-/** The area the URL is in, or `undefined` outside the shell's areas. */
+/**
+ * The area the URL is in, or `undefined` outside the shell's areas: the
+ * one with the longest `base` that holds it, so an area under another
+ * («Keçmiş oyunlar» at `/rooms/past`) wins over it.
+ */
 export function activeArea(
     areas: readonly NavArea[],
     url: string,
 ): NavArea | undefined {
     const path = pathOf(url);
 
-    return areas.find((area) => isWithin(path, area.base));
+    return areas
+        .filter((area) => isWithin(path, area.base))
+        .sort((a, b) => b.base.length - a.base.length)[0];
 }
 
 /**

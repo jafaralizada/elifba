@@ -113,7 +113,7 @@ it('has the section for rooms in both languages when the switch is on', function
     preg_match('/const ROOMS = \[(.*?)\];/s', (string) file_get_contents(resource_path('js/pages/privacy.tsx')), $list);
     preg_match_all("/'([a-z_]+)'/", $list[1] ?? '', $parts);
 
-    expect($parts[1])->toBe(['what', 'stored', 'not_stored', 'why', 'who', 'contact', 'how_long', 'delete', 'where']);
+    expect($parts[1])->toBe(['what', 'camera', 'stored', 'not_stored', 'why', 'who', 'contact', 'how_long', 'delete', 'where']);
 
     $request->get(route('privacy'))
         ->assertOk()
@@ -152,8 +152,26 @@ it('has the section for rooms in both languages when the switch is on', function
     expect((string) file_get_contents(resource_path('js/pages/privacy.tsx')))
         ->toMatch('/data-test="rooms".*?<Operator \{\.\.\.operator\} \/>.*?<\/section>/s');
 })->with([
-    'az' => [null, 'Otaqlar: böyüklərin oyunları', 'otaqlarda', 'razılığının verildiyi vaxt', 'həmin otaqların oyunçuları görür', 'yaşını soruşmur', 'bir-birinə yazması', 'Ayarlar → Profil'],
-    'en' => ['en', 'Rooms: games for adults', 'in rooms', 'when its agreement was given', 'seen only by the hosts and the players', "asks no one's age", 'write to each other', 'Settings → Profile'],
+    'az' => [null, 'Böyüklərin oyunları', '«Böyüklərin oyunları» bölməsindədir', 'razılığının verildiyi vaxt', 'otaqların aparıcıları və oyunçuları görür', 'yaşını soruşmur', 'bir-birinə yazması', 'Ayarlar → Profil'],
+    'en' => ['en', 'Games for adults', 'the section “Games for adults” below', 'when its agreement was given', 'seen only by the hosts and the players', "asks no one's age", 'write to each other', 'Settings → Profile'],
+]);
+
+it('says what the camera does with the picture', function (?string $locale, string $optional, string $asks, string $nowhere): void {
+    Rooms::on();
+    $request = $locale === null ? $this : $this->withSession(['locale' => $locale]);
+
+    $request->get(route('privacy'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('privacy')
+            ->where('translations', fn ($translations): bool => str_contains($translations['privacy.rooms.camera'], $optional)
+                && str_contains($translations['privacy.rooms.camera'], $asks)
+                && str_contains($translations['privacy.rooms.camera'], $nowhere)
+                // The scanner says the same where the camera opens.
+                && str_contains($translations['rooms.scan.privacy'], $locale === null ? 'saxlanılmır' : 'not kept')));
+})->with([
+    'az' => [null, 'istəyə bağlıdır', 'brauzer əvvəlcə icazə soruşur', 'heç yerə göndərilmir və saxlanılmır'],
+    'en' => ['en', 'is optional', 'the browser asks first', 'it is sent nowhere and is not kept'],
 ]);
 
 it('says nothing of rooms when it is off', function (): void {

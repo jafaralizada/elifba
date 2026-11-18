@@ -1,7 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { ChevronRight } from 'lucide-react';
 import { useTranslation } from '@/hooks/use-translation';
-import { index, past as pastRoute, show } from '@/routes/rooms';
+import { past as pastRoute, show } from '@/routes/rooms';
 import type { RoomMechanic } from '@/rooms/contract';
 
 /** A past room: its day, its games and the account's own row of its standing (null for a host who did not play). */
@@ -14,32 +14,41 @@ type PastRoom = {
     mine: { points: number; place: string | null } | null;
 };
 
-type Props = { past: PastRoom[] };
+type Props = {
+    past: PastRoom[];
+    /** How long the results are kept, in days (`elifba.retention_days`). */
+    retention_days: number;
+};
 
 /**
  * «Keçmiş oyunlar» (docs/frontend.md rule 15; architecture §12 "Games
  * first", ADR 026 decision 14): the rooms the account was in that are
  * closed or that it left, newest first, with their games and the
  * account's own place, labelled on the server — as «Otaqlar» listed them
- * before, on a page of their own. One row per room; no total across
- * rooms. G2 keeps the list as it was; G3 names the page and gives it its
- * entry in the navigation.
+ * before G3, on a page of their own with its entry in the player's
+ * navigation, under one line on how long the results are kept. One row per
+ * room; no total across rooms and no list ordered by points.
  */
-export default function RoomsPast({ past }: Props) {
+export default function RoomsPast({ past, retention_days: days }: Props) {
     const { t } = useTranslation();
 
     return (
         <>
-            <Head title={t('rooms.index.past_rooms')} />
+            <Head title={t('rooms.past.title')} />
 
             <div className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pt-4 pb-10 md:px-6">
-                <h1 className="text-2xl font-semibold tracking-tight">
-                    {t('rooms.index.past_rooms')}
-                </h1>
+                <header className="flex flex-col gap-1">
+                    <h1 className="text-2xl font-semibold tracking-tight">
+                        {t('rooms.past.title')}
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                        {t('rooms.past.description', { days })}
+                    </p>
+                </header>
 
                 {past.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                        {t('rooms.index.empty')}
+                    <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+                        {t('rooms.past.empty')}
                     </p>
                 )}
 
@@ -92,7 +101,7 @@ export default function RoomsPast({ past }: Props) {
     );
 }
 
-/** A past room's muted line: the players, «Siz açmısınız», the account's own place and points. */
+/** A past room's muted line: the players, «Aparıcı siz idiniz», the account's own place and points. */
 function pastLine(
     room: PastRoom,
     t: ReturnType<typeof useTranslation>['t'],
@@ -100,7 +109,7 @@ function pastLine(
     const parts = [t('rooms.index.players', { count: room.players })];
 
     if (room.host) {
-        parts.push(t('rooms.index.hosted'));
+        parts.push(t('rooms.past.hosted'));
     }
 
     if (room.mine !== null && room.games.length > 0) {
@@ -120,8 +129,5 @@ function pastLine(
 }
 
 RoomsPast.layout = {
-    breadcrumbs: [
-        { title: 'nav.rooms', href: index() },
-        { title: 'rooms.index.past_rooms', href: pastRoute() },
-    ],
+    breadcrumbs: [{ title: 'nav.rooms_past', href: pastRoute() }],
 };

@@ -5,6 +5,7 @@ import AppLogoIcon from '@/components/app-logo-icon';
 import { Button } from '@/components/ui/button';
 import { useInstallOffer } from '@/hooks/use-install-offer';
 import { useTranslation } from '@/hooks/use-translation';
+import { bannerAboveBar } from '@/lib/install-banner';
 import { cn } from '@/lib/utils';
 
 /**
@@ -12,7 +13,8 @@ import { cn } from '@/lib/utils';
  * when Chrome offers installation and only on the teacher's pages. A card
  * floating at the bottom (bottom right from `sm`), so nothing moves when it
  * comes or goes; in the teacher shell below `lg` it sits above the bottom
- * tab bar. «Quraşdır» opens Chrome's install dialog, «İndi yox» or Esc hides
+ * tab bar, and on a page with an action bar at the bottom («Oyunlar») above
+ * that bar too. «Quraşdır» opens Chrome's install dialog, «İndi yox» or Esc hides
  * it for two weeks in this browser.
  */
 export function InstallBanner({
@@ -47,9 +49,11 @@ export function InstallBanner({
             className={cn(
                 'pointer-events-none fixed inset-x-0 z-40 flex justify-center sm:justify-end',
                 'pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))]',
-                aboveTabBar
-                    ? 'bottom-[calc(4.75rem+env(safe-area-inset-bottom))] lg:bottom-6'
-                    : 'bottom-[calc(1rem+env(safe-area-inset-bottom))] sm:bottom-6',
+                aboveTabBar && bannerAboveBar(component)
+                    ? 'bottom-[calc(9.75rem+env(safe-area-inset-bottom))] lg:bottom-[6.5rem]'
+                    : aboveTabBar
+                      ? 'bottom-[calc(4.75rem+env(safe-area-inset-bottom))] lg:bottom-6'
+                      : 'bottom-[calc(1rem+env(safe-area-inset-bottom))] sm:bottom-6',
             )}
         >
             <div

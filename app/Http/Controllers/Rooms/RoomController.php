@@ -24,6 +24,7 @@ use App\Models\User;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -42,7 +43,8 @@ use Inertia\Response;
  * or the host's open room takes it, and either way the host lands in it —
  * while a game runs there, with `rooms.errors.game_running` and nothing
  * changed. «Keçmiş oyunlar» (`rooms/past`) gets the rooms the account was
- * in (`RoomList::past()`).
+ * in (`RoomList::past()`) and `retention_days`, for its line on how long
+ * the results are kept.
  *
  * A room's page gets the state (`RoomState`, names read now) for the host
  * and a present player of an open room, and for everyone who was in a
@@ -81,6 +83,7 @@ final class RoomController extends Controller
     {
         return Inertia::render('rooms/past', [
             'past' => RoomList::past($account, app()->getLocale()),
+            'retention_days' => Config::integer('elifba.retention_days'),
         ]);
     }
 

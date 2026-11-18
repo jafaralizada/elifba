@@ -1,8 +1,8 @@
 import { usePage } from '@inertiajs/react';
 import {
     BookOpenText,
-    DoorOpen,
     Gamepad2,
+    History,
     House,
     Palette,
     School,
@@ -18,7 +18,7 @@ import { index as classes } from '@/routes/classes';
 import { edit as editPlaySettings } from '@/routes/play-settings';
 import { edit as editProfile } from '@/routes/profile';
 import { edit as editRoles } from '@/routes/roles';
-import { index as rooms } from '@/routes/rooms';
+import { past as pastRooms, index as rooms } from '@/routes/rooms';
 import { edit as editSecurity } from '@/routes/security';
 import { index as words } from '@/routes/words';
 import type { Role } from '@/types';
@@ -47,12 +47,22 @@ const childrenArea: NavArea = {
     pages: [{ title: 'nav.children', href: children(), icon: House }],
 };
 
+/** «Oyunlar» (ADR 026 decision 13): the games, a room's pages and its screen. */
 const roomsArea: NavArea = {
     key: 'rooms',
     title: 'nav.rooms',
-    icon: DoorOpen,
+    icon: Gamepad2,
     base: '/rooms',
-    pages: [{ title: 'nav.rooms', href: rooms(), icon: DoorOpen }],
+    pages: [{ title: 'nav.rooms', href: rooms(), icon: Gamepad2 }],
+};
+
+/** «Keçmiş oyunlar» (ADR 026 decision 14): under `/rooms`, but its own entry. */
+const pastRoomsArea: NavArea = {
+    key: 'rooms-past',
+    title: 'nav.rooms_past',
+    icon: History,
+    base: '/rooms/past',
+    pages: [{ title: 'nav.rooms_past', href: pastRooms(), icon: History }],
 };
 
 const profilePage: NavPage = {
@@ -107,7 +117,7 @@ const playerSettingsArea: NavArea = {
 export const navAreas: Record<Role, NavArea[]> = {
     teacher: [classesArea, wordsArea, settingsArea],
     parent: [childrenArea, settingsArea],
-    player: [roomsArea, playerSettingsArea],
+    player: [roomsArea, pastRoomsArea, playerSettingsArea],
 };
 
 /** The navigation of an area; none before the role choice. */

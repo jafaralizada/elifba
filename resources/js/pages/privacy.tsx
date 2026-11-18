@@ -19,7 +19,7 @@ type Props = {
     operator: { name: string | null; email: string | null };
     /**
      * Only while the rooms switch is on (ADR 019 decision 4): then the
-     * notice has the section «Otaqlar» (architecture §12 "Adults' privacy").
+     * notice has the section «Böyüklərin oyunları» (architecture §12 "Adults' privacy").
      * `idleHours`: how long a room with no activity keeps its code.
      */
     rooms?: { idleHours: number };
@@ -44,11 +44,12 @@ const SECTIONS = [
 const HOME = ['stored', 'why', 'who', 'not_shared', 'delete', 'how_long'];
 
 /**
- * The parts of the section for adults in rooms, in order (ADR 024 decision
- * 10); the operator follows them.
+ * The parts of the section for adults' games, in order (ADR 024 decision
+ * 10; the camera, ADR 026 decision 15); the operator follows them.
  */
 const ROOMS = [
     'what',
+    'camera',
     'stored',
     'not_stored',
     'why',

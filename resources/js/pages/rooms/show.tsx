@@ -1,52 +1,63 @@
 import { Form, Head, Link, router } from '@inertiajs/react';
 import {
+    Check,
     ChevronDown,
     CircleStop,
-    DoorClosed,
     Hourglass,
     Lock,
-    LockOpen,
     LogOut,
-    Monitor,
+    Play,
+    RotateCcw,
+    SlidersHorizontal,
     Trash2,
     Trophy,
     UserMinus,
+    UserPlus,
 } from 'lucide-react';
 import { useState } from 'react';
-import { GameSetup } from '@/components/rooms/game-setup';
-import type { GameSetupOptions } from '@/components/rooms/game-setup';
+import type { ReactNode } from 'react';
+import InputError from '@/components/input-error';
+import { withGame } from '@/components/rooms/catalog';
+import type { GameSetupOptions } from '@/components/rooms/catalog';
+import { FinalStanding } from '@/components/rooms/final-standing';
+import { GameDrawing } from '@/components/rooms/game-drawing';
+import {
+    GameSettings,
+    useRoomChoice,
+    useRoomStart,
+} from '@/components/rooms/game-settings';
+import type { RoomChoice } from '@/components/rooms/game-settings';
 import { LiveRound } from '@/components/rooms/live-round';
 import { RoomActionBar } from '@/components/rooms/room-action-bar';
-import { CodeCard, CodeChip } from '@/components/rooms/room-code';
+import { CodeChip, CodeDialog, InviteCard } from '@/components/rooms/room-code';
 import type { JoinLink } from '@/components/rooms/room-code';
-import { FinalStanding } from '@/components/rooms/final-standing';
 import { RoomConfirm } from '@/components/rooms/room-confirm';
-import { Standing } from '@/components/rooms/standing';
+import { RoomTools } from '@/components/rooms/room-tools';
 import { SoundToggle } from '@/components/rooms/sound-toggle';
+import { Standing } from '@/components/rooms/standing';
+import {
+    ChoiceRow,
+    JoinedChips,
+    StandingCard,
+    useTopOnTurn,
+} from '@/components/rooms/start-parts';
 import { useLiveRoom } from '@/components/rooms/use-live-room';
 import { useRoomMotion } from '@/components/rooms/use-motion';
 import type { RoomMotion } from '@/components/rooms/use-motion';
 import { useRoomSound } from '@/components/rooms/use-room-sound';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
-import {
-    close,
-    destroy,
-    entrance,
-    index,
-    leave,
-    screen,
-    update,
-} from '@/routes/rooms';
+import { close, destroy, entrance, index, leave } from '@/routes/rooms';
 import { destroy as endGame } from '@/routes/rooms/game';
-import { destroy as remove } from '@/routes/rooms/members';
 import { destroy as forget } from '@/routes/rooms/name';
 import type {
     RoomGame,
     RoomMechanic,
     RoomRankedPlayer,
+    RoomSetup,
     RoomState,
 } from '@/rooms/contract';
 import type { RoomSoundUrls } from '@/rooms/sound';
@@ -81,21 +92,22 @@ type Props = {
 };
 
 /**
- * A room's page (docs/frontend.md rule 15, "The room page"; architecture
- * §12 "Rooms and joining", "The race"). While the room is open: the lobby
- * — the code and its QR, the players, the host's tools, and after a game
- * its end and the room's standing — with the host's «Yeni oyun» or a
- * player's waiting line at the bottom; during a game the round, phase by
- * phase, with the code as a chip in the header. Once closed, its results.
+ * A room's page (docs/frontend.md rule 15 "Games first"; architecture §12
+ * "Rooms and joining", "The race", "Games first"; ADR 026 decisions 16 and
+ * 18). While the room is open and no game is live, the start screen: for
+ * the host an invitation — the QR and the code — over the choice's row,
+ * who has joined and «Başla»; for a player «Qoşuldunuz», the same row
+ * read-only and the waiting line. While the state's `setup.played`, the
+ * game just played: its final, then «Yenidən oyna» and the other games for
+ * the host, «Aparıcı növbəti oyunu seçir.» for a player. During a game the
+ * round, phase by phase. Once closed, its results.
  *
  * The page follows the state with `useLiveRoom()`; it sends no client
  * event, and draws what the latest state says: it never derives a phase,
- * a solution or a point. A moment moves only when the page saw it begin
- * (`useRoomMotion()`, ADR 025): the one it opened on stands still. Its
- * sound is the viewer's own and quiet (`useRoomSound()`): a tap, the
- * answer sent — one sound for every answer — and, from the reveal, the
- * verdict; the room's moments are the screen's. The first tap unlocks it,
- * and the round's head holds its mute.
+ * a solution, a point or whether the choice was played. A host's tap
+ * posts and the page waits for the state (`useRoomChoice()`). A moment
+ * moves only when the page saw it begin (`useRoomMotion()`, ADR 025). Its
+ * sound is the viewer's own and quiet (`useRoomSound()`).
  */
 export default function RoomsShow({
     room,
@@ -124,12 +136,12 @@ export default function RoomsShow({
         );
     }
 
-    if (state === null) {
+    if (state === null || state.setup === null) {
         return (
             <div className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pt-4 pb-8 md:px-6">
-                <Head title={t('rooms.show.title')} />
+                <Head title={t('rooms.start.title')} />
                 <h1 className="text-2xl font-semibold tracking-tight">
-                    {t('rooms.show.title')}
+                    {t('rooms.start.title')}
                 </h1>
                 <p className="text-muted-foreground">{t('rooms.show.left')}</p>
                 <Button asChild className="h-13 text-base">
@@ -141,357 +153,542 @@ export default function RoomsShow({
 
     const game = state.game;
     const round = state.round;
-    const playing = game !== null && game.phase === 'live' && round !== null;
+
+    if (game !== null && game.phase === 'live' && round !== null) {
+        return (
+            <div className="flex flex-1 flex-col">
+                <Head title={t('rooms.start.title')} />
+                <div className="mx-auto flex w-full max-w-xl flex-col gap-5 px-4 pt-4 pb-6 md:px-6">
+                    <h1 className="sr-only">{t('rooms.start.title')}</h1>
+                    <LiveRound
+                        roomId={room.id}
+                        state={state}
+                        game={game}
+                        round={round}
+                        clock={clock}
+                        placeLabels={placeLabels}
+                        refresh={refresh}
+                        onGone={() => router.reload()}
+                        motion={motion}
+                        sound={sound}
+                        aside={
+                            <>
+                                {sounds !== null && (
+                                    <SoundToggle sound={sound} />
+                                )}
+                                {state.room.code !== null && (
+                                    <CodeChip
+                                        code={state.room.code}
+                                        join={join}
+                                    />
+                                )}
+                            </>
+                        }
+                    />
+                    {can.host && (
+                        <div className="flex justify-center border-t pt-4">
+                            <RoomConfirm
+                                trigger={
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        className="h-11 text-muted-foreground"
+                                    >
+                                        <CircleStop />
+                                        {t('rooms.game.end')}
+                                    </Button>
+                                }
+                                title={t('rooms.game.end_title')}
+                                description={t('rooms.game.end_description')}
+                                confirmLabel={t('rooms.game.end')}
+                                destructive
+                                onConfirm={() =>
+                                    roomRequest(
+                                        'DELETE',
+                                        endGame.url(room.id),
+                                    ).finally(refresh)
+                                }
+                            />
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    const over = game !== null && state.setup.played ? game : null;
+
+    if (can.host && catalog !== null) {
+        return (
+            <HostRoom
+                roomId={room.id}
+                state={state}
+                setup={state.setup}
+                over={over}
+                catalog={catalog}
+                join={join}
+                placeLabels={placeLabels}
+                motion={motion}
+                refresh={refresh}
+            />
+        );
+    }
+
+    return (
+        <PlayerRoom
+            roomId={room.id}
+            state={state}
+            setup={state.setup}
+            over={over}
+            join={join}
+            placeLabels={placeLabels}
+            motion={motion}
+            canLeave={can.leave}
+        />
+    );
+}
+
+/** A page's header outside a round: its title, «Kilidli» while locked, and the host's tools. */
+function RoomHeader({
+    title,
+    locked,
+    tools,
+}: {
+    title: string;
+    locked: boolean;
+    tools?: ReactNode;
+}) {
+    const { t } = useTranslation();
+
+    return (
+        <header className="flex min-h-11 items-center gap-2">
+            <Head title={title} />
+            <h1 className="min-w-0 truncate text-xl font-semibold tracking-tight">
+                {title}
+            </h1>
+            {locked && (
+                <Badge variant="outline" className="h-7 shrink-0 gap-1">
+                    <Lock aria-hidden />
+                    {t('rooms.show.locked_badge')}
+                </Badge>
+            )}
+            <span className="flex-1" />
+            {tools}
+        </header>
+    );
+}
+
+/**
+ * The host's page outside a game: the start screen, or after a game its
+ * final with «Yenidən oyna» and the other games. One choice, one start and
+ * one «Oyun ayarları» serve both, so a change made in the settings after a
+ * game keeps them open while the page turns back to the start screen.
+ */
+function HostRoom({
+    roomId,
+    state,
+    setup,
+    over,
+    catalog,
+    join,
+    placeLabels,
+    motion,
+    refresh,
+}: {
+    roomId: string;
+    state: RoomState;
+    setup: RoomSetup;
+    over: RoomGame | null;
+    catalog: GameSetupOptions;
+    join: JoinLink | null;
+    placeLabels: string[];
+    motion: RoomMotion;
+    refresh: () => void;
+}) {
+    const { t } = useTranslation();
+    const choice = useRoomChoice({ roomId, choice: setup, onChanged: refresh });
+    const { starting, failed, start } = useRoomStart({
+        roomId,
+        onChanged: refresh,
+    });
+    const [settings, setSettings] = useState(false);
+    const present = state.players.filter((player) => player.present).length;
+    useTopOnTurn(over === null ? 'start' : over.id);
+    const tools = (
+        <RoomTools roomId={roomId} state={state} onChanged={refresh} />
+    );
 
     return (
         <div className="flex flex-1 flex-col">
-            <Head title={t('rooms.show.title')} />
-
-            <div className="mx-auto flex w-full max-w-xl flex-col gap-5 px-4 pt-4 pb-6 md:px-6">
-                {playing ? (
-                    <h1 className="sr-only">{t('rooms.show.title')}</h1>
-                ) : (
-                    <header className="flex min-h-11 items-center justify-between gap-3">
-                        <h1 className="text-2xl font-semibold tracking-tight">
-                            {t('rooms.show.title')}
-                        </h1>
-                        {state.room.locked && (
-                            <Badge variant="outline" className="h-7 gap-1">
-                                <Lock aria-hidden />
-                                {t('rooms.show.locked_badge')}
-                            </Badge>
-                        )}
-                    </header>
-                )}
-
-                {playing ? (
+            <div className="mx-auto flex w-full max-w-xl flex-col gap-2.5 px-4 pt-1 pb-4 md:px-6">
+                {over !== null ? (
                     <>
-                        <LiveRound
-                            roomId={room.id}
-                            state={state}
-                            game={game}
-                            round={round}
-                            clock={clock}
-                            placeLabels={placeLabels}
-                            refresh={refresh}
-                            onGone={() => router.reload()}
-                            motion={motion}
-                            sound={sound}
-                            aside={
-                                <>
-                                    {sounds !== null && (
-                                        <SoundToggle sound={sound} />
-                                    )}
-                                    {state.room.code !== null && (
-                                        <CodeChip
-                                            code={state.room.code}
-                                            join={join}
-                                        />
-                                    )}
-                                </>
-                            }
+                        <RoomHeader
+                            title={t('rooms.start.final')}
+                            locked={state.room.locked}
+                            tools={tools}
                         />
-                        {can.host && (
-                            <div className="flex justify-center border-t pt-4">
-                                <RoomConfirm
-                                    trigger={
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            className="h-11 text-muted-foreground"
-                                        >
-                                            <CircleStop />
-                                            {t('rooms.game.end')}
-                                        </Button>
-                                    }
-                                    title={t('rooms.game.end_title')}
-                                    description={t(
-                                        'rooms.game.end_description',
-                                    )}
-                                    confirmLabel={t('rooms.game.end')}
-                                    destructive
-                                    onConfirm={() =>
-                                        roomRequest(
-                                            'DELETE',
-                                            endGame.url(room.id),
-                                        ).finally(refresh)
-                                    }
-                                />
-                            </div>
-                        )}
+                        <GameOver
+                            state={state}
+                            game={over}
+                            placeLabels={placeLabels}
+                            motion={motion}
+                        />
+                        <div className="flex justify-center pt-1">
+                            <RoomConfirm
+                                trigger={
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        className="h-11 text-red-600 hover:text-red-600 dark:text-red-400 dark:hover:text-red-400"
+                                    >
+                                        <LogOut />
+                                        {t('rooms.show.close')}
+                                    </Button>
+                                }
+                                title={t('rooms.show.close_title')}
+                                description={t('rooms.show.close_description')}
+                                confirmLabel={t('rooms.show.close')}
+                                destructive
+                                form={close.form(roomId)}
+                            />
+                        </div>
                     </>
                 ) : (
-                    <Lobby
-                        room={room}
-                        state={state}
-                        game={game}
-                        join={join}
-                        placeLabels={placeLabels}
-                        can={can}
-                        motion={motion}
-                    />
+                    <>
+                        <RoomHeader
+                            title={t('rooms.start.invite')}
+                            locked={state.room.locked}
+                            tools={tools}
+                        />
+                        {state.game !== null && (
+                            <StandingCard
+                                state={state}
+                                placeLabels={placeLabels}
+                            />
+                        )}
+                        {state.room.code !== null && (
+                            <InviteCard
+                                code={state.room.code}
+                                join={join}
+                                qr={state.game !== null ? 120 : 160}
+                            />
+                        )}
+                        <ChoiceRow
+                            choice={choice.shown}
+                            onChange={() => setSettings(true)}
+                        />
+                        <section className="flex flex-col gap-2">
+                            <h2 className="text-sm font-semibold">
+                                {t('rooms.start.joined_count', {
+                                    count: present,
+                                })}
+                            </h2>
+                            <JoinedChips
+                                roomId={roomId}
+                                state={state}
+                                removable
+                            />
+                        </section>
+                    </>
                 )}
             </div>
 
-            {!playing && (
-                <RoomActionBar>
-                    {catalog !== null && state.setup !== null ? (
-                        <GameSetup
-                            roomId={room.id}
-                            options={catalog}
-                            choice={state.setup}
-                            onChanged={refresh}
+            <RoomActionBar>
+                {(failed || (over !== null && choice.failed)) && (
+                    <InputError
+                        message={
+                            failed
+                                ? t('rooms.setup.failed')
+                                : t('rooms.setup.change_failed')
+                        }
+                    />
+                )}
+                {over !== null ? (
+                    <>
+                        <div className="flex gap-2">
+                            <Button
+                                type="button"
+                                className="h-13 min-w-0 flex-1 text-base"
+                                disabled={starting || choice.pending !== null}
+                                onClick={start}
+                            >
+                                {starting ? <Spinner /> : <RotateCcw />}
+                                {t('rooms.start.replay')}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="size-13 shrink-0"
+                                aria-label={t('rooms.setup.title')}
+                                onClick={() => setSettings(true)}
+                            >
+                                <SlidersHorizontal className="size-5" />
+                            </Button>
+                        </div>
+                        <OtherGames
+                            catalog={catalog}
+                            current={setup.mechanic}
+                            choice={choice}
+                            disabled={starting}
                         />
-                    ) : (
-                        <p className="flex min-h-11 items-center justify-center gap-2 text-center text-sm text-muted-foreground">
-                            <Hourglass
-                                aria-hidden
-                                className="size-4 shrink-0"
-                            />
-                            {t('rooms.show.waiting')}
-                        </p>
-                    )}
-                </RoomActionBar>
-            )}
+                    </>
+                ) : (
+                    <Button
+                        type="button"
+                        className="h-13 w-full text-base"
+                        disabled={
+                            present === 0 || starting || choice.pending !== null
+                        }
+                        onClick={start}
+                    >
+                        {starting ? <Spinner /> : <Play />}
+                        {t('rooms.start.start', { count: present })}
+                    </Button>
+                )}
+            </RoomActionBar>
+
+            <GameSettings
+                options={catalog}
+                choice={choice}
+                open={settings}
+                onOpenChange={setSettings}
+            />
+        </div>
+    );
+}
+
+/** «Başqa oyun:» and the five other games as chips in a row that scrolls sideways, each choosing that game. */
+function OtherGames({
+    catalog,
+    current,
+    choice,
+    disabled,
+}: {
+    catalog: GameSetupOptions;
+    /** The game just played: the state's choice. */
+    current: RoomMechanic;
+    choice: RoomChoice;
+    disabled: boolean;
+}) {
+    const { t } = useTranslation();
+
+    return (
+        <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">
+                {t('rooms.start.other')}
+            </span>
+            <ul className="-mx-4 flex [scrollbar-width:none] gap-2 overflow-x-auto px-4 pb-0.5 md:-mx-6 md:px-6">
+                {catalog.mechanics
+                    .filter((game) => game.mechanic !== current)
+                    .map((game) => (
+                        <li key={game.mechanic} className="shrink-0">
+                            <button
+                                type="button"
+                                disabled={disabled || choice.pending !== null}
+                                onClick={() =>
+                                    choice.choose(
+                                        withGame(choice.shown, game),
+                                        'mechanic',
+                                    )
+                                }
+                                className="flex h-11 items-center gap-2 rounded-full border bg-card py-1 pr-3.5 pl-1.5 text-sm font-medium whitespace-nowrap outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-wait disabled:opacity-60"
+                            >
+                                <GameDrawing
+                                    mechanic={game.mechanic}
+                                    className="text-[32px]"
+                                />
+                                {t(`rooms.mechanics.${game.mechanic}.short`)}
+                                {choice.pending === 'mechanic' &&
+                                    choice.shown.mechanic === game.mechanic && (
+                                        <Spinner />
+                                    )}
+                            </button>
+                        </li>
+                    ))}
+            </ul>
         </div>
     );
 }
 
 /**
- * The lobby, before the first game and between games: a game's end with
- * its final (the room's standing, ADR 025), the code and its QR, the
- * players, the host's tools and a player's way out.
+ * A player's page outside a game: «Qoşuldunuz» with the choice's row,
+ * which nobody but the host changes, how many have joined, «Dostunu
+ * çağır» and the waiting line; after a game its final and «Aparıcı
+ * növbəti oyunu seçir.». A host's change of the choice reaches it with
+ * the state, and no control here suggests otherwise.
  */
-function Lobby({
-    room,
+function PlayerRoom({
+    roomId,
     state,
-    game,
+    setup,
+    over,
     join,
     placeLabels,
-    can,
     motion,
+    canLeave,
 }: {
-    room: Props['room'];
+    roomId: string;
     state: RoomState;
-    game: RoomGame | null;
+    setup: RoomSetup;
+    over: RoomGame | null;
     join: JoinLink | null;
     placeLabels: string[];
-    can: Can;
     motion: RoomMotion;
+    canLeave: boolean;
 }) {
     const { t } = useTranslation();
     const present = state.players.filter((player) => player.present).length;
+    const me = state.players.find((player) => player.id === state.me.player_id);
+    useTopOnTurn(over === null ? 'start' : over.id);
+    const leaving = canLeave && (
+        <Form {...leave.form(roomId)} className="flex justify-center">
+            {({ processing }) => (
+                <Button
+                    type="submit"
+                    variant="ghost"
+                    className="h-11 text-muted-foreground"
+                    disabled={processing}
+                >
+                    <LogOut />
+                    {t('rooms.show.leave')}
+                </Button>
+            )}
+        </Form>
+    );
 
     return (
-        <>
-            {game !== null && game.phase === 'over' && (
-                <section
-                    key={game.id}
-                    data-motion={motion.phase ? 'on' : undefined}
-                    className="flex flex-col gap-3"
-                >
-                    <div className="flex items-center gap-3 rounded-2xl border bg-card p-4 room-motion:animate-room-enter">
-                        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-amber-400 text-amber-950 room-motion:animate-room-pop">
-                            <Trophy aria-hidden className="size-5" />
-                        </span>
-                        <span className="flex min-w-0 flex-col">
-                            <span className="font-semibold">
-                                {t('rooms.game.over')}
+        <div className="flex flex-1 flex-col">
+            <div className="mx-auto flex w-full max-w-xl flex-col gap-2.5 px-4 pt-1 pb-4 md:px-6">
+                {over !== null ? (
+                    <>
+                        <RoomHeader
+                            title={t('rooms.start.final')}
+                            locked={false}
+                        />
+                        <GameOver
+                            state={state}
+                            game={over}
+                            placeLabels={placeLabels}
+                            motion={motion}
+                        />
+                        {leaving}
+                    </>
+                ) : (
+                    <>
+                        <RoomHeader
+                            title={t('rooms.start.title')}
+                            locked={false}
+                        />
+                        {state.game !== null && (
+                            <StandingCard
+                                state={state}
+                                placeLabels={placeLabels}
+                            />
+                        )}
+                        <div className="flex flex-col items-center gap-1 py-2 text-center">
+                            <span className="mb-1.5 flex size-16 items-center justify-center rounded-full bg-emerald-600/12 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-400">
+                                <Check aria-hidden className="size-8" />
                             </span>
-                            <span className="truncate text-sm text-muted-foreground">
-                                {t('rooms.setup.summary', {
-                                    game: t(
-                                        `rooms.mechanics.${game.mechanic}.name`,
-                                    ),
-                                    difficulty: t(
-                                        `rooms.difficulty.${game.difficulty}`,
-                                    ),
-                                    count: game.rounds,
-                                })}
+                            <span className="text-xl font-semibold">
+                                {t('rooms.start.joined')}
                             </span>
-                        </span>
-                    </div>
-                    <h2 className="text-sm font-semibold">
-                        {t('rooms.game.standing')}
-                    </h2>
-                    <FinalStanding
-                        ranking={state.ranking}
-                        players={state.players}
-                        me={state.me.player_id}
-                        placeLabels={placeLabels}
-                        animate={motion.phase}
-                    />
-                </section>
-            )}
-
-            {state.room.code !== null && (
-                <CodeCard code={state.room.code} join={join} />
-            )}
-
-            {state.room.locked && (
-                <p className="-mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-                    <Lock aria-hidden className="size-4 shrink-0" />
-                    {t('rooms.show.locked')}
-                </p>
-            )}
-
-            <section className="flex flex-col gap-2">
-                <h2 className="text-sm font-semibold">
-                    {t('rooms.show.players_count', { count: present })}
-                </h2>
-                <ul className="flex flex-col divide-y overflow-hidden rounded-xl border bg-card">
-                    {state.players.map((player) => {
-                        const name = player.name ?? t('rooms.show.nameless');
-
-                        return (
-                            <li
-                                key={player.id}
-                                className={cn(
-                                    'flex min-h-12 items-center gap-2 py-1 pr-1 pl-3',
-                                    player.id === state.me.player_id &&
-                                        'bg-accent',
-                                )}
-                            >
-                                <span
-                                    className={cn(
-                                        'min-w-0 flex-1 truncate',
-                                        !player.present &&
-                                            'text-muted-foreground',
-                                    )}
-                                >
-                                    {name}
+                            {me?.name != null && (
+                                <span className="max-w-full truncate text-sm text-muted-foreground">
+                                    {t('rooms.start.joined_as', {
+                                        name: me.name,
+                                    })}
                                 </span>
-                                {player.id === state.me.player_id && (
-                                    <Badge
-                                        variant="secondary"
-                                        className="bg-background"
-                                    >
-                                        {t('rooms.show.you')}
-                                    </Badge>
-                                )}
-                                {player.host && (
-                                    <Badge variant="outline">
-                                        {t('rooms.show.host')}
-                                    </Badge>
-                                )}
-                                {!player.present && (
-                                    <Badge variant="outline">
-                                        {t('rooms.show.away')}
-                                    </Badge>
-                                )}
-                                {can.host && !player.host && (
-                                    <RoomConfirm
-                                        trigger={
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                className="h-11 shrink-0 px-3 text-muted-foreground"
-                                            >
-                                                <UserMinus />
-                                                {t('rooms.show.remove')}
-                                            </Button>
-                                        }
-                                        title={t('rooms.show.remove_title', {
-                                            name,
-                                        })}
-                                        description={t(
-                                            'rooms.show.remove_description',
-                                        )}
-                                        confirmLabel={t('rooms.show.remove')}
-                                        destructive
-                                        form={remove.form({
-                                            room: room.id,
-                                            member: player.id,
-                                        })}
-                                    />
-                                )}
-                            </li>
-                        );
-                    })}
-                </ul>
-            </section>
-
-            {can.host && (
-                <section className="flex flex-col gap-2">
-                    <h2 className="text-sm font-semibold">
-                        {t('rooms.show.tools')}
-                    </h2>
-                    <div className="grid grid-cols-2 gap-2">
-                        <Form
-                            {...update.form(room.id)}
-                            options={{ preserveScroll: true }}
-                        >
-                            {({ processing }) => (
-                                <>
-                                    <input
-                                        type="hidden"
-                                        name="locked"
-                                        value={state.room.locked ? '0' : '1'}
-                                    />
-                                    <Button
-                                        type="submit"
-                                        variant="outline"
-                                        className="h-11 w-full"
-                                        disabled={processing}
-                                    >
-                                        {state.room.locked ? (
-                                            <LockOpen />
-                                        ) : (
-                                            <Lock />
-                                        )}
-                                        {state.room.locked
-                                            ? t('rooms.show.unlock')
-                                            : t('rooms.show.lock')}
-                                    </Button>
-                                </>
                             )}
-                        </Form>
-                        <Button asChild variant="outline" className="h-11">
-                            <Link href={screen(room.id)}>
-                                <Monitor />
-                                {t('rooms.show.screen')}
-                            </Link>
-                        </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        {t('rooms.show.screen_hint')}
-                    </p>
-                    <RoomConfirm
-                        trigger={
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="h-11 border-destructive/40 text-red-600 hover:text-red-600 dark:text-red-400 dark:hover:text-red-400"
-                            >
-                                <DoorClosed />
-                                {t('rooms.show.close')}
-                            </Button>
-                        }
-                        title={t('rooms.show.close_title')}
-                        description={t('rooms.show.close_description')}
-                        confirmLabel={t('rooms.show.close')}
-                        destructive
-                        form={close.form(room.id)}
-                    />
-                </section>
-            )}
+                        </div>
+                        <ChoiceRow choice={setup} />
+                        <p className="text-center text-sm text-muted-foreground">
+                            {t('rooms.start.players_joined', {
+                                count: present,
+                            })}
+                        </p>
+                        {state.room.code !== null && (
+                            <div className="flex justify-center">
+                                <CodeDialog
+                                    code={state.room.code}
+                                    join={join}
+                                    trigger={
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="h-11"
+                                        >
+                                            <UserPlus />
+                                            {t('rooms.start.invite_friend')}
+                                        </Button>
+                                    }
+                                />
+                            </div>
+                        )}
+                        {leaving}
+                    </>
+                )}
+            </div>
 
-            {can.leave && (
-                <Form {...leave.form(room.id)} className="flex justify-center">
-                    {({ processing }) => (
-                        <Button
-                            type="submit"
-                            variant="ghost"
-                            className="h-11 text-muted-foreground"
-                            disabled={processing}
-                        >
-                            <LogOut />
-                            {t('rooms.show.leave')}
-                        </Button>
-                    )}
-                </Form>
-            )}
-        </>
+            <RoomActionBar>
+                <p className="flex min-h-11 items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+                    <Hourglass aria-hidden className="size-4 shrink-0" />
+                    {over !== null
+                        ? t('rooms.show.waiting_next')
+                        : t('rooms.show.waiting')}
+                </p>
+            </RoomActionBar>
+        </div>
+    );
+}
+
+/** A game's end: «Oyun bitdi» with what was played, and its final (the room's standing, ADR 025). */
+function GameOver({
+    state,
+    game,
+    placeLabels,
+    motion,
+}: {
+    state: RoomState;
+    game: RoomGame;
+    placeLabels: string[];
+    motion: RoomMotion;
+}) {
+    const { t } = useTranslation();
+
+    return (
+        <section
+            key={game.id}
+            data-motion={motion.phase ? 'on' : undefined}
+            className="flex flex-col gap-3"
+        >
+            <div className="flex items-center gap-3 room-motion:animate-room-enter">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-amber-400 text-amber-950 room-motion:animate-room-pop">
+                    <Trophy aria-hidden className="size-5" />
+                </span>
+                <span className="flex min-w-0 flex-col">
+                    <span className="font-semibold">
+                        {t('rooms.game.over')}
+                    </span>
+                    <span className="truncate text-sm text-muted-foreground">
+                        {t('rooms.setup.summary', {
+                            game: t(`rooms.mechanics.${game.mechanic}.name`),
+                            difficulty: t(
+                                `rooms.difficulty.${game.difficulty}`,
+                            ),
+                            count: game.rounds,
+                        })}
+                    </span>
+                </span>
+            </div>
+            <FinalStanding
+                ranking={state.ranking}
+                players={state.players}
+                me={state.me.player_id}
+                placeLabels={placeLabels}
+                animate={motion.phase}
+            />
+        </section>
     );
 }
 
@@ -518,11 +715,11 @@ function ClosedRoom({
 
     return (
         <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pt-4 pb-10 md:px-6">
-            <Head title={t('rooms.show.title')} />
+            <Head title={t('rooms.show.results')} />
             <header className="flex flex-col gap-1">
                 <div className="flex min-h-11 items-center gap-3">
                     <h1 className="text-2xl font-semibold tracking-tight">
-                        {t('rooms.show.title')}
+                        {t('rooms.show.results')}
                     </h1>
                     <Badge variant="secondary" className="h-7">
                         {t('rooms.show.closed_badge')}
@@ -651,6 +848,7 @@ function GameResult({
                 onClick={() => setOpen(!open)}
                 className="flex min-h-12 items-center gap-3 rounded-xl border bg-card px-3 py-2 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
             >
+                <GameDrawing mechanic={game.mechanic} className="text-[36px]" />
                 <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate font-medium">
                         {t(`rooms.mechanics.${game.mechanic}.name`)}

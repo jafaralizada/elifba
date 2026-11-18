@@ -11,9 +11,10 @@ import { entrance, index as rooms } from '@/routes/rooms';
 import type { WelcomeRooms } from '@/types/welcome';
 
 /**
- * «Böyüklər üçün: otaqlar» on the welcome page (docs/frontend.md rule 10,
- * architecture §12), drawn only while the rooms switch is on: what a room
- * is, its limits, the three families with their games and the way in. Every
+ * «Böyüklər üçün oyunlar» on the welcome page (docs/frontend.md rule 10,
+ * architecture §12, ADR 026 decision 4), drawn only while the rooms switch
+ * is on: what the adults' games are, their limits, the three families with
+ * their games and the way in — «Oyun seç» and «Oyuna qoşul». Every
  * fact is a prop; a game is named by `rooms.mechanics.*`, never drawn with a
  * room's own components, which stay in the player area (`RoomsApartTest`).
  * It promises nothing about memory, the mind or health (`RoomsWordingTest`).

@@ -5,9 +5,10 @@ use App\Domain\Language\Support\Az;
 /*
  * No room text promises a benefit (docs/architecture.md §12 "No promise",
  * ADR 023 decision 12, ADR 024 decision 8): no string of the player area,
- * of the welcome page's section for rooms, of the privacy notice's
- * «Otaqlar» or of the READMEs' sections for rooms says that a game improves
- * memory, the mind, attention or health. A game is named by what one does.
+ * of the welcome page's section for adults' games, of the privacy notice's
+ * «Böyüklərin oyunları» or of the READMEs' «Böyüklər üçün oyunlar» / "Games
+ * for adults" (ADR 026 decision 5) says that a game improves memory, the
+ * mind, attention or health. A game is named by what one does.
  */
 
 /**
@@ -71,7 +72,7 @@ it('promises no benefit in any room text', function (): void {
                 || str_starts_with($key, 'welcome.rooms.')
                 || str_starts_with($key, 'privacy.rooms.')
                 || str_starts_with($key, 'roles.player.')
-                || in_array($key, ['roles.agreement.player', 'roles.settings.add.player', 'nav.rooms'], true);
+                || in_array($key, ['roles.agreement.player', 'roles.settings.add.player', 'nav.rooms', 'nav.rooms_past'], true);
 
             if ($room) {
                 $texts["{$locale}: {$key}"] = $text;
@@ -79,8 +80,8 @@ it('promises no benefit in any room text', function (): void {
         }
     }
 
-    $texts['README.md: Rooms'] = roomSectionOf('README.md', 'Rooms, for adults');
-    $texts['README.az.md: Otaqlar'] = roomSectionOf('README.az.md', 'Otaqlar, böyüklər üçün');
+    $texts['README.md: Games for adults'] = roomSectionOf('README.md', 'Games for adults');
+    $texts['README.az.md: Böyüklər üçün oyunlar'] = roomSectionOf('README.az.md', 'Böyüklər üçün oyunlar');
 
     expect(count($texts))->toBeGreaterThan(300);
 
@@ -97,4 +98,35 @@ it('finds a promise however it is cased, and nothing in a plain name', function 
         ->and(promisesInRoomText('Train your BRAIN'))->toBe(['train your', 'brain'])
         ->and(promisesInRoomText('Artıq olanı tap · Ardıcıllığı yadda saxla · İki sıra'))->toBe([])
         ->and(promisesInRoomText('Remember the order · Find the odd one out'))->toBe([]);
+});
+
+it('says «otaq» only where the thing itself is named', function (): void {
+    // ADR 026 decision 2: «oyun» is what a person does; «otaq» only where a
+    // text must name the thing that holds the players and several games —
+    // the host's tools, the standing across games, a closed room, the
+    // player role's sentence and `/privacy`.
+    $allowed = [
+        'roles.agreement.player', 'roles.player.description',
+        'rooms.flash.deleted', 'rooms.game.standing',
+        'rooms.show.close', 'rooms.show.close_title', 'rooms.show.close_description', 'rooms.show.closed',
+        'rooms.show.delete', 'rooms.show.delete_title', 'rooms.show.delete_line', 'rooms.show.forget_line',
+        'rooms.show.locked', 'rooms.show.no_games', 'rooms.show.remove_description', 'rooms.show.tools',
+    ];
+
+    /** @var array<string, string> $az */
+    $az = json_decode((string) file_get_contents(lang_path('az.json')), true);
+    $found = [];
+
+    foreach ($az as $key => $text) {
+        $area = str_starts_with($key, 'rooms.') || str_starts_with($key, 'welcome.rooms.') || str_starts_with($key, 'nav.rooms')
+            || str_starts_with($key, 'roles.player.') || $key === 'roles.agreement.player';
+
+        if ($area && ! in_array($key, $allowed, true) && preg_match('/\botaq|\botağ/u', Az::lower($text)) === 1) {
+            $found[] = $key;
+        }
+    }
+
+    expect($found)->toBe([])
+        ->and(Az::lower(roomSectionOf('README.az.md', 'Böyüklər üçün oyunlar')))->not->toContain('«otaq aç»')
+        ->and($az)->not->toHaveKey('rooms.show.title');
 });

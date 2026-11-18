@@ -2,14 +2,14 @@ import { Form, Head, Link, usePage } from '@inertiajs/react';
 import { LogIn, UserRound } from 'lucide-react';
 import InputError from '@/components/input-error';
 import { RoomActionBar } from '@/components/rooms/room-action-bar';
+import { RoomCodeField } from '@/components/rooms/room-code-field';
 import { spacedCode } from '@/components/rooms/room-code';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { useTranslation } from '@/hooks/use-translation';
 import { edit as editProfile } from '@/routes/profile';
-import { entrance, index } from '@/routes/rooms';
+import { entrance as entranceRoute, index } from '@/routes/rooms';
 import { store } from '@/routes/rooms/join';
 
 type Props = {
@@ -17,16 +17,19 @@ type Props = {
     code: string | null;
     /** The account's own name, as the room will show it. */
     name: string;
+    /** At `/oyun`, its own address (`APP_URL/oyun`): the camera takes this origin too. */
+    entrance: string | null;
 };
 
 /**
- * The room's entrance (docs/frontend.md rule 15, "The entrance";
- * architecture §12 "Rooms and joining", ADR 020 decision 4): the code
- * field at `/oyun`; at `/oyun/{code}` the code, the account's own name as
- * the room will show it, and «Qoşul» at the bottom of the screen. A
- * locked or a full room is said here and nothing else about it.
+ * The entrance (docs/frontend.md rule 15 "Games first", "The entrance";
+ * architecture §12 "Rooms and joining", ADR 020 decision 4, ADR 026
+ * decisions 6 and 15): at `/oyun` the code field with its camera, focused,
+ * and «Davam et»; at `/oyun/{code}` the code, the account's own name as the
+ * game will show it, and «Qoşul» at the bottom of the screen. A locked or
+ * a full room is said here and nothing else about it.
  */
-export default function RoomsJoin({ code, name }: Props) {
+export default function RoomsJoin({ code, name, entrance }: Props) {
     const { t } = useTranslation();
     // A link or a QR that opens nothing arrives here by a full page load:
     // its refusal is in the page's errors, not in the form's own.
@@ -47,7 +50,7 @@ export default function RoomsJoin({ code, name }: Props) {
                         </p>
                     </header>
                     <Form
-                        {...entrance.form()}
+                        {...entranceRoute.form()}
                         options={{ preserveState: 'errors' }}
                         className="flex flex-col gap-3"
                     >
@@ -59,16 +62,12 @@ export default function RoomsJoin({ code, name }: Props) {
                                     <Label htmlFor="code">
                                         {t('rooms.join.code')}
                                     </Label>
-                                    <Input
+                                    <RoomCodeField
                                         id="code"
-                                        name="code"
-                                        inputMode="numeric"
-                                        autoComplete="off"
-                                        maxLength={9}
-                                        placeholder="482 913"
+                                        invalid={refusal !== undefined}
+                                        entrance={entrance}
+                                        large
                                         autoFocus
-                                        aria-invalid={refusal !== undefined}
-                                        className="h-16 text-center text-3xl font-bold tracking-[0.25em] tabular-nums placeholder:font-normal"
                                     />
                                     <InputError message={refusal} />
                                     <Button
@@ -152,6 +151,6 @@ export default function RoomsJoin({ code, name }: Props) {
 RoomsJoin.layout = {
     breadcrumbs: [
         { title: 'nav.rooms', href: index() },
-        { title: 'rooms.join.title', href: entrance() },
+        { title: 'rooms.join.title', href: entranceRoute() },
     ],
 };

@@ -1,5 +1,6 @@
 import { QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -67,72 +68,70 @@ export function RoomQr({
 }
 
 /**
- * The lobby's code card (docs/frontend.md rule 15, "The lobby"): the QR
- * beside the code and how to join with either.
+ * The start screen's invitation (docs/frontend.md rule 15 "Games first",
+ * ADR 026 decision 16): the QR of `join.url` (dark on white in both
+ * themes), «Oyun kodu», the code in two groups of three and how to join
+ * with either. `qr` is its side: 160px, 120px under the room's standing.
  */
-export function CodeCard({
+export function InviteCard({
     code,
     join,
+    qr = 160,
 }: {
     code: string;
     join: JoinLink | null;
+    qr?: number;
 }) {
     const { t } = useTranslation();
 
     return (
         <section
             aria-labelledby="room-code"
-            className="flex items-center gap-4 rounded-2xl border bg-card p-4"
+            className="flex flex-col items-center gap-1 text-center"
         >
-            {join !== null && <RoomQr url={join.url} size={120} />}
-            <div className="flex min-w-0 flex-col gap-1">
-                <span id="room-code" className="text-sm text-muted-foreground">
-                    {t('rooms.show.code')}
+            {join !== null && (
+                <RoomQr url={join.url} size={qr} className="mb-0.5 p-1.5" />
+            )}
+            <span id="room-code" className="text-xs text-muted-foreground">
+                {t('rooms.show.code')}
+            </span>
+            <span className="text-[2.375rem] leading-none font-bold tracking-wider whitespace-nowrap tabular-nums">
+                {spacedCode(code)}
+            </span>
+            {join !== null && (
+                <span className="max-w-xs text-xs leading-snug text-balance text-muted-foreground">
+                    {t('rooms.screen.join', {
+                        address: typedAddress(join.entry_url),
+                    })}
                 </span>
-                <span className="text-[2rem] leading-none font-bold tracking-wider whitespace-nowrap tabular-nums">
-                    {spacedCode(code)}
-                </span>
-                {join !== null && (
-                    <span className="mt-1 text-xs text-balance text-muted-foreground">
-                        {t('rooms.screen.join', {
-                            address: typedAddress(join.entry_url),
-                        })}
-                    </span>
-                )}
-            </div>
+            )}
         </section>
     );
 }
 
 /**
- * The code in a round's header: a chip that opens the QR in a dialog, so a
- * late player can scan it from any phone in the room.
+ * The code and its 224px QR in a dialog, so a late player can scan it from
+ * any phone in the room: behind the round's code chip (`CodeChip`) and a
+ * player's «Dostunu çağır».
  */
-export function CodeChip({
+export function CodeDialog({
     code,
     join,
+    trigger,
 }: {
     code: string;
     join: JoinLink | null;
+    trigger: ReactNode;
 }) {
     const { t } = useTranslation();
 
     return (
         <Dialog>
-            <DialogTrigger asChild>
-                <Button
-                    type="button"
-                    variant="outline"
-                    className="h-11 gap-2 rounded-full px-4 tabular-nums"
-                    aria-label={t('rooms.show.code_chip', {
-                        code: spacedCode(code),
-                    })}
-                >
-                    <QrCode aria-hidden />
-                    {spacedCode(code)}
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-sm" showCloseButton={false}>
+            <DialogTrigger asChild>{trigger}</DialogTrigger>
+            <DialogContent
+                className="max-w-sm motion-reduce:animate-none"
+                showCloseButton={false}
+            >
                 <DialogHeader>
                     <DialogTitle>{t('rooms.show.code')}</DialogTitle>
                     {join !== null && (
@@ -156,5 +155,36 @@ export function CodeChip({
                 </DialogClose>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** The code in a round's header: a chip that opens it with its QR (`CodeDialog`). */
+export function CodeChip({
+    code,
+    join,
+}: {
+    code: string;
+    join: JoinLink | null;
+}) {
+    const { t } = useTranslation();
+
+    return (
+        <CodeDialog
+            code={code}
+            join={join}
+            trigger={
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 gap-2 rounded-full px-4 tabular-nums"
+                    aria-label={t('rooms.show.code_chip', {
+                        code: spacedCode(code),
+                    })}
+                >
+                    <QrCode aria-hidden />
+                    {spacedCode(code)}
+                </Button>
+            }
+        />
     );
 }

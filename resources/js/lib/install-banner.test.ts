@@ -2,6 +2,7 @@ import { readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+    bannerAboveBar,
     bannerAllowedOn,
     DISMISS_DAYS,
     dismissedRecently,
@@ -108,6 +109,22 @@ describe('bannerAllowedOn', () => {
         expect(bannerAllowedOn('welcome/other')).toBe(false);
         expect(bannerAllowedOn('games/setup-board')).toBe(false);
         expect(bannerAllowedOn('podium/classes/x')).toBe(false);
+    });
+});
+
+describe('bannerAboveBar', () => {
+    it("lifts the banner above «Oyunlar»' code field and nowhere else", () => {
+        expect(bannerAboveBar('rooms/index')).toBe(true);
+
+        for (const page of [
+            'welcome',
+            'classes/index',
+            'rooms/past',
+            'rooms/show',
+            'rooms/index-x',
+        ]) {
+            expect(bannerAboveBar(page), page).toBe(false);
+        }
     });
 });
 

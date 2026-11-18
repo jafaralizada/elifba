@@ -113,11 +113,18 @@ describe.each([
         expect(html).not.toContain('welcome-rooms');
         expect(html).not.toMatch(/href="\/(rooms|otaq)/);
 
+        // A short label the welcome page's other sections also say («Oyun
+        // seç» in «Oyun seçimi…», "Choose a game") tells nothing; the links
+        // above and every longer text do.
+        const elsewhere = Object.entries(translations)
+            .filter(([key]) => !/^(welcome\.)?rooms\./.test(key))
+            .map(([, text]) => text);
+
         for (const text of [
             ...strings(translations, 'welcome.rooms.'),
             ...strings(translations, 'rooms.mechanics.'),
             ...strings(translations, 'rooms.setup.families.'),
-        ]) {
+        ].filter((one) => !elsewhere.some((other) => other.includes(one)))) {
             expect(html).not.toContain(escaped(text));
         }
     });
@@ -169,7 +176,7 @@ describe.each([
         );
     });
 
-    it('sends an account in the player area to its rooms', () => {
+    it('sends an account in the player area to its games', () => {
         share(translations, locale, 'player');
         const html = renderToStaticMarkup(
             createElement(Welcome, { ...welcome, rooms }),
@@ -196,7 +203,7 @@ describe.each([
         }
     });
 
-    it('draws the section «Otaqlar» on the privacy page while the switch is on', () => {
+    it('draws the section «Böyüklərin oyunları» on the privacy page while the switch is on', () => {
         const html = renderToStaticMarkup(
             createElement(Privacy, { ...privacy, rooms: { idleHours: 3 } }),
         );

@@ -164,16 +164,37 @@ describe('the navigation of each area', () => {
 });
 
 describe('the player shell areas', () => {
-    it('has the rooms and Settings, in the nav order', () => {
-        expect(player.map((area) => area.key)).toEqual(['rooms', 'settings']);
-        expect(player.map((area) => area.pages.length)).toEqual([1, 4]);
+    it('has the games, the past games and Settings, in the nav order', () => {
+        expect(player.map((area) => area.key)).toEqual([
+            'rooms',
+            'rooms-past',
+            'settings',
+        ]);
+        expect(player.map((area) => area.title)).toEqual([
+            'nav.rooms',
+            'nav.rooms_past',
+            'nav.settings',
+        ]);
+        expect(player.map((area) => area.pages.length)).toEqual([1, 1, 4]);
     });
 
-    it('finds the rooms and every room page under them', () => {
-        for (const url of ['/rooms', '/rooms/01JROOM', '/rooms?past=1']) {
+    it('finds the games and every room page under them', () => {
+        for (const url of [
+            '/rooms',
+            '/rooms/01JROOM',
+            '/rooms/01JROOM/screen',
+            '/rooms?past=1',
+            '/rooms/pastime',
+        ]) {
             expect(areaKey(url, player)).toBe('rooms');
             expect(pageTitle(url, player)).toBe('nav.rooms');
         }
+    });
+
+    it('finds the past games as their own entry, though under /rooms', () => {
+        expect(areaKey('/rooms/past', player)).toBe('rooms-past');
+        expect(pageTitle('/rooms/past', player)).toBe('nav.rooms_past');
+        expect(areaKey('/rooms/past?page=2', player)).toBe('rooms-past');
     });
 
     it("offers the settings but the boards' «Oyun»", () => {
@@ -188,8 +209,8 @@ describe('the player shell areas', () => {
         );
         expect(pageTitle('/settings/roles', player)).toBe('settings.nav.roles');
         expect(pageTitle('/settings/play', player)).toBeUndefined();
-        expect(player[1].key).toBe(teacher[2].key);
-        expect(player[1].base).toBe(teacher[2].base);
+        expect(player[2].key).toBe(teacher[2].key);
+        expect(player[2].base).toBe(teacher[2].base);
     });
 
     it('leaves the class, child, word and board pages outside', () => {

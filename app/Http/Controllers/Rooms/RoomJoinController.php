@@ -6,6 +6,7 @@ use App\Domain\Rooms\Actions\JoinRoom;
 use App\Domain\Rooms\Data\RoomCodeData;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Support\RoomCode;
+use App\Domain\Rooms\Support\RoomJoinLink;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\CodeEntrance;
@@ -32,7 +33,9 @@ use Inertia\Response;
  * over it the same field says so, and `/oyun` without a code always opens.
  * `/otaq` and `/otaq/{code}` answer with a permanent redirect to the same
  * place under `/oyun`, a query kept, so a link, a habit or a README of
- * before still arrives; they try no code themselves.
+ * before still arrives; they try no code themselves. `/oyun` also gets
+ * `entrance`, its own address, whose origin the code field's camera
+ * accepts (ADR 026 decision 15).
  */
 final class RoomJoinController extends Controller
 {
@@ -47,7 +50,7 @@ final class RoomJoinController extends Controller
             return to_route('rooms.join', ['code' => $code]);
         }
 
-        return Inertia::render('rooms/join', ['code' => null, 'name' => $account->name]);
+        return Inertia::render('rooms/join', ['code' => null, 'name' => $account->name, 'entrance' => RoomJoinLink::entrance()]);
     }
 
     public function oldEntrance(Request $request): RedirectResponse
@@ -69,7 +72,7 @@ final class RoomJoinController extends Controller
             return to_route('rooms.show', $room);
         }
 
-        return Inertia::render('rooms/join', ['code' => $room->code, 'name' => $account->name]);
+        return Inertia::render('rooms/join', ['code' => $room->code, 'name' => $account->name, 'entrance' => null]);
     }
 
     public function store(string $code, #[CurrentUser] User $account, JoinRoom $joinRoom): RedirectResponse
