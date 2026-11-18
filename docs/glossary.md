@@ -241,6 +241,23 @@ How a live room game shows its players as rivals (ADR 027, architecture §12 "Ri
 | rəqabət ikonları | rivalry icons | `content/rooms/rivalry.json`, `RoomRivalryData`, prop `rivalry` | ⚡ `clash`, 👑 `leader`, 🔥 `overtake`: Fluent Emoji files in `content/assets/fluent/`; they show the state, never a person.                                 |
 | ekrana sığdırma  | screen fit    | `ScreenFit` (`components/rooms/screen-fit.tsx`)                 | The screen's round under the strip, drawn smaller by CSS `zoom` where it does not fit; never larger, never moved by a player (ADR 027 "As built").           |
 
+### Taunts (T2)
+
+A ready-made jibe a player throws a rival during a room game, for a point of their own (ADR 029, architecture §12 "Taunts (T2)", docs/frontend.md rule 15 "Taunts"), designed in T1 on 2026-11-18 and built by T2. Until T2 lands none of the code names exists.
+
+| Azərbaycanca       | English           | Code                                                                                    | Notes                                                                                                                                                           |
+| ------------------ | ----------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| atmaca             | taunt             | `Rooms\Models\RoomTaunt` (`room_taunts`), `ThrowRoomTaunt`, `POST /rooms/{room}/taunts` | An emoji and a short ready phrase of `content/rooms/taunts.json` (`rooms.taunts.say.{key}`), thrown during a running game. Never text, never sounded. Not chat. |
+| atmaca at          | throw a taunt     | `ThrowRoomTaunt`, `RoomTauntData`, `RoomTauntReceiptData`                               | One per tap, idempotent by `event_id`; `accepted`, `duplicate`, `late`, `off`, `cooling`, `no_points`. Never closes a round, never an answer or a read.         |
+| atmaca qutusu      | tray              | the button beside `RivalryStrip` and its popover                                        | The ten taunts, the balance, «Mənə atılanları gizlət». On a player's phone only.                                                                                |
+| hədəf              | target            | `room_taunts.target_player_id`, the state's `taunts.received`                           | Any present player but the thrower for the server; the strip's rival on the phone. Emptied a day after the throw.                                               |
+| atmacanın qiyməti  | taunt cost        | `RoomPointsRule::TAUNT_COST` (1)                                                        | Paid by the thrower; counted in the ranking from the first close after the throw. The target loses nothing.                                                     |
+| balans             | balance           | `Rooms\Support\RoomTauntBalance`, the state's `taunts.balance`                          | The answers' points over the game's closed rounds less every taunt thrown in it. Derived; ≥ 1 to throw; never below 0. Not a total across games.                |
+| xərc (cavabda)     | spent             | the state's `round.reveal.spent`                                                        | The taunts counted at a close, shown as «−:count» beside the round's result. Not shown after the game.                                                          |
+| gözləmə (atmacada) | cooldown          | `elifba.rooms.taunts.cooldown_ms`, the state's `taunts.ready_ms`                        | 10 s between two taunts of one thrower, by the server's clock.                                                                                                  |
+| atmacaları gizlət  | hide taunts       | `localStorage` `elifba.rooms.phone.taunts_hidden`, `…screen.taunts_hidden`              | This device's choice, like the mute; never sent. The thrower still pays.                                                                                        |
+| atmacalar (açar)   | the taunts switch | `rooms.taunts`, `SetRoomTaunts`, `PUT /rooms/{room}/taunts`                             | The host's, on by default, at any time; off, no taunt is thrown or shown.                                                                                       |
+
 ## Project
 
 | Azərbaycanca        | English               | Code                                             | Notes                                                                                                  |

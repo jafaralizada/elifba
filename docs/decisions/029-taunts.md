@@ -1,0 +1,203 @@
+# 029 — Taunts: a ready-made jibe at a rival, paid for with a point of one's own
+
+- **Status:** Accepted, 2026-11-18 (roadmap step T1: three clickable prototypes and the owner's three answers of that day). The variant and the list were taken under the owner's standing rule of 2026-11-18 — a session that would ask the owner takes its recommended option and says so — as variant A, «Zolaqda», and the ten taunts of decision 27; the owner may reverse either, and a changed phrase or emoji is a content change (decision 28). To be built by T2.
+- **Sections:** architecture.md §1 "Tables", §12 "Scoring and what is kept", "Adults' privacy", "Guard tests", "Taunts (T2)"; docs/frontend.md rule 15 "Taunts" and "Nothing more"; glossary.md "Taunts (T2)"
+- **Amends:**
+    - [024](024-adults-privacy-in-rooms.md) decision 6 ("No contact between people: no chat, no message, no reaction, no invitation") and its rejected alternative "Chat or reactions"; decision 2 (what a room keeps) and decision 10 (the notice); architecture §12 "Adults' privacy", rows "Minimum data", "No contact" and "Notice". A player may throw another present player of the same game a taunt from a closed list — an emoji with a short phrase of ours — and nothing else: still no chat, message, typed text, invitation or contact outside a game (decisions 9, 27 and 30).
+    - [022](022-room-scoring-and-history.md) decision 1 ("nothing is ever negative") and decision 4 (the ranking sums the answers' points): an answer's points are as they were, never negative; a game's points are its answers' points over closed rounds less the taunts the player threw, counted from the first close after each, so a total can go down from one reveal to the next — never below 0 (decisions 1–3).
+    - [021](021-room-race-protocol.md) decision 1 ("each player's device writes that player's own answer, and nothing else"): it also writes that player's own taunts, through one action of their own (decision 13); decision 6 and §12 "The state": `v` 3 (decision 15); decision 8: an accepted taunt is one more fact that raises the revision and sends `room.changed`, which itself is unchanged.
+    - [025](025-room-motion-sound-and-final.md) decision 5: a ranking's totals count up from `points − result.points + spent` (decision 6). Decisions 3 and 14 hold: a taunt says nothing of anyone's right or wrong (decision 5).
+    - [027](027-rivals-face-to-face.md) (accepted on the branch `feat/rooms-rivalry`, commit `0da4bcc`, not yet on `main` when this was written): decision 1 — the strip also reads `round.reveal.spent`; decision 11 — on a phone the strip shares its row with the 44px tray (decision 17); decisions 13 and 14 — the race lanes show the cost beside the round's result, and the split and the totals move from the totals before the round, with the cost added back. Decision 2 (the strip stands still in an open round) holds: a received taunt lies over the strip and never moves it (decision 20). Decision 20's "the state stays `v: 2`" gives way to decision 15 here.
+    - docs/frontend.md rule 15 "Nothing more": "no … chat or free text" stays; a taunt is neither.
+- **Why it is hard to reverse:** points become something a player can spend, and a game scored with taunts cannot be scored again without them; players learn where a taunt lands and what it costs; and `/privacy` promised that no reaction is sent between players — a promise changed in public, and a phrase once read on someone's screen cannot be taken back.
+
+## Context
+
+The owner asked on 2026-11-18 that a player of an adults' game («Oyunlar») be able to throw the other side teasing, funny taunts — «qarşı tərəfi qıcıqlandırıcı əyləncəli atmacalar» — and that each taunt cost a point, and answered three questions before any drawing:
+
+1. **The thrower pays.** One point leaves the thrower's own points; the target loses nothing; a player with no points cannot throw.
+2. **All game long.** A taunt may be thrown during the question too, and it shows on the target's phone without covering the question, its items, the time bar or the controls.
+3. **A ready list.** A taunt is an emoji with a short ready phrase from our own list of 8–12, in Azerbaijani and English; nothing typed, and no sound in this stage.
+
+That reverses two accepted decisions by name: ADR 024 decision 6 (no contact — "no chat, no message, no reaction"; "Chat or reactions" its rejected alternative) and ADR 022 decision 1 (a total never went down). It also sits on the rivalry strip of ADR 027 (the owner's variant A, «Zolaq», committed on `feat/rooms-rivalry` the same evening), which was read before this record was written.
+
+Three constraints shaped it. **The trap of the open round:** the state's ranking counts closed rounds only, so that nothing tells right from wrong before the reveal (ADR 022 decision 4, ADR 025 decisions 3 and 14) — a balance must stay blind to the open round too, which also means nobody has a point to spend before the first round closes. **The fit:** a round with the strip must still fit 375 × 667 with its 44px controls (ADR 027 decision 11). **The wire:** no client event and nothing new on the channel (ADR 021), and every accepted taunt makes every device read the state again.
+
+T1 drew three clickable prototypes (one HTML file each, outside the repository, in `~/elifba-shots/taunts/prototypes/`): the thrower's phone, the target's phone and the big screen side by side on one state; two players and eight (one who left, one at 0 points); a round's question with the tray → a throw with the thrower's −1 → the target's phone → the screen → the reveal with the cost; one taunt or two at once; the target hiding them; a 4 × 4 grid and an 8-letter anagram; light, dark and reduced motion; Azerbaijani and English phrases. Each measured whether the round fits and whether anything of a taunt covers the question. They differed in substance:
+
+- **A, «Zolaqda»** (in the strip): the tray is a button beside the strip and throws only at the strip's rival; a received taunt takes the strip's place on the target's phone for 4 s; the screen shows it over its own strip.
+- **B, «Panel»**: a button in the round's head opens a sheet from the bottom — first the target among every present player, then the taunt; a received taunt slides over the app's header; the screen shows nothing.
+- **C, «Meydan»** (the square): a row of emoji always under the round, one tap throws at the shown target (changed from a short list); a received taunt is one line inside the target's strip; the screen is the stage, every taunt large in a column of its own.
+
+**A** is the choice (the recommendation, taken under the standing rule): it takes no height from the round (the 4 × 4 grid keeps its 57px cells in the prototype), needs no choosing under the clock, puts the taunt where the rivalry already is, and lets the room see it on the screen without giving it a stage. The ten phrases of decision 27 were drafted for it and approved the same way.
+
+## Decision
+
+### The cost
+
+1. **The thrower pays one point; the target loses nothing.** `RoomPointsRule::TAUNT_COST` is 1 — a constant of the one points rule, in PHP only, never config, so that a change can never re-price a game already played. A player's points in a game are the sum of `room_answers.points` over the game's closed rounds, less `TAUNT_COST` for each counted taunt the player threw in it (decision 2). `room_answers` never changes, and no balance or total is stored.
+2. **A taunt counts from the first close after it.** Thrown in round i's countdown, study or answer, it counts from `closes(i)`; thrown in round i's reveal, from `closes(i + 1)`; once the game is over — its last close, the host's end or the room's close — every taunt of the game counts. `RoomRanking::ofGame()` and `::ofRoom()` subtract exactly these, so the ranking, and with it ADR 027's strip, still changes only when a round closes.
+3. **The balance** is what a player may spend now: the answers' points over the game's closed rounds less every taunt the player threw in this game, counted or not (`Rooms\Support\RoomTauntBalance`, derived, never stored). A throw needs a balance of at least 1, checked by `ThrowRoomTaunt` under the room row's lock, so two taps, two tabs or two devices cannot spend one point twice; a balance never goes below 0, and neither does a total. Only the running game's points can be spent: the room's standing from earlier games is not a balance.
+4. **Nobody can throw before the first reveal.** Every balance is 0 until the first round closes. That stands — the first round belongs to the race alone and the rule needs no exception. In a duel the tray is there from the start and says it in words: «Atmaca 1 xaldır: ilk raund bitəndə xalınız olacaq.»; in a race the strip has no rival before somebody holds a place (ADR 027 decision 5), so there is no tray until then.
+5. **Why nothing leaks.** The balance reads the closed rounds and the player's own taunts, never the open round's answers, so the −1 a thrower sees at once is the same whatever anybody answered (ADR 025 decisions 3 and 14). A taunt's moment and target say nothing of an answer: a player may throw before answering, after, or without answering at all. The cost reaches the ranking only at a close, where everything else of the round is shown too, and it is shown as its own number, so a total that rose less than a result says is never read as a hidden wrong.
+6. **Where the cost shows.** On the thrower's own phone at once: the tray's balance and «Atıldı · −1 xal». Everywhere else at the next reveal: «−:count» with the taunt icon beside the round's result in «Sıralama» (`Standing`) and in the screen's race lanes, and in the thrower's verdict («Atmaca: −1 xal»); every total counts up from `points − result.points + spent` to the server's. Not at once in the strip or the ranking: ADR 027 keeps the strip still during a round — a strip that moved mid-question would invite reading it, and every other phone would see a change whose cause it cannot see.
+7. **After the game, only the net.** The final (`FinalStanding`), a closed room's results, `/rooms/past` and every later page show the net points only; who taunted whom is shown nowhere after the game — no prop, no page, no count of taunts per player — and the target is forgotten a day after the throw (decision 31).
+
+### Who, when and how often
+
+8. **The thrower** is a present player of an open room while a game is live. A host who does not play has no player row and throws nothing; a player who left or was removed throws nothing.
+9. **The target** is, for the server, any present player of the same room other than the thrower — never oneself, a player who left, a removed one or a host who does not play. Variant A's device offers only the strip's rival, as ADR 027's `rivalPair()` picks it: in a duel the other player; in a race the leader for a player behind, the runner-up for the leader. The server does not mirror that device rule, so a later device may widen the choice without a protocol change. In a race the leader is the usual target; the cooldown, the hide switch and the host's switch (decisions 11, 23, 12) answer that.
+10. **When.** From the game's start until its last round closes: the countdown, the study, the answer and every reveal but the last — in practice from the first reveal (decision 4). Never in the lobby, the start screen, the last reveal, the final or a closed room: a taunt in the last reveal would count after the last close and change the final the room is about to see.
+11. **How often.** Once per `elifba.rooms.taunts.cooldown_ms` (10 000) per thrower, by `RoomClock`, checked under the lock; and the limiter `room-taunts` (20 a minute per account) on the route. The price is the main brake (a right answer gives 10–20 points); the cooldown keeps a target from being flooded and bounds the load: every accepted taunt makes every device read the state again, so twenty players can cause at most two state reads per device a second.
+12. **The host's switch.** «Atmacalar», on by default, in «Otağın idarəsi» and on the start screen, with one line: «Oyunçular bir-birinə hazır atmaca ata bilər; hər biri atana 1 xal başa gəlir.» It is `rooms.taunts` (boolean, default true), written only by `Rooms\Actions\SetRoomTaunts` — `PUT /rooms/{room}/taunts` `{on}` (`RoomPolicy::host`, an open room, at any time, mid-game too), under the room row's lock, raising the revision and signalling; it answers 204. Off: no tray, the server refuses, and no taunt reaches any device; costs already paid stay.
+
+### The protocol
+
+13. **One action writes a taunt.** `POST /rooms/{room}/taunts` `{event_id, target_id, taunt}` (`Rooms\Data\RoomTauntData::rules()`: a ULID, a ULID, a key of `content/rooms/taunts.json`), `RoomPolicy::play`, `throttle:room-taunts` → `Rooms\Actions\ThrowRoomTaunt`, in one transaction under the room row's lock (`RoomLock`):
+    1. the `event_id` is stored → `duplicate`;
+    2. no game is live, its last round has closed, the room is closed, or the thrower is not present → `late`, nothing written;
+    3. the host switched taunts off → `off`;
+    4. `target_id` is not a present player of this room, or is the thrower's own row → 422, nothing written;
+    5. the thrower's latest taunt of this game is younger than the cooldown → `cooling`;
+    6. the balance is below 1 → `no_points`;
+    7. otherwise stored with `sent_ms` = `RoomClock::nowMs()`, the room's `last_activity_at` touched, the revision raised and `RoomChanged` dispatched after commit → `accepted`.
+
+    The answer is `{status, revision}` (`Rooms\Data\RoomTauntReceiptData`, JSON, `no-store`). A taunt never closes a round, never counts as an answer and never as a read: `ThrowRoomTaunt` calls no `RoomRoundClose`, writes no `seen_ms` and changes nothing `RoomWaits` reads. The thrower is the session's account; a body cannot name another.
+
+14. **The table** `room_taunts` (`Rooms\Models\RoomTaunt`): `id` (ulid); `room_game_id` (fk `room_games`, cascade); `room_player_id` (the thrower, fk `room_players`, cascade); `target_player_id` (fk `room_players`, null on delete, nullable: emptied a day after the throw, decision 31); `taunt` (string(32), a key of the list); `sent_ms` (bigint); `event_id` (ulid, unique). Index `(room_game_id, room_player_id)`. Nothing else: no text, no name, no device. And `rooms.taunts` (boolean, default true). Both in one additive migration.
+15. **The state** becomes `v: 3`:
+
+    ```
+    RoomState { v: 3, …,                                         // every other key as in v 2
+      room:   { …, taunts: bool },                               // the host's switch
+      taunts: RoomTaunts | null,                                 // null: no live game, or a closed room
+      round:  { …, reveal: { …, spent: [{ player_id, count }] } } // the taunts counted at this close; only in the reveal
+    }
+    RoomTaunts {
+      open: bool,                                                // a throw is accepted now but for the balance and the cooldown
+      balance: int | null,                                       // the viewer's (decision 3); null: the viewer does not play
+      ready_ms: moment | null,                                   // the end of the viewer's cooldown, while it runs
+      received: [{ id, from, taunt, sent_ms }],                  // at the viewer, thrown within show_ms of server_ms, newest first, at most 3
+      shown: [{ id, from, to, taunt, sent_ms }] | null           // the screen's request only (?for=screen), the same window; null otherwise
+    }
+    ```
+
+    `from` and `to` are `room_players.id`; a page reads the names from `players`. A taunt is in a state only within `elifba.rooms.taunts.show_ms` (4 000) of its throw, and only for its target and the screen; no other phone gets it, the thrower's own taunts are not listed (its receipt, `balance` and `ready_ms` tell its page), `received` is `[]` while the switch is off, and after the game nothing. `shown` is filled only for `GET /rooms/{room}/state?for=screen`, which only `RoomPolicy::screen` (the host of an open room) may ask. `spent` lists the players with a cost at this close. PHP: `Rooms\Data\RoomTauntsData`, `RoomTauntSeenData`, `RoomSpentData`; zod: `RoomTaunts`, strict, in `resources/js/rooms/contract.ts`. Fixtures: every `state.*.json` of an open room gains `room.taunts` and `taunts`; `state.reveal.json` gains `spent`; new `state.taunted.json` (a target with one taunt) and `state.screen-taunted.json` (the screen with two); `taunt.json` and `taunt-receipt.json`. A page loaded before the deploy meets `v: 3` and reloads once, as G2 built it.
+
+16. **The channel is unchanged.** `room.changed` stays `{v: 1, revision}`; no client event means anything in a room; no name, phrase, key or id of a taunt is broadcast or logged with a name.
+
+### The pages (variant A)
+
+17. **The tray beside the strip.** On the phone a 44px round button stands at the right end of `RivalryStrip`'s row (the strip card is 52px narrower; its height is unchanged): the `Laugh` icon in the taunt colour, `aria-label` «Atmaca at», `aria-expanded`. It is drawn in a live game for a viewer who plays while `taunts.open` and the strip shows a rival on the right — in a duel from the countdown on, in a race once a rival holds a place. With a balance of 0 or while cooling it is muted, and a tap still opens it and says why; while cooling it is a ring with the seconds left to `ready_ms` by the estimated server clock (`serverClock()`). The big screen and a host who does not play have no tray.
+18. **Open, it is a popover under the strip**, the strip's width, over the round's head and question on the thrower's own phone only (the thrower's choice; the button again, a tap outside or Escape closes it): «Kimə: :name» with «1 xal» and the icon; the balance («Sizdə :count xal · hər atmaca 1 xal») or the reason (before the first close, no points, the cooldown's seconds); the ten taunts as buttons in two columns, each the emoji (28px) beside the phrase (13px semibold), at least 48px tall; and the switch «Mənə atılanları gizlət». One tap throws and closes it.
+19. **After a throw** the receipt brings the state (`refresh()`). On `accepted`: «Atıldı · −1 xal» — a pill in the taunt colour with the taunt's emoji — lies over the strip's gap row for 2 s, a «−1» rises once from the button, and the button turns into its cooldown ring; the balance in the state is already one less. On `cooling`, `no_points`, `off` or `late` the popover says so in one line and nothing else changes.
+20. **A received taunt lies over the strip** on the target's phone — the strip's own height and width, never the tray, the round's head, the time bar, the question, its items or its controls (the prototype measures it at 375 × 667 with the 4 × 4 grid and the 8-letter anagram): a card in the taunt colour with the emoji (40px), the thrower's name (12px, the taunt colour, truncated) and the phrase in the page's own locale (16px bold), `role="status"`. Two at once share the height as two rows; a third waits for its place. It shows from the state's `received` until `sent_ms + show_ms` by the estimated server clock, then the strip is back as it was: the strip under it never moves (ADR 027 decision 2).
+21. **The big screen** shows each taunt of `shown` over its own strip for the same 4 s — one or two cards side by side: the emoji (6vh), «:from → :to» (2.1vh, `ArrowRight` between the names) and the phrase (3vh) in the screen's locale. Its top bar gains «Atmacalar» before the sound toggle — a toggle, `aria-pressed`, at least 44px — that hides them on this screen (`localStorage` `elifba.rooms.screen.taunts_hidden`). The screen still writes nothing and plays nothing for a taunt.
+22. **Every other phone** shows nothing of a taunt during the round, and the cost in the reveal (decision 6).
+23. **«Mənə atılanları gizlət»** is this device's choice, kept in `localStorage` (`elifba.rooms.phone.taunts_hidden`, every read and write in `try`/`catch`), like the mute: never sent, never the account's, no route or setting. A hidden taunt is still paid for, and its thrower is not told.
+24. **Motion** (ADR 025). A received card pops in (0.42 s) only when the page saw it arrive — the first state the page heard that holds it, keyed by its `id` (`tauntMoment()`, Vitest); a page opened on it draws it still for the time left; a state fetched again replays nothing. «−1» rises once on `accepted`. Under `prefers-reduced-motion` nothing moves: the card appears and goes, and «−1» is not drawn (the pill says it).
+25. **No sound.** No `RoomSound` case, file or cue for a taunt in this stage; ADR 025's and ADR 028's sounds are untouched.
+26. **The taunt colour** is violet: fill `violet-600` (`violet-500` dark), text `violet-700` (`violet-300` dark), tints of the fill at 9–16 % (16–26 % dark) — never emerald or red (right, wrong), never the strip's sky or orange, never the lamp's amber. ADR 027 rejected blue and violet as two _sides_; violet here is not a side, and a taunt is never told from anything by colour alone — it carries its emoji, its words and its icon. A phrase is drawn as written: no `uppercase`, no `toUpperCase()`; a name as the state gives it.
+
+### The list
+
+27. **Ten taunts, about the game only** — slowness, sleepiness, luck, bragging — never about a person's mind, age, sex, body, health, family, origin or faith; no profanity; nothing that reads as a benefit or a harm to memory, the mind or health (`RoomsWordingTest`); harmless to any reader, since a young account holder may be in a room (ADR 024 decision 7). Our own text, MIT, like the word list:
+
+    | Key         | Emoji | Fluent file | az                     | en                   |
+    | ----------- | ----- | ----------- | ---------------------- | -------------------- |
+    | `turtle`    | 🐢    | `1F422.svg` | Bir az tez ol!         | Pick up the pace!    |
+    | `tick_tock` | ⏰    | `23F0.svg`  | Tik-tak, tik-tak!      | Tick-tock!           |
+    | `frozen`    | 🥶    | `1F976.svg` | Donub qaldın?          | Frozen?              |
+    | `sleepy`    | 😴    | `1F634.svg` | Yatma, oyun gedir!     | Wake up, game's on!  |
+    | `lucky`     | 🍀    | `1F340.svg` | Sadəcə bəxtin gətirdi! | Just lucky!          |
+    | `dice`      | 🎲    | `1F3B2.svg` | Zərlə seçirsən?        | Rolling dice?        |
+    | `mine`      | 😎    | `1F60E.svg` | Bu raund mənimdir!     | This round is mine!  |
+    | `catch_me`  | 🚀    | `1F680.svg` | Yetiş görüm!           | Catch me if you can! |
+    | `too_easy`  | 🥱    | `1F971.svg` | Çox asan idi!          | Too easy!            |
+    | `so_close`  | 😅    | `1F605.svg` | Az qaldı, hə?          | So close, huh?       |
+
+    The order is the tray's. None of the emoji is ⚡, 👑 or 🔥, which are the strip's (ADR 027 decision 10).
+
+28. **Where it lives.** `content/rooms/taunts.json` — `version` and `taunts`, each `{key, image}`, the image a file of `content/assets/fluent/` named by its code point, as ADR 027's `rivalry.json` names its three — read by `ContentRepository::roomTaunts()` into `Content\Data\RoomTauntData` (`key`, `url()` from `ContentAssets::url()`), cached with the rest, and checked by `ContentValidator` with one broken fixture per rule: 8–12 taunts; keys unique, `^[a-z_]{2,32}$`; each image an SVG of `content/assets/fluent/` that exists and passes the SVG check (the folder's `credits.json` entry — Fluent Emoji (Color), commit `1ffb34c`, MIT — covers the nine new files, added unmodified at that commit; `1F422.svg` is already there for the children's pictures and the room reads it only through its own list); no file named twice, and none of the strip's three. The phrases are `rooms.taunts.say.{key}` in `lang/az.json` and `lang/en.json` (`RoomTauntsTest`: one per key, no other). `rooms/show` and `rooms/screen` get the list as the prop `taunts` (`[{key, url}]`) while they follow an open room, null otherwise; each device draws a phrase in its own locale — the thrower picks in theirs, the target reads in theirs, the screen in the host's. The images are drawn `alt=""` and `aria-hidden` beside the words; no room file imports the children's catalog, and no page asks a third party for anything. Changing a phrase, swapping a taunt or adding one up to twelve is this content change and the pinned list in `RoomTauntsTest` — no code.
+
+### Privacy
+
+29. **A taunt is not contact.** Nothing is typed or chosen as text; the target, the screen and the thrower's own phone are the only places it appears, for 4 s, inside a running game of a room both are present in; it carries only the thrower's name that the room already shows. There is still no chat, message, invitation, profile or way to reach a player outside a game, and nothing needs moderating.
+30. **`/privacy`** changes two sentences, in both languages; the player role's sentence does not change — it promises nothing about contact, and a taunt shows only the name it already shows:
+    - `privacy.rooms.contact` — az: «Elifba heç kimin yaşını soruşmur və oyunçuların bir-birinə yazması üçün heç bir yol yoxdur: mesaj, çat və ya dəvət göndərilmir. Oyun gedərkən oyunçu otaqdakı başqa oyunçuya yalnız hazır siyahıdan atmaca — emoji və qısa söz — ata bilər; hər atmaca atana 1 xal başa gəlir və onu 4 saniyə yalnız hədəf olan oyunçu və aparıcının böyük ekranı görür. Hər kəs atmacaları öz cihazında gizlədə, aparıcı isə otaqda bağlaya bilər. Otağın kodunu insanlar bir-birinə Elifba-dan kənarda verir. Aparıcı istənilən oyunçunu otaqdan çıxara bilər; çıxarılan oyunçu o otağa qayıda bilmir və adı orada görünmür.» — en: "Elifba asks no one's age, and there is no way for players to write to each other: no message, chat or invitation is sent. During a game a player can throw another player in the room only a taunt from a ready-made list — an emoji with a short phrase; each costs the thrower 1 point, and only the player it is aimed at and the host's big screen see it, for 4 seconds. Anyone can hide taunts on their own device, and the host can switch them off for the room. People pass a room's code to each other outside Elifba. The host can remove any player; a removed player cannot come back to that room, and their name is no longer shown in it."
+    - `privacy.rooms.stored` gains a fourth line — az: «Atmacalar: oyunda kimin kimə hansı hazır atmacanı nə vaxt atdığı; kimə atıldığı bir gündən sonra silinir, atanın ödədiyi xal isə oyunun nəticəsində qalır.» — en: "Taunts: who threw which ready-made taunt at whom during a game, and when; whom it was aimed at is erased after a day, and the point the thrower paid stays in the game's result."
+31. **What is kept, and for how long.** A `room_taunts` row: the game, the thrower, the target, the key, the moment. `PruneOldRooms` (daily) empties `target_player_id` of every taunt older than `elifba.rooms.taunts.forget_target_hours` (24), since only the target's phone ever needed it; the rest — the thrower and the moment, which the cost needs — goes with the room. `ForgetRoomPlayer` leaves a player's taunts, so nobody's place moves («Oyunçu» keeps the cost); `RemoveRoomPlayer` leaves them too; `DeleteRoom` and `PruneOldRooms` delete them with the room (cascade); a deleted account leaves its rows without the account, as its answers do.
+32. **Never on the wire or in logs.** A name is never in a log, an exception, a broadcast or a URL; a taunt reaches a page only in the authenticated state, by ids and a key.
+
+### Words
+
+33. Every interface string is in `lang/az.json` and `lang/en.json` under `rooms.taunts.*`; `RoomsWordingTest` reads them with the rest:
+
+    | Key                        | az                                                                                   | en                                                                                            |
+    | -------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+    | `rooms.taunts.tray`        | Atmaca at                                                                            | Throw a taunt                                                                                 |
+    | `rooms.taunts.to`          | Kimə: :name                                                                          | To: :name                                                                                     |
+    | `rooms.taunts.price`       | 1 xal                                                                                | 1 point                                                                                       |
+    | `rooms.taunts.balance`     | {one}Sizdə :count xal · hər atmaca 1 xal\|{other}Sizdə :count xal · hər atmaca 1 xal | {one}You have :count point · a taunt costs 1\|{other}You have :count points · a taunt costs 1 |
+    | `rooms.taunts.first_round` | Atmaca 1 xaldır: ilk raund bitəndə xalınız olacaq.                                   | A taunt costs 1 point: you will have points once the first round closes.                      |
+    | `rooms.taunts.no_points`   | Atmaca 1 xaldır, sizdə hələ xal yoxdur.                                              | A taunt costs 1 point, and you have none yet.                                                 |
+    | `rooms.taunts.cooling`     | Növbəti atmaca: :seconds san.                                                        | Next taunt in :seconds s                                                                      |
+    | `rooms.taunts.late`        | İndi atmaca atmaq olmur.                                                             | No taunts right now.                                                                          |
+    | `rooms.taunts.off`         | Aparıcı atmacaları bağlayıb.                                                         | The host has switched taunts off.                                                             |
+    | `rooms.taunts.sent`        | Atıldı · −1 xal                                                                      | Thrown · −1 point                                                                             |
+    | `rooms.taunts.hide`        | Mənə atılanları gizlət                                                               | Hide taunts aimed at me                                                                       |
+    | `rooms.taunts.spent`       | Atmaca: −:count xal                                                                  | Taunts: −:count                                                                               |
+    | `rooms.taunts.spent_label` | Atmacalara :count xal                                                                | :count spent on taunts                                                                        |
+    | `rooms.taunts.switch`      | Atmacalar                                                                            | Taunts                                                                                        |
+    | `rooms.taunts.switch_line` | Oyunçular bir-birinə hazır atmaca ata bilər; hər biri atana 1 xal başa gəlir.        | Players can throw ready-made taunts at each other; each costs the thrower 1 point.            |
+    | `rooms.taunts.say.{key}`   | decision 27                                                                          | decision 27                                                                                   |
+
+    `spent_label` is the `aria-label` of a reveal's «−:count»; `switch` names the host's switch and the screen's toggle.
+
+### Guard tests the build adds
+
+34. - `tests/Feature/Rooms/RoomTauntsTest.php` (new): "takes one point from the thrower and none from the target"; "counts a taunt from the first close after it, and every one once the game is over"; "refuses a throw with no points, and two at once never spend one point twice"; "stores a taunt once by its event_id"; "refuses in the lobby, the first round's countdown, the last reveal, the final, a closed room and while switched off"; "refuses oneself, a player who left, a removed player and a host who does not play as a target, and a host who does not play as a thrower"; "keeps the cooldown by the server's clock"; "never closes a round, counts as an answer or as a read" (`closed_ms`, `seen_ms` and `RoomWaits` unchanged); "shows a taunt only to its target and the screen, and only for show_ms"; "shows who taunted whom nowhere after the game" (a closed room's props, `/rooms/past`, the state after `over`); "keeps the cost when a player takes their name out or is removed"; "forgets the target after a day" (`PruneOldRooms`, `travelTo`); "holds exactly the approved list" (the keys of decision 27, pinned) and "names a phrase for every taunt in both languages and no other".
+    - `tests/Feature/Rooms/RoomRankingTest.php` (or the existing ranking tests): the net points, dense places and "a player brought to 0 by taunts has no place".
+    - `RoomContractTest` and `resources/js/rooms/contract.test.ts`: the new and changed fixtures, strict both ways.
+    - `ContentValidatorTest`: one broken fixture per rule of decision 28.
+    - `RoleAreasTest`, `RoomsSwitchTest`, `BearerReachTest`, `TeacherIsolationTest`: `rooms.taunts.store` and `rooms.taunts.update` in the player group, a 404 while the switch is off, a guest board's bearer answered as a visitor, an account outside the room 404 and changing nothing.
+    - `RoomPagesTest`: "sends the room page and the screen the taunts' images, and a closed room none".
+    - `PrivacyPageTest`: "says what a taunt is, what it costs, who sees it and how it is hidden".
+    - Vitest `components/rooms/taunts.test.ts`: "shows a taunt the page heard arrive once, however often the state comes again"; "draws a taunt the page opened on still"; "drops a taunt at sent_ms + show_ms by the server's clock"; "shows nothing while this device hides taunts"; "never reads a verdict, a solution or anyone's result before the reveal" (the tray and the cards read `taunts`, `players` and the strip only).
+    - `RoomsApartTest`: no room file imports the children's catalog for the taunts' images.
+
+### What does not change
+
+35. Everything else of ADRs 019–028, and in particular: an answer's points and `RoomPointsRule`'s rule for them; the judge and the clock on the server alone; the solution, results and ranking withheld until a close; the channel; whom a round waits for; the strip's pair, colours, emoji and stillness; the final's confetti and sounds; nothing typed, no nickname, avatar or chat; no total, rating or profile across rooms; nothing of rooms on the children's side.
+
+## Consequences
+
+- A lead becomes a thing a player can spend: a player ahead can tease for a few points, and a close race makes every taunt a choice.
+- A total can go down from one reveal to the next — always shown as «−:count», never silently.
+- The strip and the ranking still change only at a close; a taunt is a card over the strip for 4 s, and the round underneath is never covered.
+- Every accepted taunt is a revision: every device in the room reads the state once more, at most once per player per 10 s.
+- `/privacy` says something new, in two sentences; the role's sentence and the agreement already given stand.
+- T2 is a migration, one action and its route, the host's switch, the state's version, one content file with nine Fluent files, a prop, the words, and the tray and the cards beside ADR 027's strip — which must exist first (P2).
+
+## Alternatives rejected
+
+- **Variant B, «Panel»** (a head button, a sheet with every present player, a toast over the header, a silent screen): two choices under the clock and a sheet over the thrower's question for longer; one more button in the round's head truncates the game's name; and the room never sees the fun.
+- **Variant C, «Meydan»** (a row of emoji always under the round, the screen as a stage): the row takes 56px from the round — the 4 × 4 grid's cells fell to 43px in the prototype, under rule 15's 44px — an emoji without its words is a guess until it lands, and the screen's stage turns the room's attention from the question to the jibes.
+- **The −1 at once in the strip and the ranking:** a strip that moves during the question (ADR 027 decision 2), on every phone, for a reason only one phone can see.
+- **A stored balance or total:** a second number to keep true, against "derived things are never stored".
+- **A taunt that takes the target's point:** the owner's answer was the opposite; it would also make a taunt a weapon on the scoreboard rather than a joke.
+- **Spending the room's standing from earlier games:** a lead from an earlier game would buy jibes in a game where the player has nothing; a game is the unit of the race.
+- **Throwing before the first close, or in the lobby and the final:** an exception to the balance for the first round; a taunt in the lobby is a chat in all but name, and one in the last reveal would change the final.
+- **Any present player as the target on the phone** (B and C): kept open on the server (decision 9), not offered by A's device.
+- **A taunt at everyone at once:** the owner asked for a jibe at a rival, and a room-wide one is a broadcast to people who did not race the thrower.
+- **Typed text, a custom emoji or the system's emoji glyphs:** typed text needs moderation and an age rule (ADR 024); a system glyph draws differently on every phone and may be missing on an old one — the Fluent files are the app's own set.
+- **Sound or vibration for a taunt:** the owner's answer for this stage; twenty phones would sound.
+- **A taunt as a client event or on the channel:** ADR 021 — the channel carries a revision and nothing else, and a client event would be an unjudged write.
+- **Storing the phrase or a copy of the name with a taunt:** the key and the row's ids are enough; a phrase stored would outlive a correction of the list.
+- **Keeping who taunted whom for the retention period, or showing a count of taunts in the final:** a statistic about a person that ADR 024 decision 8 leaves out; the cost alone is kept.
+- **Taunts on every phone in the room:** noise over twenty questions; the screen is where the room looks together.
+- **A per-target cap beside the cooldown:** the price and the per-thrower cooldown bound it already; a cap would refuse a paying thrower for what others did.
+
+## What would make us revisit
+
+Players who ask to choose their target in a race, or targets who are flooded despite the cooldown (B's sheet, or a per-target cap); a host who switches taunts off in most rooms; a wish for a taunt's sound on the screen; a phrase that reads badly to someone in a room — the list is content and changes without code; a law or an incident that calls a taunt contact after all (ADR 024's own revisit clause).
