@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { REVEAL_MS, stagger } from '@/components/rooms/motion';
 import { press } from '@/components/rooms/motion-dom';
@@ -19,7 +20,8 @@ import type { RoomAsk, RoomItem, RoomMine, RoomStudy } from '@/rooms/contract';
  * Motion (ADR 025): the row's tiles pop in, in their order, within 0.15 s;
  * at `answer_from_ms` they turn face down at once; the question's tiles pop
  * in, a tap presses its tile and pops the item into its slot; the reveal's
- * rows come in tile by tile.
+ * rows come in tile by tile, the right order green under «Düzgün
+ * ardıcıllıq», so it never reads as the next row to remember.
  */
 
 /** The text sizes of a face: a tile on a phone, a slot, a tile on the screen. */
@@ -213,13 +215,18 @@ export function RecallOrderAsk({
     );
 }
 
-/** A list of ids as the question's items say them, in that order. */
+/**
+ * A list of ids as the question's items say them, in that order. The right
+ * order (`right`) is green under a label with `Check`, as a `choice`
+ * marks its right option, so a reveal never reads as the study's row.
+ */
 function Row({
     ask,
     ids,
     big,
     label,
     after,
+    right = false,
 }: {
     ask: RoomAsk;
     ids: string[];
@@ -227,17 +234,31 @@ function Row({
     label: string;
     /** In a reveal the page saw begin: when its first tile comes in. */
     after: number;
+    right?: boolean;
 }) {
     const items = new Map(ask.items.map((item) => [item.id, item]));
 
     return (
-        <div className="flex flex-col items-center gap-1.5">
+        <div
+            data-solution={right ? '' : undefined}
+            className="flex flex-col items-center gap-1.5"
+        >
             <span
                 className={cn(
-                    'text-sm text-muted-foreground',
-                    big && 'text-[2.4vh]',
+                    'flex items-center',
+                    right
+                        ? 'font-semibold text-emerald-700 dark:text-emerald-300'
+                        : 'text-muted-foreground',
+                    big ? 'gap-[1vh] text-[2.8vh]' : 'gap-1.5 text-sm',
                 )}
             >
+                {right && (
+                    <Check
+                        aria-hidden
+                        strokeWidth={3}
+                        className={big ? 'size-[3vh]' : 'size-4'}
+                    />
+                )}
                 {label}
             </span>
             <ol
@@ -256,7 +277,10 @@ function Row({
                                 animationDelay: `${after + stagger(index, 50, 400)}ms`,
                             }}
                             className={cn(
-                                'flex items-center justify-center border bg-card room-motion:animate-room-pop',
+                                'flex items-center justify-center border room-motion:animate-room-pop',
+                                right
+                                    ? 'border-emerald-600 bg-emerald-600/10 dark:border-emerald-400 dark:bg-emerald-400/10'
+                                    : 'bg-card',
                                 big
                                     ? 'size-[min(10vh,7vw)] rounded-[1.6vh]'
                                     : 'size-11 rounded-xl',
@@ -300,6 +324,7 @@ export function RecallOrderSolution({
                 big={big}
                 label={t('rooms.game.solution')}
                 after={REVEAL_MS.solution}
+                right
             />
             {mine !== null && (
                 <Row

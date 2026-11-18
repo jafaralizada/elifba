@@ -33,10 +33,13 @@ export function useLiveRoom({
     room,
     initial,
     onClosed = () => router.reload(),
+    answers = true,
 }: {
     room: { id: string; status: 'open' | 'closed' };
     initial: RoomState | null;
     onClosed?: () => void;
+    /** Whether the page answers for its viewer: false for the big screen (`followRoom()`). */
+    answers?: boolean;
 }): {
     state: RoomState | null;
     clock: ServerClock;
@@ -132,7 +135,7 @@ export function useLiveRoom({
             }),
         );
 
-        const follow = followRoom({ clock, refresh });
+        const follow = followRoom({ clock, refresh, answers });
         const watch = watchRoom({
             revision: firstRevision.current,
             channel: echo === null ? null : roomChannel(echo, room.id),
@@ -159,7 +162,7 @@ export function useLiveRoom({
             follow.stop();
             watch.stop();
         };
-    }, [live, room.id, room.status, clock]);
+    }, [live, room.id, room.status, clock, answers]);
 
     return { state, clock, refresh: () => refreshRef.current() };
 }

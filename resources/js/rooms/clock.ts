@@ -6,11 +6,16 @@
  * only needs to know when to ask, so it estimates the server's clock from
  * the `server_ms` of each state it fetches and asks again at the moment
  * the current phase ends — `opens_ms`, `answer_from_ms`, the bell,
- * `next_ms`. A page that asked a little early is told the same phase and
- * asks again shortly, a little later each time, so a clock that is off
- * never makes a hot loop (`room-state` allows 120 requests a minute). A
- * page that does not hear the channel also asks every 3 s in the lobby
- * and once it has answered, where only a signal would tell it of a change.
+ * `next_ms` — sent half a round trip ahead, so that it reaches the server
+ * just after the moment. A page that asked a little early is told the same
+ * phase with the server's own `server_ms`, which says how much of it was
+ * left, and asks again once that has passed; told it again, it waits a
+ * little longer each time, so a clock that is off never makes a hot loop
+ * (`room-state` allows 120 requests a minute). A page that does not hear
+ * the channel also asks every 1.5 s in the lobby and while it waits for
+ * the others in an open round, where only a signal would tell it of a
+ * change; one that hears it still asks every 3 s while it waits for the
+ * others, since a socket can be open and deaf.
  *
  * The local clock and the timers come from outside, so Vitest fakes them;
  * nothing here judges, scores or derives a phase.
@@ -45,6 +50,12 @@ export type ServerClock = {
     ) => void;
     /** The server's clock now, or null before the first state. */
     now: () => number | null;
+    /**
+     * How long a request takes to reach the server by the estimate: half
+     * the narrowest window the states left between the two clocks — 0
+     * until a fetched state bounds it from both sides.
+     */
+    trip: () => number;
 };
 
 const localNow: LocalClock = () => performance.now();
@@ -74,6 +85,8 @@ export function serverClock(local: LocalClock = localNow): ServerClock {
 
             return local() + (high === Infinity ? low : (low + high) / 2);
         },
+        trip: () =>
+            low === -Infinity || high === Infinity ? 0 : (high - low) / 2,
     };
 }
 
@@ -103,28 +116,64 @@ export function phaseEnds(state: RoomState): number | null {
 }
 
 /**
- * Whether a page that does not hear the channel asks every 3 s: in the
- * lobby and after a game, and in a round once it has answered (or cannot:
- * a host who does not play), where it waits for the others — an early
- * close is told only by a signal or a state.
+ * Whether a page that does not hear the channel asks every `POLL_MS`: in
+ * the lobby and after a game, where only a state tells it that a game
+ * began, and in a round's question once it has answered — or when it
+ * answers nothing: a host who does not play, and the big screen
+ * (`answers` false), whose viewer answers on a phone, so its own
+ * `answered` stays false while the room answers — where it waits for the
+ * others: an early close is told only by a signal or a state. The
+ * countdown, the study and the reveal end at their moments, which the
+ * page asks about anyway.
  */
-export function pollsWithoutChannel(state: RoomState): boolean {
+export function pollsWithoutChannel(state: RoomState, answers = true): boolean {
+    return state.round === null || waitsForOthers(state, answers);
+}
+
+/**
+ * Whether the page waits in a round's question for the others: it has
+ * answered, or answers nothing (a host who does not play, the screen).
+ * Only a signal or a state tells it of the early close, so it asks every
+ * `WAIT_POLL_MS` even while it hears the channel, and every `POLL_MS`
+ * while it does not.
+ */
+export function waitsForOthers(state: RoomState, answers = true): boolean {
+    const round = state.round;
+
     return (
-        state.round === null ||
-        state.round.answered ||
-        state.me.player_id === null
+        round !== null &&
+        round.phase === 'answer' &&
+        (!answers || round.answered || state.me.player_id === null)
     );
 }
+
+/**
+ * How often a page that hears the channel still asks while it waits for
+ * the others in a question. A socket can stay open and hear nothing — a
+ * phone that changed networks — until its ping times out: the
+ * rooms-flow check (2026-11-18) saw such a phone left on the question it
+ * had answered while the room closed it and played two more rounds
+ * without it, since a round waits only for the phones that read the
+ * state. Asked within the 3 s reveal, the page reads in time to be waited
+ * for in the next round.
+ */
+export const WAIT_POLL_MS = 3000;
 
 /** A moment is asked about this long after it, so the server is past it too. */
 export const LATE_MS = 60;
 
 /**
- * How long a page waits before asking again when it was told the same
- * phase after its end, or when its request failed — a little longer each
- * time in a row.
+ * At most this much of a request's way to the server is sent ahead of a
+ * moment: a first slow request makes the estimate's window wide.
  */
-export const AGAIN_MS = [250, 500, 1000, 2000, POLL_MS] as const;
+export const LEAD_MAX_MS = 250;
+
+/**
+ * How long a page waits before asking again when it was told the same
+ * phase twice after its end, or when its request failed — a little longer
+ * each time in a row.
+ */
+export const AGAIN_MS = [250, 500, 1000, 2000, 3000] as const;
 
 /** The wait before the n-th time in a row (from 1). */
 function again(times: number): number {
@@ -148,18 +197,27 @@ export type RoomFollow = {
 
 /**
  * Plans one request at a time from the state the page shows: at the end
- * of its phase, sooner every 3 s where `pollsWithoutChannel()` says so and
- * the channel is not heard. A request that failed — one this plan made,
- * or one a signal, a subscription or an answer started — is made again
- * shortly, a little later each time, until a state is shown: a page in the
- * lobby that hears the channel would otherwise wait for the next signal,
- * and miss the start of a game.
+ * of its phase, sent half a round trip ahead (`ServerClock.trip()`, at
+ * most `LEAD_MAX_MS`) so that it reaches the server `LATE_MS` after the
+ * moment; sooner every `POLL_MS` where `pollsWithoutChannel()` says so and
+ * the channel is not heard, and every `WAIT_POLL_MS` where
+ * `waitsForOthers()` says so and it is. Told the same phase after its end, the page
+ * asks again once the time the server said was left (the phase's end
+ * minus the state's `server_ms`) has passed, then a little later each
+ * time. A request that failed — one this plan made, or one a signal, a
+ * subscription or an answer started — is made again shortly, a little
+ * later each time, until a state is shown: a page in the lobby that hears
+ * the channel would otherwise wait for the next signal, and miss the start
+ * of a game.
  */
 export function followRoom(options: {
     clock: ServerClock;
     refresh: () => void;
     delays?: Delays;
+    /** Whether this page answers for its viewer: false for the big screen. */
+    answers?: boolean;
 }): RoomFollow {
+    const answers = options.answers ?? true;
     const delays = options.delays ?? realDelays;
     let shown: RoomState | null = null;
     let heard = false;
@@ -168,6 +226,8 @@ export function followRoom(options: {
     // The phase last shown, and how many times in a row it was shown after its end.
     let phase = '';
     let late = 0;
+    // Told a phase after its end: when, on the estimate, the server's own word says it is over.
+    let over: number | null = null;
     // Requests that failed since a state was last shown.
     let misses = 0;
 
@@ -195,14 +255,21 @@ export function followRoom(options: {
         let wait: number | null = null;
 
         if (ends !== null) {
-            wait =
-                now !== null && ends - now > 0
-                    ? ends - now + LATE_MS
-                    : again(late);
+            const lead = Math.min(options.clock.trip(), LEAD_MAX_MS);
+
+            if (now !== null && ends - now > 0) {
+                wait = Math.max(1, ends - now - lead + LATE_MS);
+            } else if (late === 1 && over !== null && now !== null) {
+                wait = Math.max(1, over - now);
+            } else {
+                wait = again(late);
+            }
         }
 
-        if (!heard && pollsWithoutChannel(shown)) {
+        if (!heard && pollsWithoutChannel(shown, answers)) {
             wait = Math.min(wait ?? POLL_MS, POLL_MS);
+        } else if (heard && waitsForOthers(shown, answers)) {
+            wait = Math.min(wait ?? WAIT_POLL_MS, WAIT_POLL_MS);
         }
 
         if (misses > 0) {
@@ -220,9 +287,14 @@ export function followRoom(options: {
             const key = `${state.game?.id ?? ''}.${round?.id ?? ''}.${round?.phase ?? ''}`;
             const ends = phaseEnds(state);
             const now = options.clock.now();
-            const over = ends !== null && now !== null && ends - now <= 0;
+            const ended = ends !== null && now !== null && ends - now <= 0;
 
-            late = over ? (key === phase ? late + 1 : 1) : 0;
+            late = ended ? (key === phase ? late + 1 : 1) : 0;
+            // The server read its clock this long before the end: ask once that has passed.
+            over =
+                ended && ends !== null && now !== null
+                    ? now + Math.max(0, ends - state.server_ms) + LATE_MS
+                    : null;
             phase = key;
             shown = state;
             misses = 0;

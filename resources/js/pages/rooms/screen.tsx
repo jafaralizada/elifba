@@ -69,10 +69,12 @@ export default function RoomsScreen({
 }: Props) {
     const { t } = useTranslation();
     // A closed room has no screen: its results are on the room's page.
+    // The screen answers nothing: it waits through every question as one who answered.
     const { state, clock } = useLiveRoom({
         room,
         initial,
         onClosed: () => router.visit(show(room.id)),
+        answers: false,
     });
     const motion = useRoomMotion(state);
     const sound = useRoomSound({ speaker: 'screen', sounds, state, clock });

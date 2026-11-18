@@ -10,6 +10,7 @@ import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 import { authenticate } from '@/actions/Illuminate/Broadcasting/BroadcastController';
 import { xsrfToken } from './http';
+import { SOCKET_TIMEOUTS } from './live';
 import type { RoomChannel, SocketState } from './live';
 
 export type RoomEcho = Echo<'reverb'>;
@@ -30,6 +31,7 @@ export function connectRoomEcho(): RoomEcho {
         wssPort: port,
         forceTLS: scheme === 'https',
         enabledTransports: ['ws', 'wss'],
+        ...SOCKET_TIMEOUTS,
         channelAuthorization: {
             transport: 'ajax',
             endpoint: authenticate.url(),

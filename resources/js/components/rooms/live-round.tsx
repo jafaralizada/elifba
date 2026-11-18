@@ -510,9 +510,10 @@ function phaseEnd(round: RoomRound): number | null {
 }
 
 /**
- * A round's head: «Raund :index / :total» over the game and its
- * difficulty, with `aside` (the code chip) beside them, then the time
- * bar with the seconds left. On the screen (`big`) the same, larger.
+ * A round's head: «Raund :index / :total» — in the reveal «Raund :index /
+ * :total bitdi» — over the game and its difficulty, with `aside` (the code
+ * chip) beside them, then the time bar with the seconds left. On the
+ * screen (`big`) the same, larger.
  */
 export function RoundHead({
     game,
@@ -548,6 +549,11 @@ export function RoundHead({
         seconds > 0 &&
         round.bell_ms - now <= URGENT_MS;
     const pop = motion ? 'motion-safe:animate-room-pop' : undefined;
+    // In the reveal the head says in words that the round is over.
+    const title = t(
+        round.phase === 'reveal' ? 'rooms.game.round_over' : 'rooms.game.round',
+        { index: round.index + 1, total: round.total },
+    );
     const time =
         left === null ? null : (
             <span
@@ -587,10 +593,7 @@ export function RoundHead({
                             pop,
                         )}
                     >
-                        {t('rooms.game.round', {
-                            index: round.index + 1,
-                            total: round.total,
-                        })}
+                        {title}
                     </h2>
                     {time}
                 </div>
@@ -611,10 +614,7 @@ export function RoundHead({
                             pop,
                         )}
                     >
-                        {t('rooms.game.round', {
-                            index: round.index + 1,
-                            total: round.total,
-                        })}
+                        {title}
                     </h2>
                     <p className="truncate text-xs text-muted-foreground">
                         {t(`rooms.mechanics.${game.mechanic}.name`)}

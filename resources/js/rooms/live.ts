@@ -7,13 +7,14 @@
  * listens for none — the channel below has no whisper.
  *
  * A signal sent before the channel is subscribed is lost, so the page asks
- * for the state every 3 s until the subscription succeeds, once more when
- * it does (the first and every one after a reconnect), and every 3 s again
- * whenever the socket drops or the subscription fails. A page that plays
- * a game asks by its own rules instead (`followRoom()` in `clock.ts`: at
- * the timetable's moments, and every 3 s only in the lobby and after it
- * has answered): it passes `onListening` and is told when the channel is
- * heard and when it is not, and this module does not poll.
+ * for the state every `POLL_MS` until the subscription succeeds, once more
+ * when it does (the first and every one after a reconnect), and every
+ * `POLL_MS` again whenever the socket drops or the subscription fails. A
+ * page that plays a game asks by its own rules instead (`followRoom()` in
+ * `clock.ts`: at the timetable's moments, and every `POLL_MS` only in the
+ * lobby and while it waits for the others): it passes `onListening` and is
+ * told when the channel is heard and when it is not, and this module does
+ * not poll.
  *
  * The channel comes from outside (`roomChannel()` in `socket.ts` adapts
  * Echo; tests use a fake), so this module never loads Echo.
@@ -38,8 +39,29 @@ export type Timers = {
     cancel: (handle: unknown) => void;
 };
 
-/** How often a page without a subscribed channel asks for the state. */
-export const POLL_MS = 3000;
+/**
+ * How often a page without a subscribed channel asks for the state: well
+ * inside the 3 s countdown and the 3 s reveal, so a page without a socket
+ * shows them both; two pages of one account (the host's phone and the
+ * screen) stay under `room-state`'s 120 requests a minute.
+ */
+export const POLL_MS = 1500;
+
+/**
+ * How soon a socket that hears nothing is found dead (`connectRoomEcho()`
+ * in `socket.ts` gives these to pusher-js, which pings
+ * after `activityTimeout` of silence — the lower of this and Reverb's 30 s
+ * — and closes when no pong comes within `pongTimeout`): about 15 s
+ * rather than a minute. Until then the page takes the channel for heard;
+ * the rooms-flow check (2026-11-18) saw a phone whose socket heard
+ * nothing stay in the lobby while the game it missed ran on. Closed, it
+ * polls (`watchRoom()`) and reconnects, and reads the state once
+ * subscribed again.
+ */
+export const SOCKET_TIMEOUTS = {
+    activityTimeout: 10_000,
+    pongTimeout: 5_000,
+} as const;
 
 const realTimers: Timers = {
     every: (callback, ms) => window.setInterval(callback, ms),

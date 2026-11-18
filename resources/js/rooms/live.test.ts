@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vite-plus/test';
 import type { RoomChannel, SocketState, Timers } from './live';
-import { oneAtATime, POLL_MS, watchRoom } from './live';
+import { oneAtATime, POLL_MS, SOCKET_TIMEOUTS, watchRoom } from './live';
 
 /*
  * A room page's live link (docs/architecture.md §12 "The race"): it fetches
@@ -226,5 +226,19 @@ describe('oneAtATime', () => {
         run();
         run();
         await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+    });
+});
+
+describe('the socket', () => {
+    it('finds a socket that hears nothing within about 15 s, not a minute', () => {
+        // pusher-js pings after the lower of its own and Reverb's 30 s of silence, and
+        // closes when no pong comes: a phone whose socket heard nothing stayed in the
+        // lobby while its game ran on (rooms-flow check, 2026-11-18).
+        expect(
+            SOCKET_TIMEOUTS.activityTimeout + SOCKET_TIMEOUTS.pongTimeout,
+        ).toBeLessThanOrEqual(15_000);
+        expect(SOCKET_TIMEOUTS.activityTimeout).toBeLessThan(30_000);
+        // Closed, the page polls until it is subscribed again — within the 3 s countdown.
+        expect(POLL_MS).toBeLessThan(3000);
     });
 });

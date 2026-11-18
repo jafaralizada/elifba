@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { REVEAL_MS } from '@/components/rooms/motion';
 import { press } from '@/components/rooms/motion-dom';
@@ -12,14 +13,14 @@ import type { RoomAsk, RoomItem, RoomMine, RoomStudy } from '@/rooms/contract';
  * study holds the lit cells only and is drawn only from a state in its
  * study phase; the question is every cell of the grid, the same whichever
  * were lit, and only `reveal.solution` says which. A lit cell is amber, a
- * lamp in both themes; the viewer's taps are the primary colour. The
- * reveal draws the lit cells and marks the viewer's taps on them; whether
- * the answer was right is the server's word (`mine.correct`).
+ * lamp in both themes, and only in the study; the viewer's taps are the
+ * primary colour. The reveal draws the cells that were lit as the right
+ * answer — green, with a check — and rings the viewer's taps; whether the
+ * answer was right is the server's word (`mine.correct`).
  *
  * Motion (ADR 025): the lit cells switch on together; at `answer_from_ms`
  * they go dark at once, so the dark grid the question brings is already
- * there; a tap presses its cell; the reveal switches the lit cells on
- * again and then marks the viewer's taps.
+ * there; a tap presses its cell; in the reveal the right cells' checks pop.
  */
 
 type Grid = { cols: number; rows: number };
@@ -182,7 +183,23 @@ export function RecallCellsAsk({
     );
 }
 
-/** The cells that were lit, from the reveal, with the viewer's own taps marked on the grid. */
+/** A cell that was lit, as the reveal draws it: the right answer, green with a check — never the study's lamp. */
+const RIGHT =
+    'border-emerald-600 bg-emerald-600/15 text-emerald-700 dark:border-emerald-400 dark:bg-emerald-400/15 dark:text-emerald-300';
+/** A cell that was not lit, in the reveal: only its outline, neither the study's nor the question's dark cell. */
+const EMPTY = 'border-dashed border-muted-foreground/35 bg-transparent';
+/** The viewer's own tap, in the reveal: a ring of the viewer's colour, the same on a right cell and a wrong one. */
+const YOURS = 'ring-[3px] ring-primary ring-inset';
+
+/**
+ * The cells that were lit, from the reveal, as the round's right answer:
+ * under «Düzgün xanalar» with `Check`, each such cell green with a check,
+ * the others only outlined, and the viewer's own taps ringed in their
+ * colour. It shares nothing with the study's look — no amber, no glow, no
+ * lamp — so a player who did not answer never takes it for the next
+ * round's cells to remember (the owner's report from elifba.io,
+ * 2026-11-18).
+ */
 export function RecallCellsSolution({
     ask,
     solution,
@@ -196,11 +213,12 @@ export function RecallCellsSolution({
 }) {
     const { t } = useTranslation();
     const grid = ask.grid ?? { cols: 1, rows: 1 };
-    const lit = new Set(solution);
+    const right = new Set(solution);
     const tapped = new Set(mine?.picked ?? []);
 
     return (
         <div
+            data-solution
             className={cn(
                 'flex w-full flex-col items-center',
                 big ? 'gap-[2vh]' : 'gap-2',
@@ -208,11 +226,16 @@ export function RecallCellsSolution({
         >
             <span
                 className={cn(
-                    'text-sm text-muted-foreground',
-                    big && 'text-[2.4vh]',
+                    'flex items-center font-semibold text-emerald-700 dark:text-emerald-300',
+                    big ? 'gap-[1vh] text-[3vh]' : 'gap-1.5 text-sm',
                 )}
             >
-                {t('rooms.game.lit_cells')}
+                <Check
+                    aria-hidden
+                    strokeWidth={3}
+                    className={big ? 'size-[3.2vh]' : 'size-4'}
+                />
+                {t('rooms.game.right_cells')}
             </span>
             <div
                 className={cn('mx-auto grid', gap(grid, big))}
@@ -221,22 +244,24 @@ export function RecallCellsSolution({
                 {ask.items.map((item) => (
                     <span
                         key={item.id}
-                        style={{ animationDelay: `${REVEAL_MS.solution}ms` }}
+                        data-cell={place(item)}
+                        data-right={right.has(item.id) ? '' : undefined}
+                        data-yours={tapped.has(item.id) ? '' : undefined}
                         className={cn(
                             CELL,
                             'flex items-center justify-center',
-                            lit.has(item.id)
-                                ? cn(LIT, 'room-motion:animate-room-lamp')
-                                : DARK,
+                            right.has(item.id) ? RIGHT : EMPTY,
+                            tapped.has(item.id) && YOURS,
                         )}
                     >
-                        {tapped.has(item.id) && (
-                            <span
+                        {right.has(item.id) && (
+                            <Check
                                 aria-hidden
+                                strokeWidth={3}
                                 style={{
                                     animationDelay: `${REVEAL_MS.highlight}ms`,
                                 }}
-                                className="size-[34%] rounded-full bg-primary ring-2 ring-background room-motion:animate-room-pop"
+                                className="size-[46%] room-motion:animate-room-pop"
                             />
                         )}
                     </span>
@@ -246,7 +271,10 @@ export function RecallCellsSolution({
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <span
                         aria-hidden
-                        className="inline-block size-2.5 rounded-full bg-primary"
+                        className={cn(
+                            'inline-block size-3.5 rounded-[18%]',
+                            YOURS,
+                        )}
                     />
                     {t('rooms.game.yours_marked')}
                 </span>
