@@ -7,6 +7,7 @@ import {
     longestText,
     rowFont,
 } from '@/components/rooms/mechanics/choice-layout';
+import { REVEAL_MS, stagger } from '@/components/rooms/motion';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import type { RoomAsk, RoomItem, RoomMine } from '@/rooms/contract';
@@ -19,6 +20,9 @@ import type { RoomAsk, RoomItem, RoomMine } from '@/rooms/contract';
  * right option into that place, from `reveal.solution`, and marks the
  * options under the row as the reveal says. The page never works out a
  * term: the right one is the server's word.
+ *
+ * Motion (ADR 025): the row's numbers pop in left to right and the «?»
+ * last; in the reveal the right number pops into its place.
  */
 
 /**
@@ -60,14 +64,31 @@ function Row({
                     fontSize: font,
                 }}
             >
-                {shown.map((item) => (
-                    <li key={item.id} className={cn(cell, 'bg-card')}>
+                {shown.map((item, index) => (
+                    <li
+                        key={item.id}
+                        style={{
+                            animationDelay: `${next === undefined ? stagger(index) : 0}ms`,
+                        }}
+                        className={cn(
+                            cell,
+                            'bg-card',
+                            next === undefined &&
+                                'room-motion:animate-room-pop',
+                        )}
+                    >
                         {itemText(item)}
                     </li>
                 ))}
                 <li
+                    style={{
+                        animationDelay: `${next === undefined ? stagger(shown.length) : REVEAL_MS.highlight}ms`,
+                    }}
                     className={cn(
                         cell,
+                        next === undefined
+                            ? 'room-motion:animate-room-pop'
+                            : 'room-motion:animate-room-bump',
                         next === undefined
                             ? 'border-2 border-dashed border-primary/60 bg-primary/5 text-primary'
                             : 'border-2 border-emerald-600 bg-emerald-600/10 text-emerald-700 dark:border-emerald-400 dark:text-emerald-300',
@@ -76,7 +97,18 @@ function Row({
                     <span className="sr-only">
                         {t('rooms.game.next_term')}:{' '}
                     </span>
-                    {next === undefined ? '?' : itemText(next)}
+                    {next === undefined ? (
+                        '?'
+                    ) : (
+                        <span
+                            style={{
+                                animationDelay: `${REVEAL_MS.highlight}ms`,
+                            }}
+                            className="room-motion:animate-room-pop"
+                        >
+                            {itemText(next)}
+                        </span>
+                    )}
                 </li>
             </ol>
         </div>

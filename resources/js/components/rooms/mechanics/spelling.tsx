@@ -1,5 +1,7 @@
 import { Mark, TILE } from '@/components/rooms/mechanics/choice';
 import { optionMark } from '@/components/rooms/mechanics/choice-layout';
+import { REVEAL_MS, stagger } from '@/components/rooms/motion';
+import { press } from '@/components/rooms/motion-dom';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import type { RoomAsk, RoomMine } from '@/rooms/contract';
@@ -19,6 +21,9 @@ import type { RoomAsk, RoomMine } from '@/rooms/contract';
  * Words are drawn as the server wrote them: no `uppercase` or
  * `capitalize` class and no `toUpperCase()`, which outside an Azerbaijani
  * locale would turn «i» into «I» and lose «ı» and «İ».
+ *
+ * Motion (ADR 025): the spellings pop in top to bottom, a tap presses the
+ * one it chose, and the reveal's marked spellings stand out.
  */
 
 const WORD = 'font-semibold tracking-wide';
@@ -45,10 +50,16 @@ export function SpellingAsk({
     if (big) {
         return (
             <ul className={cn(COLUMN, 'max-w-[80vh] gap-[1.6vh]')}>
-                {ask.items.map((item) => (
+                {ask.items.map((item, index) => (
                     <li
                         key={item.id}
-                        className={cn(TILE, WORD, BIG, 'bg-card shadow-sm')}
+                        style={{ animationDelay: `${stagger(index, 35)}ms` }}
+                        className={cn(
+                            TILE,
+                            WORD,
+                            BIG,
+                            'bg-card shadow-sm room-motion:animate-room-pop',
+                        )}
                     >
                         {item.text ?? ''}
                     </li>
@@ -63,7 +74,7 @@ export function SpellingAsk({
             aria-label={t('rooms.mechanics.spelling.ask')}
             className={cn(COLUMN, 'max-w-sm gap-2')}
         >
-            {ask.items.map((item) => {
+            {ask.items.map((item, index) => {
                 const chosen = picked.includes(item.id);
 
                 return (
@@ -72,12 +83,16 @@ export function SpellingAsk({
                         type="button"
                         aria-pressed={chosen}
                         disabled={disabled}
-                        onClick={() => onPick(item.id)}
+                        onClick={(event) => {
+                            press(event.currentTarget);
+                            onPick(item.id);
+                        }}
+                        style={{ animationDelay: `${stagger(index, 35)}ms` }}
                         className={cn(
                             TILE,
                             WORD,
                             PHONE,
-                            'bg-card py-2 shadow-sm transition-[background-color,opacity,transform] outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100',
+                            'bg-card py-2 shadow-sm transition-[background-color,opacity,transform] outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 room-motion:animate-room-pop',
                             chosen &&
                                 'border-primary bg-primary text-primary-foreground',
                             disabled && !chosen && 'opacity-50',
@@ -121,10 +136,13 @@ export function SpellingSolution({
                 return (
                     <li
                         key={item.id}
+                        style={{ animationDelay: `${REVEAL_MS.highlight}ms` }}
                         className={cn(
                             TILE,
                             WORD,
                             'flex-col gap-0.5',
+                            mark.tone !== null &&
+                                'room-motion:animate-room-bump',
                             big ? cn(BIG, 'py-[1vh]') : cn(PHONE, 'py-1.5'),
                             mark.tone === 'right' &&
                                 'border-emerald-600 bg-emerald-600/10 dark:border-emerald-400',

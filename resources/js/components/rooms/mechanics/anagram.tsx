@@ -6,6 +6,8 @@ import {
     slotText,
     tileRows,
 } from '@/components/rooms/mechanics/word-layout';
+import { REVEAL_MS, stagger } from '@/components/rooms/motion';
+import { press } from '@/components/rooms/motion-dom';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import type { RoomAsk, RoomMine } from '@/rooms/contract';
@@ -23,6 +25,10 @@ import type { RoomAsk, RoomMine } from '@/rooms/contract';
  * reveal says so rather than drawing it as a mistake.
  *
  * No case is changed here: no `uppercase` class, no `toUpperCase()`.
+ *
+ * Motion (ADR 025): the places come in and the tiles pop in; a tap presses
+ * its tile and pops its letter into the place, and the next empty place
+ * breathes; the reveal writes the word letter by letter.
  */
 
 /** A tile: 60px on a phone (five to a row at 375px), up to 13vh on the screen. */
@@ -57,7 +63,7 @@ function Places({
         <ol
             aria-label={label}
             className={cn(
-                'grid w-full justify-center',
+                'grid w-full justify-center room-motion:animate-room-enter',
                 big ? 'gap-[1vh]' : 'gap-1.5',
             )}
             style={{
@@ -82,13 +88,20 @@ function Places({
                                 ? cn(
                                       'border border-dashed',
                                       next
-                                          ? 'border-2 border-primary'
+                                          ? 'border-2 border-primary motion-safe:animate-room-breathe'
                                           : 'border-muted-foreground/40',
                                   )
                                 : 'border bg-card shadow-xs',
                         )}
                     >
-                        {letter}
+                        {letter !== null && (
+                            <span
+                                key={`${index}-${letter}`}
+                                className="motion-safe:animate-room-pop"
+                            >
+                                {letter}
+                            </span>
+                        )}
                     </li>
                 );
             })}
@@ -129,10 +142,11 @@ export function AnagramAsk({
                     className="flex flex-wrap justify-center gap-[1.6vh]"
                     style={tilesWidth(ask.items.length, true)}
                 >
-                    {ask.items.map((item) => (
+                    {ask.items.map((item, index) => (
                         <li
                             key={item.id}
-                            className="flex size-[min(13vh,9vw)] items-center justify-center rounded-[min(2.5vh,1.8vw)] border bg-card text-[min(8vh,5.5vw)] font-semibold shadow-sm"
+                            style={{ animationDelay: `${stagger(index)}ms` }}
+                            className="flex size-[min(13vh,9vw)] items-center justify-center rounded-[min(2.5vh,1.8vw)] border bg-card text-[min(8vh,5.5vw)] font-semibold shadow-sm room-motion:animate-room-pop"
                         >
                             {item.text ?? ''}
                         </li>
@@ -155,7 +169,7 @@ export function AnagramAsk({
                 className="flex w-full flex-wrap justify-center gap-2"
                 style={tilesWidth(ask.items.length, false)}
             >
-                {ask.items.map((item) => {
+                {ask.items.map((item, index) => {
                     const used = picked.includes(item.id);
 
                     return (
@@ -165,9 +179,13 @@ export function AnagramAsk({
                             disabled={disabled || used}
                             aria-pressed={used}
                             aria-label={item.text ?? ''}
-                            onClick={() => onPick(item.id)}
+                            onClick={(event) => {
+                                press(event.currentTarget);
+                                onPick(item.id);
+                            }}
+                            style={{ animationDelay: `${stagger(index)}ms` }}
                             className={cn(
-                                'flex size-15 items-center justify-center rounded-2xl border text-3xl font-semibold transition-[opacity,transform] outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100',
+                                'flex size-15 items-center justify-center rounded-2xl border text-3xl font-semibold transition-[opacity,transform] outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100 room-motion:animate-room-pop',
                                 used
                                     ? 'border-dashed border-muted-foreground/40 bg-transparent'
                                     : 'bg-card shadow-sm',
@@ -194,6 +212,7 @@ function Word({
     big,
     label,
     mark,
+    after,
 }: {
     /** For checks (`data-word`): the round's word or the viewer's. */
     kind: 'word' | 'yours';
@@ -202,6 +221,8 @@ function Word({
     big: boolean;
     label: string;
     mark: ReactNode;
+    /** In a reveal the page saw begin: when its first letter comes in. */
+    after: number;
 }) {
     return (
         <div
@@ -240,8 +261,11 @@ function Word({
                 {letters.map((letter, index) => (
                     <span
                         key={index}
+                        style={{
+                            animationDelay: `${after + stagger(index, 60, 480)}ms`,
+                        }}
                         className={cn(
-                            'flex items-center justify-center border font-semibold',
+                            'flex items-center justify-center border font-semibold room-motion:animate-room-pop',
                             big
                                 ? 'h-[12vh] rounded-[1.4vh] border-[0.3vh]'
                                 : cn(
@@ -303,6 +327,7 @@ export function AnagramSolution({
                 tone="right"
                 big={big}
                 label={t('rooms.game.word')}
+                after={REVEAL_MS.solution}
                 mark={
                     theirs === null ? null : (
                         <Mark
@@ -324,6 +349,7 @@ export function AnagramSolution({
                     tone={theirs === 'other' ? 'right' : 'wrong'}
                     big={big}
                     label={t('rooms.game.yours')}
+                    after={REVEAL_MS.highlight}
                     mark={
                         <Mark
                             mark={{

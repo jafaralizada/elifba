@@ -22,9 +22,12 @@ import { LiveRound } from '@/components/rooms/live-round';
 import { RoomActionBar } from '@/components/rooms/room-action-bar';
 import { CodeCard, CodeChip } from '@/components/rooms/room-code';
 import type { JoinLink } from '@/components/rooms/room-code';
+import { FinalStanding } from '@/components/rooms/final-standing';
 import { RoomConfirm } from '@/components/rooms/room-confirm';
 import { Standing } from '@/components/rooms/standing';
 import { useLiveRoom } from '@/components/rooms/use-live-room';
+import { useRoomMotion } from '@/components/rooms/use-motion';
+import type { RoomMotion } from '@/components/rooms/use-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
@@ -85,7 +88,8 @@ type Props = {
  *
  * The page follows the state with `useLiveRoom()`; it sends no client
  * event, and draws what the latest state says: it never derives a phase,
- * a solution or a point.
+ * a solution or a point. A moment moves only when the page saw it begin
+ * (`useRoomMotion()`, ADR 025): the one it opened on stands still.
  */
 export default function RoomsShow({
     room,
@@ -98,6 +102,7 @@ export default function RoomsShow({
 }: Props) {
     const { t } = useTranslation();
     const { state, clock, refresh } = useLiveRoom({ room, initial });
+    const motion = useRoomMotion(state);
     // The host's last choice of a game, for the next «Yeni oyun».
     const [choice, setChoice] = useState<SetupChoice | null>(null);
 
@@ -164,6 +169,7 @@ export default function RoomsShow({
                             placeLabels={placeLabels}
                             refresh={refresh}
                             onGone={() => router.reload()}
+                            motion={motion}
                             aside={
                                 state.room.code !== null ? (
                                     <CodeChip
@@ -210,6 +216,7 @@ export default function RoomsShow({
                         join={join}
                         placeLabels={placeLabels}
                         can={can}
+                        motion={motion}
                     />
                 )}
             </div>
@@ -241,8 +248,8 @@ export default function RoomsShow({
 
 /**
  * The lobby, before the first game and between games: a game's end with
- * the room's standing, the code and its QR, the players, the host's tools
- * and a player's way out.
+ * its final (the room's standing, ADR 025), the code and its QR, the
+ * players, the host's tools and a player's way out.
  */
 function Lobby({
     room,
@@ -251,6 +258,7 @@ function Lobby({
     join,
     placeLabels,
     can,
+    motion,
 }: {
     room: Props['room'];
     state: RoomState;
@@ -258,6 +266,7 @@ function Lobby({
     join: JoinLink | null;
     placeLabels: string[];
     can: Can;
+    motion: RoomMotion;
 }) {
     const { t } = useTranslation();
     const present = state.players.filter((player) => player.present).length;
@@ -265,9 +274,13 @@ function Lobby({
     return (
         <>
             {game !== null && game.phase === 'over' && (
-                <section className="flex flex-col gap-3">
-                    <div className="flex items-center gap-3 rounded-2xl border bg-card p-4">
-                        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted">
+                <section
+                    key={game.id}
+                    data-motion={motion.phase ? 'on' : undefined}
+                    className="flex flex-col gap-3"
+                >
+                    <div className="flex items-center gap-3 rounded-2xl border bg-card p-4 room-motion:animate-room-enter">
+                        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-amber-400 text-amber-950 room-motion:animate-room-pop">
                             <Trophy aria-hidden className="size-5" />
                         </span>
                         <span className="flex min-w-0 flex-col">
@@ -290,11 +303,12 @@ function Lobby({
                     <h2 className="text-sm font-semibold">
                         {t('rooms.game.standing')}
                     </h2>
-                    <Standing
+                    <FinalStanding
                         ranking={state.ranking}
                         players={state.players}
                         me={state.me.player_id}
                         placeLabels={placeLabels}
+                        animate={motion.phase}
                     />
                 </section>
             )}

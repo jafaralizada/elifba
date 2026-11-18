@@ -4,6 +4,8 @@ import {
     optionMark,
 } from '@/components/rooms/mechanics/choice-layout';
 import type { OptionMark } from '@/components/rooms/mechanics/choice-layout';
+import { REVEAL_MS, stagger } from '@/components/rooms/motion';
+import { press } from '@/components/rooms/motion-dom';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import type { RoomAsk, RoomItem, RoomMine } from '@/rooms/contract';
@@ -19,6 +21,10 @@ import type { RoomAsk, RoomItem, RoomMine } from '@/rooms/contract';
  * takes the viewer's colour and the others fade and stop taking taps.
  * The reveal draws the same options in the same places, the right one
  * marked from `reveal.solution` and the viewer's own by `mine.correct`.
+ *
+ * Motion (ADR 025): the options pop in one after another within 0.15 s, a
+ * tap presses the option it chose, and in the reveal the marked options
+ * stand out (`room-bump`) without ever being hidden.
  */
 
 /** Nothing is studied in a logic or a word round; the view has no study. */
@@ -80,12 +86,13 @@ export function ChoiceOptions({
     if (big) {
         return (
             <ul className={gridClass(ask.items.length, true)}>
-                {ask.items.map((item) => (
+                {ask.items.map((item, index) => (
                     <li
                         key={item.id}
+                        style={{ animationDelay: `${stagger(index, 30)}ms` }}
                         className={cn(
                             TILE,
-                            'rounded-[1.6vh] bg-card px-[2vh] shadow-sm',
+                            'rounded-[1.6vh] bg-card px-[2vh] shadow-sm room-motion:animate-room-pop',
                             bigHeight(ask.items.length),
                             textClass(item, true),
                         )}
@@ -103,7 +110,7 @@ export function ChoiceOptions({
             aria-label={label}
             className={gridClass(ask.items.length, false)}
         >
-            {ask.items.map((item) => {
+            {ask.items.map((item, index) => {
                 const chosen = picked.includes(item.id);
 
                 return (
@@ -112,10 +119,14 @@ export function ChoiceOptions({
                         type="button"
                         aria-pressed={chosen}
                         disabled={disabled}
-                        onClick={() => onPick(item.id)}
+                        onClick={(event) => {
+                            press(event.currentTarget);
+                            onPick(item.id);
+                        }}
+                        style={{ animationDelay: `${stagger(index, 30)}ms` }}
                         className={cn(
                             TILE,
-                            'min-h-13 rounded-2xl bg-card px-3 py-2 shadow-sm transition-[background-color,opacity,transform] outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100',
+                            'min-h-13 rounded-2xl bg-card px-3 py-2 shadow-sm transition-[background-color,opacity,transform] outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100 room-motion:animate-room-pop',
                             textClass(item, false),
                             chosen &&
                                 'border-primary bg-primary text-primary-foreground',
@@ -212,9 +223,12 @@ export function ChoiceReveal({
                 return (
                     <li
                         key={item.id}
+                        style={{ animationDelay: `${REVEAL_MS.highlight}ms` }}
                         className={cn(
                             TILE,
                             one ? 'flex-row gap-3' : 'flex-col gap-0.5',
+                            mark.tone !== null &&
+                                'room-motion:animate-room-bump',
                             big
                                 ? cn(
                                       'rounded-[1.6vh] px-[2vh] py-[1vh]',

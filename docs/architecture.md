@@ -78,16 +78,16 @@ Owner decisions of 2026-11-17 (fixed; ADRs 019–024, §12, built in B2–B7): g
 
 Versions checked 2026-11-09. Replace one only with a concrete reason, recorded here.
 
-| Layer   | Choice                                                                                                                                                                                                  |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Server  | Laravel 13, PHP 8.4, the official React starter kit (Laravel Installer 5.31.1) with its built-in authentication                                                                                         |
-| Pages   | Inertia 3 + React 19.2 + TypeScript + Tailwind 4, shadcn/ui from the starter kit, Wayfinder typed routes                                                                                                |
-| Live    | Laravel Reverb 1.x (Pusher protocol), `laravel-echo` + `@laravel/echo-react` 2.6.3                                                                                                                      |
-| Board   | Phaser 4.2.1, loaded only on the board page                                                                                                                                                             |
-| Extras  | `qrcode.react` 4.2.0 (pairing QR), `modern-screenshot` 4.7.0 (share card), `canvas-confetti` 1.9.4 (podium), `zod` 4.6 (the round contract and client-event validation in TypeScript, §2, §4)           |
-| Roles   | `spatie/laravel-permission` 8.5 (R2; checked 2026-11-11: PHP ^8.3, Laravel 12 and 13, Larastan 3.9; roles only, ADR 010)                                                                                |
-| Tests   | Pest (PHP); Vitest for pure TypeScript modules from A6, run as `vp test` (Vite+ ships Vitest 5; `npm run test`, configured in `vite.config.ts`'s `test` block); PHPStan level 8 (Larastan), Pint, `tsc` |
-| Runtime | Node 22 for builds; dev served by Laravel Herd; production as docker compose (§10)                                                                                                                      |
+| Layer   | Choice                                                                                                                                                                                                             |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Server  | Laravel 13, PHP 8.4, the official React starter kit (Laravel Installer 5.31.1) with its built-in authentication                                                                                                    |
+| Pages   | Inertia 3 + React 19.2 + TypeScript + Tailwind 4, shadcn/ui from the starter kit, Wayfinder typed routes                                                                                                           |
+| Live    | Laravel Reverb 1.x (Pusher protocol), `laravel-echo` + `@laravel/echo-react` 2.6.3                                                                                                                                 |
+| Board   | Phaser 4.2.1, loaded only on the board page                                                                                                                                                                        |
+| Extras  | `qrcode.react` 4.2.0 (pairing QR), `modern-screenshot` 4.7.0 (share card), `canvas-confetti` 1.9.4 (podium; a room's final, §12), `zod` 4.6 (the round contract and client-event validation in TypeScript, §2, §4) |
+| Roles   | `spatie/laravel-permission` 8.5 (R2; checked 2026-11-11: PHP ^8.3, Laravel 12 and 13, Larastan 3.9; roles only, ADR 010)                                                                                           |
+| Tests   | Pest (PHP); Vitest for pure TypeScript modules from A6, run as `vp test` (Vite+ ships Vitest 5; `npm run test`, configured in `vite.config.ts`'s `test` block); PHPStan level 8 (Larastan), Pint, `tsc`            |
+| Runtime | Node 22 for builds; dev served by Laravel Herd; production as docker compose (§10)                                                                                                                                 |
 
 ### Decisions at a glance
 
@@ -1943,7 +1943,7 @@ GitHub Actions (`.github/workflows/ci.yml`, actions pinned by SHA as in the prec
 
 ## 12. Rooms: adults' games (B2–B7)
 
-Designed in B1 (2026-11-17, ADRs 019–024) and built by B2–B7; until a step lands, nothing of what it is marked with exists. The section is whole on purpose: everything about rooms is here, and §1–§11 only point to it, so the contract of class and home games reads as before.
+Designed in B1 (2026-11-17, ADRs 019–024) and built by B2–B7; a game's motion, its sound and its final in ADR 025 (2026-11-18); until a step lands, nothing of what it is marked with exists. The section is whole on purpose: everything about rooms is here, and §1–§11 only point to it, so the contract of class and home games reads as before.
 
 A **room** is opened by an account and entered by other accounts with its code. In it, everyone plays the same rounds at the same time, each on their own phone, and the room sees a ranking. The games are memory, logic and sequences, and Azerbaijani word games, at a difficulty the host picks.
 
@@ -2166,7 +2166,7 @@ There is no pause, and the host is never replaced.
 
 **The contract** is the room's own: PHP DTOs in `Rooms\Data\*` (`RoomStateData`, `RoomRoundData`, `RoomItemData`, `RoomRevealData`, `RoomAnswerData`, `RoomAnswerReceiptData`), zod schemas in `resources/js/rooms/contract.ts` with the TypeScript types inferred from them, fixtures in `tests/Fixtures/rooms/` (`state.lobby.json`, `state.countdown.json`, `state.study.json`, `state.answer.json`, `state.reveal.json`, `state.over.json`, `answer.json`, `receipt.json`, `judge.json`) read by `RoomContractTest` and `contract.test.ts`. The schemas are strict, so a name or a solution in the wrong place fails them. `resources/js/game/contract.ts`, `RoundData` and `tests/Fixtures/contract/` are not touched.
 
-**The pages** are React on a phone, without Phaser, sound or voice (B4; `docs/frontend.md` gets a rule for the player shell). A mechanic's instruction is interface text — `rooms.mechanics.{mechanic}.{name,line,study,ask}` in `lang/az.json` and `lang/en.json`, with no `study` for a game that is not studied — and what a round shows is content, Azerbaijani in every locale and cased on the server.
+**The pages** are React on a phone, without Phaser or voice (B4; `docs/frontend.md` rule 15 is the player shell). Every moment of a game moves as ADR 025 decides (rule 15 "Motion"): the movement follows the state and the viewer's own taps, a page animates only a moment it saw begin (`roomMoment()`), nothing moves differently for a right or a wrong answer before the reveal, numbers that count are the server's, and everything stands still under `prefers-reduced-motion`. The end of a game is a final (`FinalStanding`): the state's ranking — the room's standing — opening from the last place to the first, the first three emphasised, a short `canvas-confetti` burst on the screen and on the winner's own phone. Sound follows ADR 025 "Sound" in the next step: the screen is the room's speaker, a phone plays only quiet cues of its own, each device has a mute, nothing audible about right or wrong before the reveal. A mechanic's instruction is interface text — `rooms.mechanics.{mechanic}.{name,line,study,ask}` in `lang/az.json` and `lang/en.json`, with no `study` for a game that is not studied — and what a round shows is content, Azerbaijani in every locale and cased on the server.
 
 **No promise.** No interface text, landing text or README says that a game improves memory, intelligence, attention or health; the games are named by what one does.
 
@@ -2218,6 +2218,8 @@ How "the teacher, parent and child sides are untouched" is proven, and which tes
 | `tests/Feature/Family/ChildPagesTest.php`          | "sends nothing about rooms to a page of the parent area"                                                                                                                                                                                                                |
 | `tests/Feature/Play/GameCatalogTest.php`           | "lists no room game": the catalog's games stay the pinned list, and no `RoomMechanic` value is a `Mechanic` value                                                                                                                                                       |
 | `tests/Feature/Auth/RolesTableTest.php`            | "holds exactly the roles of the enum": three rows                                                                                                                                                                                                                       |
+| `resources/js/components/rooms/motion.test.ts`     | ADR 025: "draws the moment a page opened on still" (a reload replays nothing); "moves rows only between two orders the server gave"; "counts the server's numbers"                                                                                                      |
+| `resources/js/components/rooms/final.test.ts`      | ADR 025: "opens the places from the last to the first", "opens a shared place at once", "has no winner when nobody scored"                                                                                                                                              |
 
 ---
 

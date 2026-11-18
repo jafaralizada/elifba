@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils';
 import { timeLeft } from '@/rooms/clock';
 
 /** The last stretch of an answer, when the bar turns red. */
-const URGENT_MS = 3000;
+export const URGENT_MS = 3000;
 
 /**
  * How much of the phase is left (docs/frontend.md rule 15, "The time

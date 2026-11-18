@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { REVEAL_MS, stagger } from '@/components/rooms/motion';
+import { press } from '@/components/rooms/motion-dom';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import type { RoomAsk, RoomItem, RoomMine, RoomStudy } from '@/rooms/contract';
@@ -13,6 +15,11 @@ import type { RoomAsk, RoomItem, RoomMine, RoomStudy } from '@/rooms/contract';
  * `reveal.solution` says which way it goes. The viewer's answer is shown
  * beside the right order, never compared with it item by item: right or
  * wrong is the server's word (`mine.correct`).
+ *
+ * Motion (ADR 025): the row's tiles pop in, in their order, within 0.15 s;
+ * at `answer_from_ms` they turn face down at once; the question's tiles pop
+ * in, a tap presses its tile and pops the item into its slot; the reveal's
+ * rows come in tile by tile.
  */
 
 /** The text sizes of a face: a tile on a phone, a slot, a tile on the screen. */
@@ -53,32 +60,52 @@ function tileSize(big: boolean): string {
         : 'size-15 rounded-2xl';
 }
 
-/** The row in the order shown; drawn only from a state in its study phase. */
+/**
+ * The row in the order shown; drawn only from a state in its study phase
+ * and, `covered`, face down: as many tiles, with nothing on them.
+ */
 export function RecallOrderStudy({
     study,
     big = false,
+    covered = false,
 }: {
     study: RoomStudy;
     big?: boolean;
+    covered?: boolean;
 }) {
     return (
         <ol
+            data-covered={covered ? '' : undefined}
             className={cn(
                 'flex flex-wrap justify-center',
                 big ? 'gap-[1.6vh]' : 'gap-2',
             )}
         >
-            {study.items.map((item) => (
-                <li
-                    key={item.id}
-                    className={cn(
-                        'flex items-center justify-center border bg-card shadow-sm',
-                        tileSize(big),
-                    )}
-                >
-                    {face(item, big ? 'big' : 'tile')}
-                </li>
-            ))}
+            {study.items.map((item, index) =>
+                covered ? (
+                    <li
+                        key={`back-${index}`}
+                        aria-hidden
+                        className={cn(
+                            'flex items-center justify-center border border-primary/15 bg-muted room-motion:animate-room-pop',
+                            tileSize(big),
+                        )}
+                    >
+                        <span className="size-[18%] rounded-full bg-muted-foreground/25" />
+                    </li>
+                ) : (
+                    <li
+                        key={item.id}
+                        className={cn(
+                            'flex items-center justify-center border bg-card shadow-sm room-motion:animate-room-pop',
+                            tileSize(big),
+                        )}
+                        style={{ animationDelay: `${stagger(index)}ms` }}
+                    >
+                        {face(item, big ? 'big' : 'tile')}
+                    </li>
+                ),
+            )}
         </ol>
     );
 }
@@ -118,7 +145,7 @@ export function RecallOrderAsk({
         <div className="flex w-full flex-col items-center gap-4">
             <ol
                 aria-label={t('rooms.game.yours')}
-                className="grid w-full justify-center gap-1.5"
+                className="grid w-full justify-center gap-1.5 room-motion:animate-room-enter"
                 style={{
                     gridTemplateColumns: `repeat(${ask.pick}, minmax(0, 2.75rem))`,
                 }}
@@ -136,14 +163,21 @@ export function RecallOrderAsk({
                                     : 'border bg-card shadow-xs',
                             )}
                         >
-                            {item !== undefined && face(item, 'slot')}
+                            {item !== undefined && (
+                                <span
+                                    key={item.id}
+                                    className="flex size-full items-center justify-center motion-safe:animate-room-pop"
+                                >
+                                    {face(item, 'slot')}
+                                </span>
+                            )}
                         </li>
                     );
                 })}
             </ol>
 
             <div className="flex flex-wrap justify-center gap-2">
-                {ask.items.map((item) => {
+                {ask.items.map((item, index) => {
                     const position = picked.indexOf(item.id);
                     const used = position !== -1;
 
@@ -153,9 +187,13 @@ export function RecallOrderAsk({
                             type="button"
                             disabled={disabled || used}
                             aria-pressed={used}
-                            onClick={() => onPick(item.id)}
+                            onClick={(event) => {
+                                press(event.currentTarget);
+                                onPick(item.id);
+                            }}
+                            style={{ animationDelay: `${stagger(index)}ms` }}
                             className={cn(
-                                'relative flex items-center justify-center border bg-card shadow-sm transition-[opacity,transform] outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100',
+                                'relative flex items-center justify-center border bg-card shadow-sm transition-[opacity,transform] outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100 room-motion:animate-room-pop',
                                 tileSize(false),
                                 used && 'opacity-35 shadow-none',
                                 disabled && !used && 'opacity-60',
@@ -163,7 +201,7 @@ export function RecallOrderAsk({
                         >
                             {face(item, 'tile')}
                             {used && (
-                                <span className="absolute -top-1.5 -right-1.5 flex size-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground tabular-nums">
+                                <span className="absolute -top-1.5 -right-1.5 flex size-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground tabular-nums motion-safe:animate-room-pop">
                                     {position + 1}
                                 </span>
                             )}
@@ -181,11 +219,14 @@ function Row({
     ids,
     big,
     label,
+    after,
 }: {
     ask: RoomAsk;
     ids: string[];
     big: boolean;
     label: string;
+    /** In a reveal the page saw begin: when its first tile comes in. */
+    after: number;
 }) {
     const items = new Map(ask.items.map((item) => [item.id, item]));
 
@@ -211,8 +252,11 @@ function Row({
                     return (
                         <li
                             key={`${id}-${index}`}
+                            style={{
+                                animationDelay: `${after + stagger(index, 50, 400)}ms`,
+                            }}
                             className={cn(
-                                'flex items-center justify-center border bg-card',
+                                'flex items-center justify-center border bg-card room-motion:animate-room-pop',
                                 big
                                     ? 'size-[min(10vh,7vw)] rounded-[1.6vh]'
                                     : 'size-11 rounded-xl',
@@ -255,6 +299,7 @@ export function RecallOrderSolution({
                 ids={solution}
                 big={big}
                 label={t('rooms.game.solution')}
+                after={REVEAL_MS.solution}
             />
             {mine !== null && (
                 <Row
@@ -262,6 +307,7 @@ export function RecallOrderSolution({
                     ids={mine.picked}
                     big={big}
                     label={t('rooms.game.yours')}
+                    after={REVEAL_MS.highlight}
                 />
             )}
         </div>

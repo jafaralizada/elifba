@@ -39,10 +39,20 @@ import type {
  * with `big`, the screen's. A mechanic is a builder on the server, an
  * answer shape for the judge and this; the room page and the screen draw
  * a round through it. The question's taps are the page's (`tap()`); on
- * the screen it is drawn without them.
+ * the screen it is drawn without them. Its items come in, pop and stand
+ * out under the `room-motion:` variant, inside a moment the page saw
+ * begin (docs/frontend.md rule 15 "Motion", ADR 025).
  */
 export type MechanicView = {
-    Study: ComponentType<{ study: RoomStudy; big?: boolean }>;
+    /**
+     * `covered` from `answer_from_ms` on the estimated server clock until
+     * the question arrives: the material's place with nothing of it shown.
+     */
+    Study: ComponentType<{
+        study: RoomStudy;
+        big?: boolean;
+        covered?: boolean;
+    }>;
     Ask: ComponentType<{
         ask: RoomAsk;
         picked: string[];

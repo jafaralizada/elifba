@@ -1,0 +1,115 @@
+import { describe, expect, it } from 'vite-plus/test';
+import type { RoomRankedPlayer } from '@/rooms/contract';
+import { finalTier, finalTimeline, holdsFirst } from './final';
+import { standingGroups } from './standing-groups';
+
+/*
+ * The final of a room game (docs/frontend.md rule 15 "The final", ADR
+ * 025): the places open from the last to the first, a place that players
+ * share opens at once, the first three slower, the first last.
+ */
+const LABELS = Array.from({ length: 20 }, (_, index) => `${index + 1}.`);
+
+function ranking(places: (number | null)[]): RoomRankedPlayer[] {
+    return places.map((place, index) => ({
+        player_id: `p${index}`,
+        points: place === null ? 0 : 100 - place,
+        place,
+    }));
+}
+
+describe('finalTimeline', () => {
+    it('opens the places from the last to the first, players without points first', () => {
+        const groups = standingGroups(ranking([1, 2, 3, 4, 5, null]), LABELS);
+        const { opensAt, winnerAt, endsAt } = finalTimeline(groups, 'screen');
+
+        // Shown first place first; each opens after the one below it.
+        for (let index = 0; index + 1 < opensAt.length; index++) {
+            expect(opensAt[index]).toBeGreaterThan(opensAt[index + 1]);
+        }
+
+        expect(opensAt.at(-1)).toBe(Math.min(...opensAt));
+        expect(winnerAt).toBe(opensAt[0]);
+        expect(endsAt).toBe(opensAt[0]);
+    });
+
+    it('opens a shared place at once, with all who share it', () => {
+        const groups = standingGroups(
+            ranking([1, 1, 2, 3, 3, 3, null]),
+            LABELS,
+        );
+        const { opensAt } = finalTimeline(groups, 'screen');
+
+        expect(groups.map((group) => group.rows.length)).toEqual([2, 1, 3, 1]);
+        expect(opensAt).toHaveLength(4);
+        expect(new Set(opensAt).size).toBe(4);
+    });
+
+    it('slows down for the first three and keeps the first for last', () => {
+        const groups = standingGroups(ranking([1, 2, 3, 4, 5, 6]), LABELS);
+        const { opensAt } = finalTimeline(groups, 'screen');
+        const [first, second, third, fourth, fifth] = opensAt;
+
+        const restStep = fourth - fifth;
+        const beforeThird = third - fourth;
+        const beforeSecond = second - third;
+        const beforeFirst = first - second;
+
+        expect(beforeThird).toBeGreaterThan(restStep);
+        expect(beforeSecond).toBeGreaterThan(beforeThird);
+        expect(beforeFirst).toBeGreaterThan(beforeSecond);
+    });
+
+    it('keeps the rest quick however many play', () => {
+        const places = Array.from({ length: 20 }, (_, index) => index + 1);
+        const groups = standingGroups(ranking(places), LABELS);
+        const { opensAt } = finalTimeline(groups, 'screen');
+
+        // Places 4 to 20 together within the budget.
+        expect(opensAt[3] - opensAt[19]).toBeLessThanOrEqual(1600);
+        expect(finalTimeline(groups, 'phone').endsAt).toBeLessThan(
+            finalTimeline(groups, 'screen').endsAt,
+        );
+    });
+
+    it('has no winner when nobody scored', () => {
+        const groups = standingGroups(ranking([null, null, null]), LABELS);
+        const timeline = finalTimeline(groups, 'phone');
+
+        expect(groups).toHaveLength(1);
+        expect(timeline.winnerAt).toBeNull();
+        expect(timeline.opensAt).toEqual([timeline.endsAt]);
+    });
+
+    it('opens nothing for an empty ranking', () => {
+        expect(finalTimeline([], 'screen')).toEqual({
+            opensAt: [],
+            winnerAt: null,
+            endsAt: 0,
+        });
+    });
+});
+
+describe('finalTier', () => {
+    it('emphasises the first three places only', () => {
+        expect([1, 2, 3, 4, null].map(finalTier)).toEqual([
+            'first',
+            'second',
+            'third',
+            null,
+            null,
+        ]);
+    });
+});
+
+describe('holdsFirst', () => {
+    it('finds the viewer in the first place, alone or shared', () => {
+        const rows = ranking([1, 1, 2]);
+
+        expect(holdsFirst(rows, 'p0')).toBe(true);
+        expect(holdsFirst(rows, 'p1')).toBe(true);
+        expect(holdsFirst(rows, 'p2')).toBe(false);
+        expect(holdsFirst(rows, null)).toBe(false);
+        expect(holdsFirst(rows, 'nobody')).toBe(false);
+    });
+});

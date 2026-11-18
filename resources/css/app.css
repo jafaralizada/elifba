@@ -7,6 +7,21 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * A room game's moments (docs/frontend.md rule 15 "Motion", ADR 025): an
+ * element animates under `room-motion:` only inside a moment the page saw
+ * begin (`data-motion="on"` on the moment's block) and only without
+ * `prefers-reduced-motion`, so a reload, a late join and reduced motion all
+ * draw the moment still.
+ */
+@custom-variant room-motion {
+    @media (prefers-reduced-motion: no-preference) {
+        &:where([data-motion='on'], [data-motion='on'] *) {
+            @slot;
+        }
+    }
+}
+
 @theme {
     --font-sans:
         'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
@@ -218,6 +233,149 @@
         100% {
             transform: scale(1);
             opacity: 1;
+        }
+    }
+}
+
+/*
+ * A room game's moments (docs/frontend.md rule 15 "Motion", ADR 025): a
+ * block comes in, an item pops, the countdown's figure drops into its ring
+ * and the ring ripples, the next empty place breathes, the waiting
+ * hourglass turns, a place of the final opens and the first place glows.
+ * A lit cell switches on (`lamp`) and a right item stands out (`bump`)
+ * without ever being hidden. Every use is `room-motion:` or `motion-safe:`,
+ * so nothing moves under `prefers-reduced-motion`. None of them shows
+ * anything longer than the moment allows: the study is covered at once,
+ * never faded out.
+ */
+@theme {
+    --animate-room-enter: room-enter 280ms cubic-bezier(0.2, 0.8, 0.2, 1)
+        backwards;
+    --animate-room-pop: room-pop 240ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+    --animate-room-tick: room-tick 420ms cubic-bezier(0.2, 0.8, 0.2, 1)
+        backwards;
+    --animate-room-ripple: room-ripple 900ms ease-out forwards;
+    --animate-room-breathe: room-breathe 1.4s ease-in-out infinite;
+    --animate-room-wait: room-wait 2.4s ease-in-out infinite;
+    --animate-room-open: room-open 480ms cubic-bezier(0.2, 0.8, 0.2, 1)
+        backwards;
+    --animate-room-glow: room-glow 1.4s ease-out 2 backwards;
+    --animate-room-lamp: room-lamp 260ms ease-out backwards;
+    --animate-room-bump: room-bump 420ms cubic-bezier(0.2, 0.8, 0.2, 1)
+        backwards;
+
+    @keyframes room-enter {
+        0% {
+            transform: translateY(0.75rem);
+            opacity: 0;
+        }
+        100% {
+            transform: none;
+            opacity: 1;
+        }
+    }
+
+    @keyframes room-pop {
+        0% {
+            transform: scale(0.82);
+            opacity: 0;
+        }
+        40% {
+            opacity: 1;
+        }
+        70% {
+            transform: scale(1.05);
+        }
+        100% {
+            transform: none;
+            opacity: 1;
+        }
+    }
+
+    @keyframes room-tick {
+        0% {
+            transform: scale(1.6);
+            opacity: 0;
+        }
+        100% {
+            transform: none;
+            opacity: 1;
+        }
+    }
+
+    @keyframes room-ripple {
+        0% {
+            transform: scale(0.94);
+            opacity: 0.6;
+        }
+        100% {
+            transform: scale(1.22);
+            opacity: 0;
+        }
+    }
+
+    @keyframes room-breathe {
+        0%,
+        100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.45;
+        }
+    }
+
+    @keyframes room-wait {
+        0%,
+        35% {
+            transform: rotate(0deg);
+        }
+        50%,
+        85% {
+            transform: rotate(180deg);
+        }
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    @keyframes room-open {
+        0% {
+            transform: perspective(40rem) rotateX(-75deg);
+            opacity: 0;
+        }
+        100% {
+            transform: none;
+            opacity: 1;
+        }
+    }
+
+    @keyframes room-lamp {
+        0% {
+            filter: brightness(0.55) saturate(0.3);
+            transform: scale(0.9);
+        }
+        100% {
+            filter: none;
+            transform: none;
+        }
+    }
+
+    @keyframes room-bump {
+        0%,
+        100% {
+            transform: none;
+        }
+        45% {
+            transform: scale(1.07);
+        }
+    }
+
+    @keyframes room-glow {
+        0% {
+            box-shadow: 0 0 0 0 rgb(251 191 36 / 0.65);
+        }
+        100% {
+            box-shadow: 0 0 0 1.25rem rgb(251 191 36 / 0);
         }
     }
 }

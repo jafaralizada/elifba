@@ -1,4 +1,6 @@
 import type { CSSProperties } from 'react';
+import { REVEAL_MS } from '@/components/rooms/motion';
+import { press } from '@/components/rooms/motion-dom';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import type { RoomAsk, RoomItem, RoomMine, RoomStudy } from '@/rooms/contract';
@@ -13,6 +15,11 @@ import type { RoomAsk, RoomItem, RoomMine, RoomStudy } from '@/rooms/contract';
  * lamp in both themes; the viewer's taps are the primary colour. The
  * reveal draws the lit cells and marks the viewer's taps on them; whether
  * the answer was right is the server's word (`mine.correct`).
+ *
+ * Motion (ADR 025): the lit cells switch on together; at `answer_from_ms`
+ * they go dark at once, so the dark grid the question brings is already
+ * there; a tap presses its cell; the reveal switches the lit cells on
+ * again and then marks the viewer's taps.
  */
 
 type Grid = { cols: number; rows: number };
@@ -61,19 +68,25 @@ const DARK = 'border-border bg-muted';
 const LIT =
     'border-amber-500 bg-amber-400 shadow-[0_0_0.9rem_rgb(251_191_36/0.55)] dark:border-amber-300';
 
-/** The grid with its lit cells; drawn only from a state in its study phase. */
+/**
+ * The grid with its lit cells; drawn only from a state in its study phase
+ * and, `covered`, all dark.
+ */
 export function RecallCellsStudy({
     study,
     big = false,
+    covered = false,
 }: {
     study: RoomStudy;
     big?: boolean;
+    covered?: boolean;
 }) {
     const grid = study.grid ?? { cols: 1, rows: 1 };
-    const lit = new Set(study.items.map(place));
+    const lit = new Set(covered ? [] : study.items.map(place));
 
     return (
         <div
+            data-covered={covered ? '' : undefined}
             className={cn('mx-auto grid', gap(grid, big))}
             style={gridStyle(grid, big)}
         >
@@ -82,7 +95,12 @@ export function RecallCellsStudy({
                     key={key}
                     data-cell={key}
                     data-lit={lit.has(key) ? '' : undefined}
-                    className={cn(CELL, lit.has(key) ? LIT : DARK)}
+                    className={cn(
+                        CELL,
+                        lit.has(key)
+                            ? cn(LIT, 'room-motion:animate-room-lamp')
+                            : DARK,
+                    )}
                 />
             ))}
         </div>
@@ -145,7 +163,10 @@ export function RecallCellsAsk({
                             row: (item.cell?.[1] ?? 0) + 1,
                         })}
                         disabled={disabled}
-                        onClick={() => onPick(item.id)}
+                        onClick={(event) => {
+                            press(event.currentTarget);
+                            onPick(item.id);
+                        }}
                         className={cn(
                             CELL,
                             'min-h-11 transition-[background-color,transform] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100',
@@ -200,16 +221,22 @@ export function RecallCellsSolution({
                 {ask.items.map((item) => (
                     <span
                         key={item.id}
+                        style={{ animationDelay: `${REVEAL_MS.solution}ms` }}
                         className={cn(
                             CELL,
                             'flex items-center justify-center',
-                            lit.has(item.id) ? LIT : DARK,
+                            lit.has(item.id)
+                                ? cn(LIT, 'room-motion:animate-room-lamp')
+                                : DARK,
                         )}
                     >
                         {tapped.has(item.id) && (
                             <span
                                 aria-hidden
-                                className="size-[34%] rounded-full bg-primary ring-2 ring-background"
+                                style={{
+                                    animationDelay: `${REVEAL_MS.highlight}ms`,
+                                }}
+                                className="size-[34%] rounded-full bg-primary ring-2 ring-background room-motion:animate-room-pop"
                             />
                         )}
                     </span>

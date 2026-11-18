@@ -10,10 +10,13 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { MECHANIC_VIEWS } from '@/components/rooms/mechanics/views';
+import { REVEAL_MS } from '@/components/rooms/motion';
 import { seconds } from '@/components/rooms/seconds';
 import { Standing } from '@/components/rooms/standing';
 import { tap, untap } from '@/components/rooms/taps';
-import { TimeBar } from '@/components/rooms/time-bar';
+import { TimeBar, URGENT_MS } from '@/components/rooms/time-bar';
+import { useCountUp, usePreviousReveal } from '@/components/rooms/use-motion';
+import type { RoomMotion } from '@/components/rooms/use-motion';
 import { secondsUntil, useServerNow } from '@/components/rooms/use-server-now';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -61,6 +64,12 @@ type Sent = {
  * `ask.pick` items, with one event id that every retry repeats. Its
  * receipt says only whether it was taken; right or wrong comes from the
  * reveal.
+ *
+ * Each moment moves as ADR 025 designs it (rule 15 "Motion"): its block is
+ * keyed on the round and the phase and carries `data-motion="on"` when the
+ * page saw it begin (`motion`), so a state fetched again replays nothing
+ * and the moment the page opened on stands still. The answer sent moves
+ * the same for every answer; right and wrong show only from the reveal.
  */
 export function LiveRound({
     roomId,
@@ -72,6 +81,7 @@ export function LiveRound({
     refresh,
     onGone,
     aside = null,
+    motion,
 }: {
     roomId: string;
     state: RoomState;
@@ -83,10 +93,13 @@ export function LiveRound({
     onGone: () => void;
     /** Beside the round's number: the room's code chip. */
     aside?: ReactNode;
+    /** Whether the page saw this round and this phase begin (`useRoomMotion()`). */
+    motion: RoomMotion;
 }) {
     const { t } = useTranslation();
     const now = useServerNow(clock, true);
     const view = MECHANIC_VIEWS[game.mechanic];
+    const previous = usePreviousReveal(game, round, state.ranking);
     const [draft, setDraft] = useState<{ round: string; ids: string[] }>({
         round: '',
         ids: [],
@@ -181,148 +194,291 @@ export function LiveRound({
             data-round={round.index}
             className="flex flex-col gap-4"
         >
-            <RoundHead game={game} round={round} now={now} aside={aside} />
+            <RoundHead
+                game={game}
+                round={round}
+                now={now}
+                aside={aside}
+                motion={motion.round}
+            />
 
-            {round.phase === 'countdown' && (
-                <div className="flex flex-col items-center gap-3 py-8 text-center">
-                    <span className="text-muted-foreground">
-                        {t('rooms.game.countdown')}
-                    </span>
-                    <span className="text-7xl font-bold tabular-nums">
-                        {secondsUntil(round.opens_ms, now)}
-                    </span>
-                    <p className="max-w-xs text-sm text-balance text-muted-foreground">
-                        {t(`rooms.mechanics.${game.mechanic}.line`)}
-                    </p>
-                </div>
-            )}
+            <div
+                key={`${round.index}:${round.phase}`}
+                data-motion={motion.phase ? 'on' : undefined}
+                className="flex flex-col gap-4"
+            >
+                {round.phase === 'countdown' && (
+                    <Countdown game={game} round={round} now={now} />
+                )}
 
-            {round.phase === 'study' && (
-                <div className="flex flex-col items-center gap-3">
-                    <p className="text-center font-medium">
-                        {t(`rooms.mechanics.${game.mechanic}.study`)}
-                    </p>
-                    {round.study !== null &&
-                    now !== null &&
-                    now < round.answer_from_ms ? (
-                        <view.Study study={round.study} />
-                    ) : (
-                        <Hourglass
-                            aria-hidden
-                            className="my-8 size-8 text-muted-foreground"
-                        />
-                    )}
-                </div>
-            )}
-
-            {round.phase === 'answer' && round.ask !== null && (
-                <div className="flex flex-col gap-3">
-                    <p className="text-center font-medium">
-                        {t(`rooms.mechanics.${game.mechanic}.ask`)}
-                    </p>
-                    <view.Ask
-                        ask={round.ask}
-                        picked={shown}
-                        disabled={locked}
-                        onPick={pick}
-                    />
-
-                    {!sentNote && (
-                        <div className="flex min-h-11 items-center gap-3">
-                            {plays &&
-                                !locked &&
-                                (round.ask.shape === 'sequence' ? (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="h-11"
-                                        disabled={picked.length === 0}
-                                        onClick={() =>
-                                            setDraft({
-                                                round: round.id,
-                                                ids: untap(picked),
-                                            })
-                                        }
-                                    >
-                                        <Undo2 />
-                                        {t('rooms.game.undo')}
-                                    </Button>
-                                ) : round.ask.shape === 'set' ? (
-                                    <span className="text-sm text-muted-foreground tabular-nums">
-                                        {t('rooms.game.picked', {
-                                            count: picked.length,
-                                            total: round.ask.pick,
-                                        })}
-                                    </span>
-                                ) : null)}
-                            <span className="ml-auto flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground tabular-nums">
-                                <Users aria-hidden className="size-4" />
-                                {answeredCount}
-                            </span>
-                        </div>
-                    )}
-
-                    <div role="status" aria-live="polite">
-                        {!plays && (
-                            <p className="text-center text-sm text-muted-foreground">
-                                {t('rooms.game.watching')}
-                            </p>
-                        )}
-                        {plays &&
-                            note === null &&
-                            round.ask.shape === 'set' &&
-                            picked.length > 0 && (
-                                <p className="text-center text-xs text-muted-foreground">
-                                    {t('rooms.game.untap_hint')}
-                                </p>
-                            )}
-                        {sentNote && (
-                            <AnswerNote note={note} count={answeredCount} />
-                        )}
-                        {mySent?.status === 'failed' && (
-                            <div className="flex flex-col items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm">
-                                <span className="text-red-600 dark:text-red-400">
-                                    {t('rooms.game.failed')}
-                                </span>
-                                <Button
-                                    type="button"
-                                    className="h-11"
-                                    onClick={() => void send(mySent.answer)}
-                                >
-                                    {t('rooms.game.resend')}
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {round.phase === 'reveal' &&
-                round.ask !== null &&
-                round.reveal !== null && (
-                    <div className="flex flex-col gap-4">
-                        <Verdict mine={round.reveal.mine} plays={plays} />
-                        <view.Solution
-                            ask={round.ask}
-                            solution={round.reveal.solution}
-                            mine={round.reveal.mine}
-                            word={round.reveal.word}
-                        />
-                        <section className="flex flex-col gap-2">
-                            <h3 className="text-sm font-semibold">
-                                {t('rooms.game.ranking')}
-                            </h3>
-                            <Standing
-                                ranking={state.ranking}
-                                players={state.players}
-                                me={state.me.player_id}
-                                placeLabels={placeLabels}
-                                results={round.reveal.results}
+                {round.phase === 'study' && (
+                    <div className="flex flex-col items-center gap-3">
+                        <p className="text-center font-semibold room-motion:animate-room-enter">
+                            {t(`rooms.mechanics.${game.mechanic}.study`)}
+                        </p>
+                        {round.study !== null ? (
+                            <view.Study
+                                study={round.study}
+                                covered={
+                                    now === null || now >= round.answer_from_ms
+                                }
                             />
-                        </section>
+                        ) : (
+                            <Hourglass
+                                aria-hidden
+                                className="my-8 size-8 text-muted-foreground"
+                            />
+                        )}
                     </div>
                 )}
+
+                {round.phase === 'answer' && round.ask !== null && (
+                    <div className="flex flex-col gap-3">
+                        <p className="text-center font-semibold room-motion:animate-room-enter">
+                            {t(`rooms.mechanics.${game.mechanic}.ask`)}
+                        </p>
+                        <view.Ask
+                            ask={round.ask}
+                            picked={shown}
+                            disabled={locked}
+                            onPick={pick}
+                        />
+
+                        {!sentNote && (
+                            <div className="flex min-h-11 items-center gap-3">
+                                {plays &&
+                                    !locked &&
+                                    (round.ask.shape === 'sequence' ? (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="h-11"
+                                            disabled={picked.length === 0}
+                                            onClick={() =>
+                                                setDraft({
+                                                    round: round.id,
+                                                    ids: untap(picked),
+                                                })
+                                            }
+                                        >
+                                            <Undo2 />
+                                            {t('rooms.game.undo')}
+                                        </Button>
+                                    ) : round.ask.shape === 'set' ? (
+                                        <span className="text-sm text-muted-foreground tabular-nums">
+                                            {t('rooms.game.picked', {
+                                                count: picked.length,
+                                                total: round.ask.pick,
+                                            })}
+                                        </span>
+                                    ) : null)}
+                                <span className="ml-auto flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground tabular-nums">
+                                    <Users aria-hidden className="size-4" />
+                                    <Counted value={round.answered_count}>
+                                        {answeredCount}
+                                    </Counted>
+                                </span>
+                            </div>
+                        )}
+
+                        <div role="status" aria-live="polite">
+                            {!plays && (
+                                <p className="text-center text-sm text-muted-foreground">
+                                    {t('rooms.game.watching')}
+                                </p>
+                            )}
+                            {plays &&
+                                note === null &&
+                                round.ask.shape === 'set' &&
+                                picked.length > 0 && (
+                                    <p className="text-center text-xs text-muted-foreground">
+                                        {t('rooms.game.untap_hint')}
+                                    </p>
+                                )}
+                            {sentNote && (
+                                <AnswerNote
+                                    note={note}
+                                    count={answeredCount}
+                                    answered={round.answered_count}
+                                    own={mySent !== null}
+                                />
+                            )}
+                            {mySent?.status === 'failed' && (
+                                <div className="flex flex-col items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm">
+                                    <span className="text-red-600 dark:text-red-400">
+                                        {t('rooms.game.failed')}
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        className="h-11"
+                                        onClick={() => void send(mySent.answer)}
+                                    >
+                                        {t('rooms.game.resend')}
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {round.phase === 'reveal' &&
+                    round.ask !== null &&
+                    round.reveal !== null && (
+                        <div className="flex flex-col gap-4">
+                            <Verdict
+                                mine={round.reveal.mine}
+                                plays={plays}
+                                motion={motion.phase}
+                            />
+                            <div
+                                className="room-motion:animate-room-enter"
+                                style={{
+                                    animationDelay: `${REVEAL_MS.solution}ms`,
+                                }}
+                            >
+                                <view.Solution
+                                    ask={round.ask}
+                                    solution={round.reveal.solution}
+                                    mine={round.reveal.mine}
+                                    word={round.reveal.word}
+                                />
+                            </div>
+                            <section
+                                className="flex flex-col gap-2 room-motion:animate-room-enter"
+                                style={{
+                                    animationDelay: `${REVEAL_MS.ranking}ms`,
+                                }}
+                            >
+                                <h3 className="text-sm font-semibold">
+                                    {t('rooms.game.ranking')}
+                                </h3>
+                                <Standing
+                                    ranking={state.ranking}
+                                    players={state.players}
+                                    me={state.me.player_id}
+                                    placeLabels={placeLabels}
+                                    results={round.reveal.results}
+                                    motion={
+                                        motion.phase
+                                            ? {
+                                                  previous,
+                                                  delay: REVEAL_MS.ranking,
+                                              }
+                                            : null
+                                    }
+                                />
+                            </section>
+                        </div>
+                    )}
+            </div>
         </section>
+    );
+}
+
+/**
+ * The countdown to the first round: «Oyun başlayır» over the seconds in a
+ * ring — each second's figure drops in and the ring ripples, in a moment
+ * the page saw begin — then the game's name and what it asks. The seconds
+ * are the estimated server clock's, for show only.
+ */
+export function Countdown({
+    game,
+    round,
+    now,
+    big = false,
+}: {
+    game: RoomGame;
+    round: RoomRound;
+    now: number | null;
+    big?: boolean;
+}) {
+    const { t } = useTranslation();
+    const left = secondsUntil(round.opens_ms, now);
+
+    return (
+        <div
+            className={cn(
+                'flex flex-col items-center text-center',
+                big ? 'flex-1 justify-center gap-[2.4vh]' : 'gap-3 py-4',
+            )}
+        >
+            <span
+                className={cn(
+                    'text-muted-foreground room-motion:animate-room-enter',
+                    big ? 'text-[3.4vh]' : 'text-sm',
+                )}
+            >
+                {t('rooms.game.countdown')}
+            </span>
+            <span
+                className={cn(
+                    'relative flex items-center justify-center rounded-full border-primary/15',
+                    big ? 'size-[36vh] border-[1vh]' : 'size-36 border-4',
+                )}
+            >
+                <span
+                    key={`ring-${left}`}
+                    aria-hidden
+                    className={cn(
+                        'absolute rounded-full border-primary/40 opacity-0 room-motion:animate-room-ripple',
+                        big ? '-inset-[1vh] border-[1vh]' : '-inset-1 border-4',
+                    )}
+                />
+                <span
+                    key={left}
+                    className={cn(
+                        'leading-none font-bold tabular-nums room-motion:animate-room-tick',
+                        big ? 'text-[20vh]' : 'text-7xl',
+                    )}
+                >
+                    {left}
+                </span>
+            </span>
+            <span
+                className={cn(
+                    'font-semibold room-motion:animate-room-enter',
+                    big ? 'text-[4.4vh]' : 'text-lg',
+                )}
+                style={{ animationDelay: '120ms' }}
+            >
+                {t(`rooms.mechanics.${game.mechanic}.name`)}
+            </span>
+            <p
+                className={cn(
+                    'text-balance text-muted-foreground room-motion:animate-room-enter',
+                    big ? 'max-w-[60vw] text-[2.8vh]' : 'max-w-xs text-sm',
+                )}
+                style={{ animationDelay: '180ms' }}
+            >
+                {t(`rooms.mechanics.${game.mechanic}.line`)}
+            </p>
+        </div>
+    );
+}
+
+/**
+ * A number of the state that pops when it changes — the count of answers —
+ * but not on the value it had when it was first drawn.
+ */
+export function Counted({
+    value,
+    children,
+}: {
+    value: number;
+    children: ReactNode;
+}) {
+    const [first] = useState(value);
+
+    return (
+        <span
+            key={value}
+            className={cn(
+                'inline-block',
+                value !== first && 'motion-safe:animate-room-pop',
+            )}
+        >
+            {children}
+        </span>
     );
 }
 
@@ -351,12 +507,15 @@ export function RoundHead({
     now,
     aside = null,
     big = false,
+    motion = false,
 }: {
     game: RoomGame;
     round: RoomRound;
     now: number | null;
     aside?: ReactNode;
     big?: boolean;
+    /** The page saw this round begin: its number pops in. */
+    motion?: boolean;
 }) {
     const { t } = useTranslation();
     const end = phaseEnd(round);
@@ -368,6 +527,28 @@ export function RoundHead({
             : round.phase === 'reveal'
               ? t(last ? 'rooms.game.final' : 'rooms.game.next', { seconds })
               : t('rooms.game.seconds', { seconds });
+    // The last seconds of an answer: red, each second with a pulse, as the bar turns.
+    const hurry =
+        round.phase === 'answer' &&
+        now !== null &&
+        seconds !== null &&
+        seconds > 0 &&
+        round.bell_ms - now <= URGENT_MS;
+    const pop = motion ? 'motion-safe:animate-room-pop' : undefined;
+    const time =
+        left === null ? null : (
+            <span
+                key={hurry ? `hurry-${seconds}` : 'calm'}
+                className={cn(
+                    'shrink-0 font-medium tabular-nums',
+                    big ? 'text-[3.4vh]' : 'text-sm',
+                    hurry &&
+                        'text-red-600 motion-safe:animate-room-pop dark:text-red-400',
+                )}
+            >
+                {left}
+            </span>
+        );
     const bar = (
         <TimeBar
             stretch={barStretch(round)}
@@ -386,17 +567,19 @@ export function RoundHead({
                     {t(`rooms.difficulty.${game.difficulty}`)}
                 </p>
                 <div className="flex items-baseline justify-between gap-3">
-                    <h2 className="text-[3.4vh] font-semibold tabular-nums">
+                    <h2
+                        key={round.index}
+                        className={cn(
+                            'origin-left text-[3.4vh] font-semibold tabular-nums',
+                            pop,
+                        )}
+                    >
                         {t('rooms.game.round', {
                             index: round.index + 1,
                             total: round.total,
                         })}
                     </h2>
-                    {left !== null && (
-                        <span className="shrink-0 text-[3.4vh] font-medium tabular-nums">
-                            {left}
-                        </span>
-                    )}
+                    {time}
                 </div>
                 {bar}
             </div>
@@ -408,8 +591,12 @@ export function RoundHead({
             <div className="flex min-h-11 items-center gap-3">
                 <div className="flex min-w-0 flex-1 flex-col">
                     <h2
+                        key={round.index}
                         id="round-heading"
-                        className="leading-tight font-semibold tabular-nums"
+                        className={cn(
+                            'origin-left leading-tight font-semibold tabular-nums',
+                            pop,
+                        )}
                     >
                         {t('rooms.game.round', {
                             index: round.index + 1,
@@ -426,24 +613,30 @@ export function RoundHead({
             </div>
             <div className="flex min-h-5 items-center gap-3">
                 {bar}
-                {left !== null && (
-                    <span className="shrink-0 text-sm font-medium tabular-nums">
-                        {left}
-                    </span>
-                )}
+                {time}
             </div>
         </div>
     );
 }
 
-/** What the page says of the viewer's answer while the round is open: never whether it is right. */
+/**
+ * What the page says of the viewer's answer while the round is open: never
+ * whether it is right. Sent on this page (`own`), it rises in; while the
+ * room answers its hourglass turns — one movement for every answer.
+ */
 function AnswerNote({
     note,
     count,
+    answered,
+    own,
 }: {
     note: Exclude<keyof typeof NOTES, 'failed'>;
     /** «Cavab verib: :count / :total». */
     count: string;
+    /** The count of answers, which pops when it changes. */
+    answered: number;
+    /** The answer was sent from this page, not read from a reloaded state. */
+    own: boolean;
 }) {
     const { t } = useTranslation();
     const icon =
@@ -454,22 +647,26 @@ function AnswerNote({
         ) : note === 'refused' ? (
             <X aria-hidden className="size-5 shrink-0" />
         ) : (
-            <Hourglass aria-hidden className="size-5 shrink-0" />
+            <Hourglass
+                aria-hidden
+                className="size-5 shrink-0 motion-safe:animate-room-wait"
+            />
         );
 
     return (
         <p
             className={cn(
-                'flex items-center justify-center gap-2 rounded-xl border bg-muted/50 px-3 py-2 text-center text-sm',
+                'flex items-center justify-center gap-2.5 rounded-xl border bg-muted/50 px-3 py-2.5 text-center text-sm',
+                own && 'motion-safe:animate-room-enter',
                 note === 'refused' &&
                     'border-destructive/30 bg-destructive/10 text-red-600 dark:text-red-400',
             )}
         >
             {icon}
             <span className="flex flex-col">
-                <span>{t(NOTES[note])}</span>
+                <span className="font-medium">{t(NOTES[note])}</span>
                 <span className="text-muted-foreground tabular-nums">
-                    {count}
+                    <Counted value={answered}>{count}</Counted>
                 </span>
             </span>
         </p>
@@ -479,10 +676,24 @@ function AnswerNote({
 /**
  * The viewer's own result of the round, from the reveal only: right with
  * its points and time, wrong, or no answer. A host who does not play has
- * none.
+ * none. In a reveal the page saw begin it comes in first, the same way
+ * whatever the server judged, and its points count up from 0.
  */
-function Verdict({ mine, plays }: { mine: RoomMine | null; plays: boolean }) {
+function Verdict({
+    mine,
+    plays,
+    motion,
+}: {
+    mine: RoomMine | null;
+    plays: boolean;
+    motion: boolean;
+}) {
     const { t } = useTranslation();
+    const points = useCountUp(mine?.points ?? 0, {
+        enabled: motion,
+        delay: 200,
+        duration: 600,
+    });
 
     if (!plays) {
         return null;
@@ -490,11 +701,16 @@ function Verdict({ mine, plays }: { mine: RoomMine | null; plays: boolean }) {
 
     if (mine === null) {
         return (
-            <div className="flex items-center gap-3 rounded-xl border bg-muted/50 p-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
-                    <Minus aria-hidden className="size-5" />
+            <div className="flex items-center gap-3 rounded-2xl border bg-muted/50 p-3 room-motion:animate-room-enter">
+                <span
+                    className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted room-motion:animate-room-pop"
+                    style={{ animationDelay: '120ms' }}
+                >
+                    <Minus aria-hidden className="size-6" />
                 </span>
-                <span className="font-medium">{t('rooms.game.no_answer')}</span>
+                <span className="font-semibold">
+                    {t('rooms.game.no_answer')}
+                </span>
             </div>
         );
     }
@@ -504,7 +720,7 @@ function Verdict({ mine, plays }: { mine: RoomMine | null; plays: boolean }) {
     return (
         <div
             className={cn(
-                'flex items-center gap-3 rounded-xl border p-3',
+                'flex items-center gap-3 rounded-2xl border p-3 room-motion:animate-room-enter',
                 mine.correct
                     ? 'border-emerald-600/30 bg-emerald-600/10'
                     : 'border-destructive/30 bg-destructive/10',
@@ -512,20 +728,21 @@ function Verdict({ mine, plays }: { mine: RoomMine | null; plays: boolean }) {
         >
             <span
                 className={cn(
-                    'flex size-10 shrink-0 items-center justify-center rounded-full text-white',
+                    'flex size-12 shrink-0 items-center justify-center rounded-full text-white room-motion:animate-room-pop',
                     mine.correct ? 'bg-emerald-600' : 'bg-destructive',
                 )}
+                style={{ animationDelay: '120ms' }}
             >
                 {mine.correct ? (
-                    <Check aria-hidden className="size-6" />
+                    <Check aria-hidden className="size-7" strokeWidth={3} />
                 ) : (
-                    <X aria-hidden className="size-6" />
+                    <X aria-hidden className="size-7" strokeWidth={3} />
                 )}
             </span>
-            <span className="flex min-w-0 flex-col">
+            <span className="flex min-w-0 flex-1 flex-col">
                 <span
                     className={cn(
-                        'text-lg leading-tight font-semibold',
+                        'text-xl leading-tight font-bold',
                         mine.correct
                             ? 'text-emerald-700 dark:text-emerald-300'
                             : 'text-red-600 dark:text-red-400',
@@ -536,10 +753,11 @@ function Verdict({ mine, plays }: { mine: RoomMine | null; plays: boolean }) {
                         : t('rooms.game.wrong')}
                 </span>
                 <span className="text-sm text-muted-foreground tabular-nums">
-                    {t('rooms.game.points_won', { count: mine.points })}
-                    {' · '}
                     {t('rooms.game.elapsed', { seconds: time })}
                 </span>
+            </span>
+            <span className="shrink-0 text-xl font-bold tabular-nums">
+                {t('rooms.game.points_won', { count: points })}
             </span>
         </div>
     );

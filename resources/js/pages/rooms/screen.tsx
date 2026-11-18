@@ -2,13 +2,20 @@ import { Head, Link, router } from '@inertiajs/react';
 import { ArrowLeft, Maximize, Minimize, Trophy, Users } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 import AppLogoIcon from '@/components/app-logo-icon';
-import { RoundHead } from '@/components/rooms/live-round';
+import { FinalStanding } from '@/components/rooms/final-standing';
+import { Countdown, Counted, RoundHead } from '@/components/rooms/live-round';
 import { MECHANIC_VIEWS } from '@/components/rooms/mechanics/views';
+import { REVEAL_MS } from '@/components/rooms/motion';
 import { RoomQr, spacedCode, typedAddress } from '@/components/rooms/room-code';
 import type { JoinLink } from '@/components/rooms/room-code';
 import { Standing } from '@/components/rooms/standing';
 import { useLiveRoom } from '@/components/rooms/use-live-room';
-import { secondsUntil, useServerNow } from '@/components/rooms/use-server-now';
+import {
+    usePreviousReveal,
+    useRoomMotion,
+} from '@/components/rooms/use-motion';
+import type { RoomMotion } from '@/components/rooms/use-motion';
+import { useServerNow } from '@/components/rooms/use-server-now';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
@@ -40,6 +47,10 @@ type Props = {
  * result; after a game, the room's standing with the code for whoever
  * comes next. It follows the same state as the room page and writes
  * nothing: no control here changes the room.
+ *
+ * It is the room's show (ADR 025): every moment it saw begin moves, larger
+ * than on a phone, and a game's end is the final, with its confetti. A
+ * moment it was opened on stands still.
  */
 export default function RoomsScreen({
     room,
@@ -54,6 +65,7 @@ export default function RoomsScreen({
         initial,
         onClosed: () => router.visit(show(room.id)),
     });
+    const motion = useRoomMotion(state);
     const game = state?.game ?? null;
     const round = state?.round ?? null;
     const playing = game !== null && game.phase === 'live' && round !== null;
@@ -98,13 +110,16 @@ export default function RoomsScreen({
                         round={round}
                         clock={clock}
                         placeLabels={placeLabels}
+                        motion={motion}
                     />
                 ) : game !== null && game.phase === 'over' ? (
                     <ScreenOver
+                        key={game.id}
                         state={state}
                         game={game}
                         join={join}
                         placeLabels={placeLabels}
+                        motion={motion}
                     />
                 ) : (
                     <ScreenLobby state={state} join={join} />
@@ -189,25 +204,30 @@ function ScreenLobby({
     );
 }
 
-/** After a game: its end and the room's standing, with the code for whoever comes next. */
+/** After a game: its end and its final (the room's standing, ADR 025), with the code for whoever comes next. */
 function ScreenOver({
     state,
     game,
     join,
     placeLabels,
+    motion,
 }: {
     state: RoomState;
     game: RoomGame;
     join: JoinLink | null;
     placeLabels: string[];
+    motion: RoomMotion;
 }) {
     const { t } = useTranslation();
 
     return (
-        <div className="grid flex-1 grid-cols-[minmax(0,1fr)_auto] gap-[4vw]">
+        <div
+            data-motion={motion.phase ? 'on' : undefined}
+            className="grid flex-1 grid-cols-[minmax(0,1fr)_auto] gap-[4vw]"
+        >
             <section className="flex min-w-0 flex-col gap-[2.4vh]">
-                <div className="flex items-center gap-[2vh]">
-                    <span className="flex size-[8vh] items-center justify-center rounded-full bg-muted">
+                <div className="flex items-center gap-[2vh] room-motion:animate-room-enter">
+                    <span className="flex size-[8vh] items-center justify-center rounded-full bg-amber-400 text-amber-950 room-motion:animate-room-pop">
                         <Trophy aria-hidden className="size-[4.4vh]" />
                     </span>
                     <span className="flex flex-col">
@@ -230,11 +250,12 @@ function ScreenOver({
                 <h2 className="text-[2.8vh] font-semibold">
                     {t('rooms.game.standing')}
                 </h2>
-                <Standing
+                <FinalStanding
                     ranking={state.ranking}
                     players={state.players}
                     me={null}
                     placeLabels={placeLabels}
+                    animate={motion.phase}
                     big
                 />
             </section>
@@ -273,16 +294,19 @@ function ScreenRound({
     round,
     clock,
     placeLabels,
+    motion,
 }: {
     state: RoomState;
     game: RoomGame;
     round: RoomRound;
     clock: ServerClock;
     placeLabels: string[];
+    motion: RoomMotion;
 }) {
     const { t } = useTranslation();
     const now = useServerNow(clock, true);
     const view = MECHANIC_VIEWS[game.mechanic];
+    const previous = usePreviousReveal(game, round, state.ranking);
 
     return (
         <section
@@ -290,97 +314,136 @@ function ScreenRound({
             data-round={round.index}
             className="flex flex-1 flex-col gap-[3vh]"
         >
-            <RoundHead game={game} round={round} now={now} big />
+            <RoundHead
+                game={game}
+                round={round}
+                now={now}
+                motion={motion.round}
+                big
+            />
 
-            {round.phase === 'countdown' && (
-                <div className="flex flex-1 flex-col items-center justify-center gap-[2vh] text-center">
-                    <span className="text-[3.4vh] text-muted-foreground">
-                        {t('rooms.game.countdown')}
-                    </span>
-                    <span className="text-[24vh] leading-none font-bold tabular-nums">
-                        {secondsUntil(round.opens_ms, now)}
-                    </span>
-                    <p className="max-w-[60vw] text-[2.8vh] text-balance text-muted-foreground">
-                        {t(`rooms.mechanics.${game.mechanic}.line`)}
-                    </p>
-                </div>
-            )}
+            <div
+                key={`${round.index}:${round.phase}`}
+                data-motion={motion.phase ? 'on' : undefined}
+                className="flex flex-1 flex-col"
+            >
+                {round.phase === 'countdown' && (
+                    <Countdown game={game} round={round} now={now} big />
+                )}
 
-            {round.phase === 'study' && (
-                <div className="flex flex-1 flex-col items-center justify-center gap-[4vh] pb-[8vh]">
-                    <p className="text-[4vh] font-medium">
-                        {t(`rooms.mechanics.${game.mechanic}.study`)}
-                    </p>
-                    {round.study !== null &&
-                        now !== null &&
-                        now < round.answer_from_ms && (
-                            <view.Study study={round.study} big />
-                        )}
-                </div>
-            )}
-
-            {round.phase === 'answer' && round.ask !== null && (
-                <div className="grid flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-[4vw]">
-                    <div className="flex flex-col items-center gap-[4vh]">
-                        <p className="text-center text-[4vh] font-medium">
-                            {t(`rooms.mechanics.${game.mechanic}.ask`)}
+                {round.phase === 'study' && (
+                    <div className="flex flex-1 flex-col items-center justify-center gap-[4vh] pb-[8vh]">
+                        <p className="text-[4vh] font-semibold room-motion:animate-room-enter">
+                            {t(`rooms.mechanics.${game.mechanic}.study`)}
                         </p>
-                        <view.Ask
-                            ask={round.ask}
-                            picked={[]}
-                            disabled
-                            onPick={() => {}}
-                            big
-                        />
-                    </div>
-                    <AnsweredCount
-                        count={round.answered_count}
-                        total={round.present_count}
-                    />
-                </div>
-            )}
-
-            {round.phase === 'reveal' &&
-                round.ask !== null &&
-                round.reveal !== null && (
-                    <div className="grid flex-1 grid-cols-[minmax(0,5fr)_minmax(0,6fr)] items-start gap-[4vw]">
-                        <view.Solution
-                            ask={round.ask}
-                            solution={round.reveal.solution}
-                            mine={null}
-                            word={round.reveal.word}
-                            big
-                        />
-                        <section className="flex min-w-0 flex-col gap-[1.6vh]">
-                            <h2 className="text-[2.8vh] font-semibold">
-                                {t('rooms.game.ranking')}
-                            </h2>
-                            <Standing
-                                ranking={state.ranking}
-                                players={state.players}
-                                me={null}
-                                placeLabels={placeLabels}
-                                results={round.reveal.results}
+                        {round.study !== null && (
+                            <view.Study
+                                study={round.study}
+                                covered={
+                                    now === null || now >= round.answer_from_ms
+                                }
                                 big
                             />
-                        </section>
+                        )}
                     </div>
                 )}
+
+                {round.phase === 'answer' && round.ask !== null && (
+                    <div className="grid flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-[4vw]">
+                        <div className="flex flex-col items-center gap-[4vh]">
+                            <p className="text-center text-[4vh] font-semibold room-motion:animate-room-enter">
+                                {t(`rooms.mechanics.${game.mechanic}.ask`)}
+                            </p>
+                            <view.Ask
+                                ask={round.ask}
+                                picked={[]}
+                                disabled
+                                onPick={() => {}}
+                                big
+                            />
+                        </div>
+                        <AnsweredCount
+                            count={round.answered_count}
+                            total={round.present_count}
+                        />
+                    </div>
+                )}
+
+                {round.phase === 'reveal' &&
+                    round.ask !== null &&
+                    round.reveal !== null && (
+                        <div className="grid flex-1 grid-cols-[minmax(0,5fr)_minmax(0,6fr)] items-start gap-[4vw]">
+                            <div
+                                className="room-motion:animate-room-enter"
+                                style={{
+                                    animationDelay: `${REVEAL_MS.solution}ms`,
+                                }}
+                            >
+                                <view.Solution
+                                    ask={round.ask}
+                                    solution={round.reveal.solution}
+                                    mine={null}
+                                    word={round.reveal.word}
+                                    big
+                                />
+                            </div>
+                            <section
+                                className="flex min-w-0 flex-col gap-[1.6vh] room-motion:animate-room-enter"
+                                style={{
+                                    animationDelay: `${REVEAL_MS.ranking}ms`,
+                                }}
+                            >
+                                <h2 className="text-[2.8vh] font-semibold">
+                                    {t('rooms.game.ranking')}
+                                </h2>
+                                <Standing
+                                    ranking={state.ranking}
+                                    players={state.players}
+                                    me={null}
+                                    placeLabels={placeLabels}
+                                    results={round.reveal.results}
+                                    motion={
+                                        motion.phase
+                                            ? {
+                                                  previous,
+                                                  delay: REVEAL_MS.ranking,
+                                              }
+                                            : null
+                                    }
+                                    big
+                                />
+                            </section>
+                        </div>
+                    )}
+            </div>
         </section>
     );
 }
 
-/** The count of answers in large figures, with a bar. */
+/**
+ * The count of answers in large figures, with a bar: it comes in after the
+ * question, its figure pops at each new answer, and its card is outlined
+ * once everyone present has answered.
+ */
 function AnsweredCount({ count, total }: { count: number; total: number }) {
     const { t } = useTranslation();
+    const all = total > 0 && count >= total;
 
     return (
-        <div className="flex w-[min(36vh,26vw)] flex-col items-center gap-[1.6vh] rounded-2xl border bg-card p-[3vh]">
+        <div
+            className={cn(
+                'flex w-[min(36vh,26vw)] flex-col items-center gap-[1.6vh] rounded-2xl border bg-card p-[3vh] transition-colors motion-reduce:transition-none room-motion:animate-room-enter',
+                all && 'border-primary',
+            )}
+            style={{ animationDelay: '200ms' }}
+        >
             <span className="text-[2.6vh] text-muted-foreground">
                 {t('rooms.screen.answered')}
             </span>
             <span className="text-[8vh] leading-none font-bold whitespace-nowrap tabular-nums">
-                {t('rooms.screen.count', { count, total })}
+                <Counted value={count}>
+                    {t('rooms.screen.count', { count, total })}
+                </Counted>
             </span>
             <div
                 aria-hidden
