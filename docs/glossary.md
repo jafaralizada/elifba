@@ -260,7 +260,7 @@ A ready-made jibe a player throws a rival during a room game, for a point of the
 
 ### Live voice (C1–C5)
 
-Players of a room talking while they play (ADR 030, architecture §12 "Live voice"), designed by C1 on 2026-11-18. Not the board's voice: that is «səsləndirmə», prerecorded clips for children (ADR 015, `content:voice`, `elifba.voice.*`), and it never meets this.
+Players of a room talking while they play (ADR 031, architecture §12 "Live voice"), designed by C1 on 2026-11-18. Not the board's voice: that is «səsləndirmə», prerecorded clips for children (ADR 015, `content:voice`, `elifba.voice.*`), and it never meets this.
 
 | Azərbaycanca                  | English                   | Code                                                                                                                   | Notes                                                                                                                             |
 | ----------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |

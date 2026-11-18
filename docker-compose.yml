@@ -177,7 +177,7 @@ services:
             db:
                 condition: service_healthy
 
-    # Live voice (§10 "Live voice", ADR 030), only with the profile `voice`.
+    # Live voice (§10 "Live voice", ADR 031), only with the profile `voice`.
     # Signalling and the API on 7880 stay on the internal network (Caddy sends
     # /rtc here; `app` and `scheduler` call /twirp/*); media cannot pass through
     # a proxy, so its two ports are published and the firewall must allow them.

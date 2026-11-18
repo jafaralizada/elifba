@@ -160,7 +160,7 @@ Phones open `https://elifba.example.az/pult`.
 
 **Changing `.env`.** After changing the operator, mail or `ELIFBA_ROOMS`, run `docker compose up -d --wait`; the containers are recreated with the new values. After changing `ELIFBA_DOMAIN`, `ELIFBA_SCHEME`, `ELIFBA_PORT` or `REVERB_APP_KEY`, run `docker compose up -d --build --wait`: the browser's Reverb address is built into the assets.
 
-**Live voice (optional).** Players in a room can talk while they play, through this instance's own voice server (the `voice` service, LiveKit; [ADR 030](docs/decisions/030-live-voice-in-rooms.md)): no audio goes to another company and nothing is recorded. It needs the games for adults (`ELIFBA_ROOMS=true`), at least 2 vCPU and 4 GB of memory, and two more ports open in the firewall: **UDP 7882** and **TCP 7881** (media cannot pass through Caddy). Then three lines in `.env` — the profile that starts the server, the server's public IPv4 address, the switch:
+**Live voice (optional).** Players in a room can talk while they play, through this instance's own voice server (the `voice` service, LiveKit; [ADR 031](docs/decisions/031-live-voice-in-rooms.md)): no audio goes to another company and nothing is recorded. It needs the games for adults (`ELIFBA_ROOMS=true`), at least 2 vCPU and 4 GB of memory, and two more ports open in the firewall: **UDP 7882** and **TCP 7881** (media cannot pass through Caddy). Then three lines in `.env` — the profile that starts the server, the server's public IPv4 address, the switch:
 
 ```dotenv
 COMPOSE_PROFILES=voice

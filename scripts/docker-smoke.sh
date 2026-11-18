@@ -155,7 +155,7 @@ if [ "$voice" = 1 ]; then
     check "it logged the address it was given ($voice_ip)" \
         bash -c 'docker compose logs voice | grep "using explicit node IP" | grep -q "\"V4\":\"$1\""' _ "$voice_ip"
 
-    # A ticket, as the app will mint it (HS256 with the voice secret; ADR 030 decision 20).
+    # A ticket, as the app will mint it (HS256 with the voice secret; ADR 031 decision 20).
     b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
     voice_ticket() { # voice_ticket <claims, without iss/nbf/exp>
         local now head body

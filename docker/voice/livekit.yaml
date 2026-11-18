@@ -1,6 +1,6 @@
 # The `voice` service: our own voice server for live voice in a room
 # (docker-compose.yml, profile `voice`; docs/architecture.md §10 "Live voice",
-# docs/decisions/030-live-voice-in-rooms.md). docker/voice/start.sh writes
+# docs/decisions/031-live-voice-in-rooms.md). docker/voice/start.sh writes
 # the instance's address (ELIFBA_ROOMS_VOICE_IP) where this file says
 # __ELIFBA_ROOMS_VOICE_IP__ and starts the server with the copy; the key and the
 # secret come as LIVEKIT_KEYS, never in a file.
@@ -28,7 +28,7 @@ rtc:
         - __ELIFBA_ROOMS_VOICE_IP__:7882
 
 room:
-    # Only the app makes a voice room (ADR 030 decision 21); a ticket for a room
+    # Only the app makes a voice room (ADR 031 decision 21); a ticket for a room
     # it did not make joins nothing.
     auto_create: false
     # Nobody but the player turns a player's microphone on (decision 10).

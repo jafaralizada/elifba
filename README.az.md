@@ -160,7 +160,7 @@ Telefonlar `https://elifba.example.az/pult` ünvanını açır.
 
 **`.env` dəyişəndə.** Operatoru, poçtu və ya `ELIFBA_ROOMS`-u dəyişəndən sonra `docker compose up -d --wait` işə salın; konteynerlər yeni dəyərlərlə yenidən yaradılır. `ELIFBA_DOMAIN`, `ELIFBA_SCHEME`, `ELIFBA_PORT` və ya `REVERB_APP_KEY` dəyişəndən sonra isə `docker compose up -d --build --wait` lazımdır: brauzerin Reverb ünvanı build zamanı fayllara yazılır.
 
-**Canlı səs (istəyə görə).** Otaqdakı oyunçular oynaya-oynaya bu serverin öz səs serveri vasitəsilə danışa bilər (`voice` xidməti, LiveKit; [ADR 030](docs/decisions/030-live-voice-in-rooms.md)): səs başqa şirkətə getmir və heç nə yazılmır. Bunun üçün böyüklər üçün oyunlar açıq olmalıdır (`ELIFBA_ROOMS=true`), server ən azı 2 vCPU və 4 GB yaddaşa malik olmalıdır, firewall-da isə daha iki port açılmalıdır: **UDP 7882** və **TCP 7881** (media Caddy-dən keçə bilmir). Sonra `.env`-də üç sətir — serveri işə salan profil, serverin ictimai IPv4 ünvanı və açar:
+**Canlı səs (istəyə görə).** Otaqdakı oyunçular oynaya-oynaya bu serverin öz səs serveri vasitəsilə danışa bilər (`voice` xidməti, LiveKit; [ADR 031](docs/decisions/031-live-voice-in-rooms.md)): səs başqa şirkətə getmir və heç nə yazılmır. Bunun üçün böyüklər üçün oyunlar açıq olmalıdır (`ELIFBA_ROOMS=true`), server ən azı 2 vCPU və 4 GB yaddaşa malik olmalıdır, firewall-da isə daha iki port açılmalıdır: **UDP 7882** və **TCP 7881** (media Caddy-dən keçə bilmir). Sonra `.env`-də üç sətir — serveri işə salan profil, serverin ictimai IPv4 ünvanı və açar:
 
 ```dotenv
 COMPOSE_PROFILES=voice
