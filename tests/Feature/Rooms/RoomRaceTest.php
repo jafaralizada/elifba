@@ -266,8 +266,8 @@ it('counts each player\'s answer once, whatever is sent twice', function (): voi
     $this->travelTo(Rooms::at($game, RoomPhase::Answer));
     $event = Rooms::answer($round, Rooms::right($round))['event_id'];
 
-    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round), $event)->assertExactJson(['status' => 'accepted', 'revision' => 2]);
-    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round), $event)->assertExactJson(['status' => 'duplicate', 'revision' => 2]);
+    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round), $event)->assertExactJson(['status' => 'accepted', 'revision' => 3]);
+    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round), $event)->assertExactJson(['status' => 'duplicate', 'revision' => 3]);
     // The same event with other items, in upper case, or later: the first stays.
     $this->travelTo(RoomClock::at(RoomClock::nowMs() + 2000));
     raceAnswer($this->aygun, $this->room, $round, Rooms::wrong($round), strtoupper($event))->assertJsonPath('status', 'duplicate');
@@ -282,7 +282,7 @@ it('refuses a second answer of the same player', function (): void {
     $this->travelTo(Rooms::at($game, RoomPhase::Answer));
 
     raceAnswer($this->aygun, $this->room, $round, Rooms::wrong($round))->assertJsonPath('status', 'accepted');
-    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertExactJson(['status' => 'answered', 'revision' => 2]);
+    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertExactJson(['status' => 'answered', 'revision' => 3]);
 
     expect(RoomAnswer::query()->sole())->toMatchArray(['room_player_id' => $this->aygunRow->id, 'correct' => false, 'points' => 0]);
 });
@@ -380,7 +380,7 @@ it('measures the time on the server\'s clock', function (): void {
     // Whatever the device says of its own time is not read.
     $this->travelTo(RoomClock::at($from + 2345));
     raceAnswer($this->aygun, $this->room, $round, Rooms::right($round), extra: ['elapsed_ms' => 1, 'sent_ms' => $from, 'client_ms' => $from])
-        ->assertExactJson(['status' => 'accepted', 'revision' => 2]);
+        ->assertExactJson(['status' => 'accepted', 'revision' => 3]);
 
     $this->travelTo(RoomClock::at($from + 9999));
     raceAnswer($this->host, $this->room, $round, Rooms::right($round))->assertJsonPath('status', 'accepted');
@@ -404,8 +404,9 @@ it('never says right or wrong in the receipt', function (): void {
     $right = raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertOk()->assertHeader('Cache-Control', 'no-store, private');
     $wrong = raceAnswer($this->host, $this->room, $round, Rooms::wrong($round))->assertOk()->assertHeader('Cache-Control', 'no-store, private');
 
-    expect($right->getContent())->toBe($wrong->getContent())
-        ->and($right->json())->toBe(['status' => 'accepted', 'revision' => 3])
+    // Each accepted answer is one change of the room; the receipts differ by that alone.
+    expect($right->json())->toBe(['status' => 'accepted', 'revision' => 4])
+        ->and($wrong->json())->toBe(['status' => 'accepted', 'revision' => 5])
         ->and(RoomAnswer::query()->orderBy('id')->pluck('correct')->all())->toBe([true, false]);
 });
 
@@ -414,16 +415,16 @@ it('closes the round when every present player has answered', function (): void 
     $round = Rooms::round($game, 0);
     $this->travelTo(RoomClock::at($game->timetable()->answerFrom(0) + 1000));
 
-    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertExactJson(['status' => 'accepted', 'revision' => 2]);
+    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertExactJson(['status' => 'accepted', 'revision' => 3]);
     expect($round->refresh()->closed_ms)->toBeNull();
 
     $this->travelTo(RoomClock::at(RoomClock::nowMs() + 500));
     $closedAt = RoomClock::nowMs();
-    raceAnswer($this->host, $this->room, $round, Rooms::wrong($round))->assertExactJson(['status' => 'accepted', 'revision' => 3]);
+    raceAnswer($this->host, $this->room, $round, Rooms::wrong($round))->assertExactJson(['status' => 'accepted', 'revision' => 4]);
 
     expect($round->refresh()->closed_ms)->toBe($closedAt);
     ['state' => $state] = raceRead($this->aygun, $this->room);
-    expect($state['revision'])->toBe(3)
+    expect($state['revision'])->toBe(4)
         ->and($state['round'])->toMatchArray(['index' => 0, 'phase' => 'reveal', 'closes_ms' => $closedAt, 'next_ms' => $closedAt + $game->reveal_ms, 'answered_count' => 2])
         ->and($game->refresh()->timetable()->opens(1))->toBe($closedAt + $game->reveal_ms);
 

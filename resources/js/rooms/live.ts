@@ -137,3 +137,38 @@ export function watchRoom(options: {
         },
     };
 }
+
+/**
+ * Runs `request` one at a time: a call made while one is in flight is
+ * not sent at once but folded, with any others, into one more request
+ * when it ends. Every accepted answer raises the room's revision, so a
+ * burst of answers is a burst of signals; each page then asks for the
+ * state at most twice for it, never once per answer (`room-state` allows
+ * 120 requests a minute).
+ */
+export function oneAtATime(request: () => Promise<unknown>): () => void {
+    let busy = false;
+    let again = false;
+
+    const run = () => {
+        if (busy) {
+            again = true;
+
+            return;
+        }
+
+        busy = true;
+        again = false;
+        void request()
+            .catch(() => undefined)
+            .finally(() => {
+                busy = false;
+
+                if (again) {
+                    run();
+                }
+            });
+    };
+
+    return run;
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vite-plus/test';
 import type { RoomChannel, SocketState, Timers } from './live';
-import { POLL_MS, watchRoom } from './live';
+import { oneAtATime, POLL_MS, watchRoom } from './live';
 
 /*
  * A room page's live link (docs/architecture.md §12 "The race"): it fetches
@@ -187,5 +187,44 @@ describe('watchRoom', () => {
         watch.stop();
         fake.socket('disconnected');
         expect(heard).toEqual([false, true, false, true]);
+    });
+});
+
+describe('oneAtATime', () => {
+    it('folds the calls made while a request is in flight into one more', async () => {
+        const ends: Array<() => void> = [];
+        const request = vi.fn(
+            () => new Promise<void>((resolve) => ends.push(resolve)),
+        );
+        const run = oneAtATime(request);
+
+        run();
+        run();
+        run();
+        run();
+        expect(request).toHaveBeenCalledTimes(1);
+
+        ends[0]();
+        await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+
+        ends[1]();
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(request).toHaveBeenCalledTimes(2);
+
+        run();
+        expect(request).toHaveBeenCalledTimes(3);
+    });
+
+    it('goes on after a request that failed', async () => {
+        const request = vi
+            .fn<() => Promise<void>>()
+            .mockRejectedValueOnce(new Error('offline'))
+            .mockResolvedValue(undefined);
+        const run = oneAtATime(request);
+
+        run();
+        run();
+        await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(2));
     });
 });

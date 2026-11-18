@@ -6,7 +6,7 @@ import type { RoomFollow, ServerClock } from '@/rooms/clock';
 import type { RoomState } from '@/rooms/contract';
 import { fetchState } from '@/rooms/http';
 import type { RoomWatch } from '@/rooms/live';
-import { watchRoom } from '@/rooms/live';
+import { oneAtATime, watchRoom } from '@/rooms/live';
 import { connectRoomEcho, roomChannel } from '@/rooms/socket';
 
 /** Whether `next` may replace `shown`: a fetch that was overtaken never covers a newer state. */
@@ -90,9 +90,13 @@ export function useLiveRoom({
             echo = null;
         }
 
-        const refresh = () => {
-            void fetchState(stateRoute.url(room.id)).then((result) => {
-                if (stopped) {
+        // A burst of answers is a burst of signals: one request at a time.
+        const refresh = oneAtATime(() =>
+            (stopped
+                ? Promise.resolve(null)
+                : fetchState(stateRoute.url(room.id))
+            ).then((result) => {
+                if (stopped || result === null) {
                     return;
                 }
 
@@ -125,8 +129,8 @@ export function useLiveRoom({
                     setState(next);
                     follow.show(next);
                 }
-            });
-        };
+            }),
+        );
 
         const follow = followRoom({ clock, refresh });
         const watch = watchRoom({
