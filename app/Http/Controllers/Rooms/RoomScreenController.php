@@ -7,6 +7,7 @@ use App\Domain\Content\Enums\RoomSpeaker;
 use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Rooms\Data\RoomGameSetupData;
 use App\Domain\Rooms\Models\Room;
+use App\Domain\Rooms\Support\RoomFinishVoice;
 use App\Domain\Rooms\Support\RoomJoinLink;
 use App\Domain\Rooms\Support\RoomPlaces;
 use App\Domain\Rooms\Support\RoomState;
@@ -30,7 +31,9 @@ use Inertia\Response;
  * room's speaker (ADR 025 "Sound"), never a phone's own cues;
  * `rivalry`, the URLs of the rivalry strip's three emoji (ADR 027); and
  * `taunts`, the list's keys with their emoji's URLs, for the taunts its
- * state shows (T2, ADR 029 decisions 21 and 28). Its state is the
+ * state shows (T2, ADR 029 decisions 21 and 28); and `finish`, the URLs of
+ * «Əla oynadın!» and «Əla oynadınız!» it says after the final's fanfare,
+ * after the winner's name (`RoomFinishVoice`, ADR 030). Its state is the
  * screen's (`RoomState::for(…, screen: true)`): the taunts shown now with
  * their targets.
  *
@@ -46,7 +49,7 @@ use Inertia\Response;
  */
 final class RoomScreenController extends Controller
 {
-    public function __invoke(Room $room, #[CurrentUser] User $account, ContentRepository $content): Response
+    public function __invoke(Room $room, #[CurrentUser] User $account, ContentRepository $content, RoomFinishVoice $finish): Response
     {
         return Inertia::render('rooms/screen', [
             'room' => ['id' => $room->id, 'status' => $room->status()->value],
@@ -57,6 +60,7 @@ final class RoomScreenController extends Controller
             'sounds' => $content->roomSounds()->urls(RoomSpeaker::Screen),
             'rivalry' => $content->roomRivalry()->urls(),
             'taunts' => RoomTauntData::props($content->roomTaunts()),
+            'finish' => $finish->urls(),
         ]);
     }
 }

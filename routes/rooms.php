@@ -8,6 +8,7 @@ use App\Http\Controllers\Rooms\RoomGameController;
 use App\Http\Controllers\Rooms\RoomJoinController;
 use App\Http\Controllers\Rooms\RoomLeaveController;
 use App\Http\Controllers\Rooms\RoomMemberController;
+use App\Http\Controllers\Rooms\RoomMemberVoiceController;
 use App\Http\Controllers\Rooms\RoomNameController;
 use App\Http\Controllers\Rooms\RoomPlaysController;
 use App\Http\Controllers\Rooms\RoomScreenController;
@@ -79,6 +80,14 @@ Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::mid
         ->whereUlid('room')
         ->can('screen', 'room')
         ->name('rooms.screen');
+
+    // The final's winner, said by the screen after the fanfare: a member's
+    // first-name clip, by ids only, for whoever may open the screen (ADR 030).
+    Route::get('rooms/{room}/members/{member}/voice', RoomMemberVoiceController::class)
+        ->whereUlid(['room', 'member'])
+        ->scopeBindings()
+        ->can('screen', 'room')
+        ->name('rooms.members.voice');
 
     // A present player's own answer to the round open now (B3).
     Route::post('rooms/{room}/answers', RoomAnswerController::class)

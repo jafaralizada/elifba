@@ -3,6 +3,7 @@
 use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Content\Enums\RoomSequenceRule;
 use App\Domain\Content\Support\ContentRepository;
+use App\Domain\Content\Support\VoiceClips;
 use App\Domain\Language\Support\Ordinal;
 use App\Domain\Rooms\Data\RoomGameSetupData;
 use App\Domain\Rooms\Enums\RoomPhase;
@@ -445,6 +446,24 @@ it('sends the screen the room\'s sounds and a phone only its own, and a closed r
     $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('sounds', null));
     $this->actingAs($this->resad)->post(route('rooms.close', $room))->assertRedirect();
     $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('sounds', null));
+});
+
+it('sends the screen the end phrases it says after the winner\'s name, and a phone none', function (): void {
+    $room = Rooms::open($this->resad);
+    Rooms::join($room, $this->aygun);
+    $clips = app(VoiceClips::class);
+
+    $finish = pagesProps($this->actingAs($this->resad)->get(route('rooms.screen', $room)))['finish'];
+
+    // The board's own clips, «Əla oynadın!» and «Əla oynadınız!» (ADR 030): public files that name nobody.
+    expect($finish)->toBe(['one' => $clips->url($clips->finish()), 'many' => $clips->url($clips->finishClass())])
+        ->and($finish['one'])->toStartWith(asset('content/voice').'/')
+        ->and($finish['many'])->toStartWith(asset('content/voice').'/');
+
+    // A phone says nothing of the final.
+    foreach ([$this->resad, $this->aygun] as $account) {
+        expect(pagesProps($this->actingAs($account)->get(route('rooms.show', $room))))->not->toHaveKey('finish');
+    }
 });
 
 it('sends the rivalry icons to the room page of an open room and to the screen, and none to a closed room', function (): void {

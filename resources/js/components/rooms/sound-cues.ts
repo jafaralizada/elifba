@@ -19,7 +19,8 @@ import type { RoomSoundName, RoomSpeaker } from '@/rooms/sound';
  * later round; the clock, one file that ends at `bell_ms`, in an answer's
  * last `CLOCK_MS`; the round closing (the reveal opening) and its ranking;
  * in the final a hit as the third and the second places open, a roll
- * ending where the first opens, then a fanfare; and between games a
+ * ending where the first opens, then a fanfare and the cheer — the
+ * winner's first name and «Əla oynadın!» (ADR 030); and between games a
  * `join` when a player appears. It has no viewer, so nothing it plays
  * depends on anyone's answer. A phone plays the viewer's own: the answer
  * sent (`answered`, the same for every answer) and, from the reveal only,
@@ -30,8 +31,17 @@ import type { RoomSoundName, RoomSpeaker } from '@/rooms/sound';
 /** What a page heard at one moment: the latest state and the server's clock as estimated. */
 export type RoomEar = { state: RoomState | null; now: number | null };
 
-/** A cue: `at` ms from now it starts — or, with `ends`, it ends there (the countdown, the clock, the roll). */
-export type RoomCue = { sound: RoomSoundName; at: number; ends?: boolean };
+/**
+ * A cue: `at` ms from now it starts — or, with `ends`, it ends there (the
+ * countdown, the clock, the roll). `cheer` is the screen's one voice (ADR
+ * 030), as a home board ends a game: from `at`, the first place's first
+ * names (`players`, by `player_id`, none when more than `MAX_NAMES` share
+ * it), then «Əla oynadın!», or «Əla oynadınız!» when the place is shared
+ * (`many`).
+ */
+export type RoomCue =
+    | { sound: RoomSoundName; at: number; ends?: boolean }
+    | { sound: 'cheer'; at: number; players: string[]; many: boolean };
 
 /**
  * A moment heard later than this after it began is not announced: a page
@@ -54,6 +64,20 @@ export const CLOCK_MS = 5000;
 export const LEAD_MS = 500;
 
 /**
+ * The fanfare's length (`scripts/room-sounds/README.md`, ADR 028): the
+ * cheer follows it (ADR 030). A fanfare of another length changes
+ * this number in the same change.
+ */
+export const FANFARE_MS = 2300;
+
+/**
+ * The most who share the first place and are named, one after another, in
+ * the state's order; when more share it, nobody is named and the cheer is
+ * «Əla oynadınız!» alone (ADR 030 decision 4).
+ */
+export const MAX_NAMES = 3;
+
+/**
  * What one ear means for a speaker: the moment (the game, the round and
  * its phase) with when it began and its cues; a beat within it — the
  * clock, the viewer's answer sent — with its own cues; and, between games
@@ -70,7 +94,28 @@ type Heard = {
 
 const now0 = (sound: RoomSoundName): RoomCue => ({ sound, at: 0 });
 
-/** The final's cues: a hit as the third and the second open, the roll ending where the first opens, the fanfare. */
+/**
+ * The cheer after the fanfare: who holds the final's first place, in the
+ * state's ranking order (the server's, never re-sorted) — none named when
+ * more than `MAX_NAMES` share it — and whether it is shared.
+ */
+function cheer(state: RoomState, at: number): RoomCue {
+    const first = state.ranking
+        .filter((row) => row.place === 1)
+        .map((row) => row.player_id);
+
+    return {
+        sound: 'cheer',
+        at,
+        players: first.length > MAX_NAMES ? [] : first,
+        many: first.length > 1,
+    };
+}
+
+/**
+ * The final's cues: a hit as the third and the second open, the roll
+ * ending where the first opens, the fanfare, and after it the cheer.
+ */
 function finalCues(state: RoomState): RoomCue[] {
     const groups = standingGroups(state.ranking, []);
     const timeline = finalTimeline(groups, 'screen');
@@ -92,6 +137,7 @@ function finalCues(state: RoomState): RoomCue[] {
         ...places,
         { sound: 'roll', at: timeline.winnerAt, ends: true },
         { sound: 'fanfare', at: timeline.winnerAt },
+        cheer(state, timeline.winnerAt + FANFARE_MS),
     ];
 }
 

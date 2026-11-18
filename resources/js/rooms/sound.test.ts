@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vite-plus/test';
 import {
     MIN_TAIL_MS,
     MUTE_STORAGE_KEYS,
+    NAME_GAP_MS,
+    NAME_LEAD_MS,
+    PHRASE_GAP_MS,
     readMuted,
     ROOM_SOUNDS,
     roomSoundPlayer,
     SPEAKER_GAIN,
     STOP_MS,
+    VOICE_GAIN,
     writeMuted,
 } from './sound';
 import type {
@@ -22,7 +26,9 @@ import type {
  * muted or the page hidden, its own speaker's files only, a long cue that
  * ends where it is asked to — from its middle when late, not at all when
  * too little is left — every cue stopped when its moment ends, and never a
- * throw where audio is missing, refused or a file fails.
+ * throw where audio is missing, refused or a file fails. The screen's one
+ * voice, the winner's name (ADR 030): said after its time from the clips
+ * that arrived, never on a phone, never muted, hidden or locked.
  */
 
 function memoryStorage(): StorageLike & { items: Map<string, string> } {
@@ -204,6 +210,93 @@ function loader(missing: string[] = []) {
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/** A name clip's route, by ids, as the screen builds it. */
+const nameUrl = (member: string) => `/rooms/01room/members/${member}/voice`;
+
+/** «Əla oynadın!», a public content file (the fake loader names it `finish`). */
+const PHRASE = '/content/finish.mp3';
+
+/**
+ * Fetching a name clip gives `name:<member>` as bytes; `missing` answer
+ * 404, `slow` stay pending until `arrive()`.
+ */
+function nameLoader({
+    missing = [],
+    slow = [],
+}: { missing?: string[]; slow?: string[] } = {}) {
+    const asked: string[] = [];
+    const pending = new Map<string, () => void>();
+
+    return {
+        asked,
+        arrive: (member: string) => pending.get(member)?.(),
+        load: (url: string) => {
+            asked.push(url);
+            const member = url.split('/')[4];
+            const bytes = new TextEncoder().encode(`name:${member}`).buffer;
+
+            if (missing.includes(member)) {
+                return Promise.reject(new Error('404'));
+            }
+
+            if (slow.includes(member)) {
+                return new Promise<ArrayBuffer>((resolve) =>
+                    pending.set(member, () => resolve(bytes)),
+                );
+            }
+
+            return Promise.resolve(bytes);
+        },
+    };
+}
+
+/** A timer the test runs by hand: what was asked for, and whether it was cancelled. */
+function manualLater() {
+    const asked: { run: () => void; ms: number; cancelled: boolean }[] = [];
+
+    return {
+        asked,
+        later: (run: () => void, ms: number) => {
+            const entry = { run, ms, cancelled: false };
+            asked.push(entry);
+
+            return () => {
+                entry.cancelled = true;
+            };
+        },
+        /** Time passes: every timer not cancelled runs. */
+        fire: () =>
+            asked
+                .filter((entry) => !entry.cancelled)
+                .forEach((entry) => entry.run()),
+    };
+}
+
+/** A player whose name clips come from `names` and whose timers are `timers`. */
+function namingPlayer(
+    speaker: 'screen' | 'phone',
+    names: ReturnType<typeof nameLoader>,
+    timers: ReturnType<typeof manualLater>,
+    audio = fakeAudio(),
+    storage: () => StorageLike | null = memoryStorage,
+) {
+    const files = loader();
+
+    return {
+        audio,
+        files,
+        player: roomSoundPlayer({
+            speaker,
+            urls: urls[speaker],
+            storage,
+            createContext: audio.create,
+            load: (url) =>
+                url.startsWith('/rooms/') ? names.load(url) : files.load(url),
+            later: timers.later,
+        }),
+    };
+}
 
 describe('the device mute', () => {
     it('is remembered per speaker on this device, and a refusing storage never throws', () => {
@@ -513,5 +606,164 @@ describe('roomSoundPlayer', () => {
         player.play('tap');
         expect(audio.made).toHaveLength(2);
         expect(audio.started.map(({ sound }) => sound)).toEqual(['tap']);
+    });
+});
+
+describe("roomSoundPlayer and the winner's cheer (ADR 030)", () => {
+    it('says the names that arrived in time, one after another, then the phrase, and skips one that has not', async () => {
+        const names = nameLoader({ missing: ['m2'], slow: ['m3'] });
+        const timers = manualLater();
+        const { audio, files, player } = namingPlayer('screen', names, timers);
+
+        player.unlock();
+        await settle();
+        // After the fanfare: 2.9 s from now, the clock at 10 s.
+        player.say(['m1', 'm2', 'm3', 'm4'].map(nameUrl), PHRASE, 2900);
+        await settle();
+
+        // Fetched at once, names by ids; settled a quarter second before the time.
+        expect(names.asked).toEqual(['m1', 'm2', 'm3', 'm4'].map(nameUrl));
+        expect(files.asked).toContain(PHRASE);
+        expect(timers.asked.map(({ ms }) => ms)).toEqual([2900 - NAME_LEAD_MS]);
+        expect(audio.started).toEqual([]);
+
+        timers.fire();
+        // m3 arrives too late: it is dropped.
+        names.arrive('m3');
+        await settle();
+
+        // Each fake clip lasts 0.2 s: a name, the gap, a name, the shorter gap, the phrase.
+        expect(
+            audio.started.map(({ sound, when, gain }) => [sound, when, gain]),
+        ).toEqual([
+            ['name:m1', 12.9, SPEAKER_GAIN.screen * VOICE_GAIN],
+            [
+                'name:m4',
+                12.9 + 0.2 + NAME_GAP_MS / 1000,
+                SPEAKER_GAIN.screen * VOICE_GAIN,
+            ],
+            [
+                'finish',
+                12.9 + 0.2 + NAME_GAP_MS / 1000 + 0.2 + PHRASE_GAP_MS / 1000,
+                SPEAKER_GAIN.screen * VOICE_GAIN,
+            ],
+        ]);
+        expect(VOICE_GAIN).toBeLessThan(1);
+        expect(PHRASE_GAP_MS).toBe(150);
+    });
+
+    it('says the phrase alone when no name can be said', async () => {
+        const names = nameLoader({ missing: ['m1'] });
+        const timers = manualLater();
+        const { audio, player } = namingPlayer('screen', names, timers);
+
+        player.unlock();
+        await settle();
+        // A name off the list (404), then four sharing the first place (no name at all).
+        player.say([nameUrl('m1')], PHRASE, 2900);
+        player.say([], PHRASE, 2900);
+        await settle();
+        timers.fire();
+
+        expect(audio.started.map(({ sound, when }) => [sound, when])).toEqual([
+            ['finish', 12.9],
+            ['finish', 12.9],
+        ]);
+    });
+
+    it('fetches nothing while muted or locked, and never on a phone', async () => {
+        const timers = manualLater();
+
+        // Locked: the screen's sound was never turned on.
+        const locked = nameLoader();
+        const lockedScreen = namingPlayer('screen', locked, timers);
+        lockedScreen.player.say([nameUrl('m1')], PHRASE, 0);
+
+        // Muted on this device.
+        const storage = memoryStorage();
+        writeMuted(storage, 'screen', true);
+        const quiet = nameLoader();
+        const muted = namingPlayer(
+            'screen',
+            quiet,
+            timers,
+            fakeAudio(),
+            () => storage,
+        );
+        muted.player.unlock();
+        await settle();
+        muted.player.say([nameUrl('m1')], PHRASE, 0);
+
+        // A phone, its sound on.
+        const phoneNames = nameLoader();
+        const phone = namingPlayer('phone', phoneNames, timers);
+        phone.player.unlock();
+        await settle();
+        phone.player.say([nameUrl('m1')], PHRASE, 0);
+        timers.fire();
+        await settle();
+
+        expect(locked.asked).toEqual([]);
+        expect(quiet.asked).toEqual([]);
+        expect(phoneNames.asked).toEqual([]);
+        for (const page of [lockedScreen, muted, phone]) {
+            expect(page.files.asked).not.toContain(PHRASE);
+        }
+        expect(timers.asked).toEqual([]);
+        expect(phone.audio.started).toEqual([]);
+    });
+
+    it('drops the cheer with its moment or a hidden page', async () => {
+        const names = nameLoader();
+        const timers = manualLater();
+        const { audio, player } = namingPlayer('screen', names, timers);
+
+        player.unlock();
+        await settle();
+
+        // A new game began before the cheer was due.
+        player.say([nameUrl('m1')], PHRASE, 2900);
+        await settle();
+        player.cancel();
+
+        // The page was hidden before it was due.
+        player.say([nameUrl('m2')], PHRASE, 2900);
+        await settle();
+        player.hide();
+
+        // Muted before it was due.
+        player.resume();
+        player.say([nameUrl('m3')], PHRASE, 2900);
+        await settle();
+        player.setMuted(true);
+
+        timers.fire();
+        await settle();
+
+        expect(timers.asked.map(({ cancelled }) => cancelled)).toEqual([
+            true,
+            true,
+            true,
+        ]);
+        expect(audio.started).toEqual([]);
+    });
+
+    it('stops a cheer being said when its moment ends', async () => {
+        const names = nameLoader();
+        const timers = manualLater();
+        const { audio, player } = namingPlayer('screen', names, timers);
+
+        player.unlock();
+        await settle();
+        player.say([nameUrl('m1')], PHRASE, 0);
+        await settle();
+        timers.fire();
+        audio.made[0].currentTime = 10.1;
+        player.cancel();
+
+        expect(audio.started).toMatchObject([
+            { sound: 'name:m1', stopped: true },
+            { sound: 'finish', stopped: true },
+        ]);
     });
 });

@@ -6,6 +6,7 @@ import type { RoomState } from '@/rooms/contract';
 import { roomSoundPlayer } from '@/rooms/sound';
 import type {
     PhoneSound,
+    RoomFinishVoice,
     RoomSoundState,
     RoomSoundUrls,
     RoomSpeaker,
@@ -13,6 +14,15 @@ import type {
 
 /** How often the page listens for a beat of the clock (a countdown's second, a last second). */
 const LISTEN_MS = 200;
+
+/**
+ * What the screen says after the final's fanfare (ADR 030): a member's
+ * first-name clip by ids, and the end phrases' URLs from its props.
+ */
+export type RoomCheer = {
+    nameUrl: (playerId: string) => string;
+    finish: RoomFinishVoice;
+};
 
 /** What a page's sound controls offer: its state, the toggle and the phone's own taps. */
 export type RoomSound = RoomSoundState & {
@@ -65,17 +75,24 @@ function allowedWithoutGesture(): boolean {
  * ends — one scheduled is dropped, one sounding fades out at once — and
  * when the page is hidden; coming back wakes the sound where the browser
  * lets it and plays nothing that was missed.
+ *
+ * `cheer` is the screen's alone (ADR 030): the route of a member's
+ * first-name clip, by ids, and the URLs of the end phrases, for what it
+ * says after the final's fanfare. A page without it — a phone — says
+ * nothing.
  */
 export function useRoomSound({
     speaker,
     sounds,
     state,
     clock,
+    cheer,
 }: {
     speaker: RoomSpeaker;
     sounds: RoomSoundUrls | null;
     state: RoomState | null;
     clock: ServerClock;
+    cheer?: RoomCheer;
 }): RoomSound {
     const [player] = useState(() =>
         sounds === null ? null : roomSoundPlayer({ speaker, urls: sounds }),
@@ -86,8 +103,13 @@ export function useRoomSound({
         () => NO_SOUND,
     );
     const stateRef = useRef(state);
+    const cheerRef = useRef(cheer);
     const heard = useRef<RoomEar | null>(null);
     const listenRef = useRef<() => void>(() => {});
+
+    useEffect(() => {
+        cheerRef.current = cheer;
+    }, [cheer]);
 
     // A new state is heard at once, not at the next beat of the clock.
     useEffect(() => {
@@ -109,7 +131,17 @@ export function useRoomSound({
             }
 
             for (const cue of roomCues(previous, ear, speaker)) {
-                player.play(cue.sound, cue);
+                const voice = cheerRef.current;
+
+                if (cue.sound !== 'cheer') {
+                    player.play(cue.sound, cue);
+                } else if (voice !== undefined) {
+                    player.say(
+                        cue.players.map(voice.nameUrl),
+                        cue.many ? voice.finish.many : voice.finish.one,
+                        cue.at,
+                    );
+                }
             }
 
             heard.current = ear;

@@ -8,7 +8,7 @@ import {
     RotateCcw,
     Trophy,
 } from 'lucide-react';
-import { useCallback, useState, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import AppLogoIcon from '@/components/app-logo-icon';
 import InputError from '@/components/input-error';
 import { withGame } from '@/components/rooms/catalog';
@@ -53,6 +53,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import { show } from '@/routes/rooms';
+import { voice } from '@/routes/rooms/members';
 import type { ServerClock } from '@/rooms/clock';
 import type {
     RoomGame,
@@ -61,7 +62,7 @@ import type {
     RoomSetup,
     RoomState,
 } from '@/rooms/contract';
-import type { RoomSoundUrls } from '@/rooms/sound';
+import type { RoomFinishVoice, RoomSoundUrls } from '@/rooms/sound';
 
 type Props = {
     room: { id: string; status: 'open' | 'closed' };
@@ -78,6 +79,8 @@ type Props = {
     rivalry: RivalryIcons;
     /** The taunts' list, each key with its emoji (T2, ADR 029). */
     taunts: TauntList;
+    /** «Əla oynadın!» and «Əla oynadınız!», said after the final's fanfare (ADR 030). */
+    finish: RoomFinishVoice;
 };
 
 /**
@@ -104,7 +107,10 @@ type Props = {
  * moment it was opened on stands still. It is also the room's speaker:
  * once its «Səsi aç» is pressed (browsers allow no sound before a
  * gesture), it plays the moments everybody shares (`useRoomSound()`) —
- * and the same whatever anyone answered, since it has no viewer.
+ * and the same whatever anyone answered, since it has no viewer — and,
+ * after the final's fanfare, cheers the first place as a home board ends a
+ * game: the first name from the name list's clip, then «Əla oynadın!»
+ * (ADR 030).
  */
 export default function RoomsScreen({
     room,
@@ -115,6 +121,7 @@ export default function RoomsScreen({
     sounds,
     rivalry,
     taunts,
+    finish,
 }: Props) {
     const { t } = useTranslation();
     // A closed room has no screen: its results are on the room's page.
@@ -127,7 +134,21 @@ export default function RoomsScreen({
     });
     const motion = useRoomMotion(state);
     const [tauntsHidden, setTauntsHidden] = useTauntsHidden('screen');
-    const sound = useRoomSound({ speaker: 'screen', sounds, state, clock });
+    // After the final's fanfare the screen cheers the winner: the first name, fetched by ids, and «Əla oynadın!» (ADR 030).
+    const cheer = useMemo(
+        () => ({
+            nameUrl: (member: string) => voice.url({ room: room.id, member }),
+            finish,
+        }),
+        [room.id, finish],
+    );
+    const sound = useRoomSound({
+        speaker: 'screen',
+        sounds,
+        state,
+        clock,
+        cheer,
+    });
     const game = state?.game ?? null;
     const round = state?.round ?? null;
     const playing = game !== null && game.phase === 'live' && round !== null;

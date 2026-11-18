@@ -19,6 +19,14 @@
  * one not yet started is dropped, one sounding fades out within `STOP_MS`.
  * A long cue placed to end at a moment (`ends`) starts from its middle when
  * the page is late, and not at all when less than `MIN_TAIL_MS` is left.
+ *
+ * The screen's one voice (ADR 030, `say()`), as a home board ends a game:
+ * the clips of the final's first place's first names, fetched by ids from
+ * `GET /rooms/{room}/members/{member}/voice`, then the board's end phrase
+ * («Əla oynadın!», «Əla oynadınız!»), fetched when the page hears the
+ * final begin and its sound is on, kept decoded in memory only, and said
+ * one after another after the fanfare — those that arrived in time; a
+ * phone says none.
  */
 
 /** Each speaker's sounds, as `content/rooms/sounds.json` and `RoomSound` name them. */
@@ -44,6 +52,9 @@ export type ScreenSound = (typeof ROOM_SOUNDS.screen)[number];
 export type PhoneSound = (typeof ROOM_SOUNDS.phone)[number];
 export type RoomSoundName = ScreenSound | PhoneSound;
 
+/** The screen's `finish` prop (ADR 030): «Əla oynadın!» and «Əla oynadınız!», public clips, or null. */
+export type RoomFinishVoice = { one: string | null; many: string | null };
+
 /** A page's `sounds` prop: its speaker's files by name, from the server. */
 export type RoomSoundUrls = Partial<Record<RoomSoundName, string>>;
 
@@ -68,6 +79,25 @@ export const STOP_MS = 40;
 
 /** A cue placed to end at a moment plays nothing when less than this is left of it: a fragment is noise. */
 export const MIN_TAIL_MS = 250;
+
+/**
+ * The voice's level beside the room's files (ADR 030): the name and phrase
+ * clips are levelled to −16 LUFS, the room's set to −20 LUFS, so the voice
+ * plays 3.6 dB under the screen's level and sits with the effects.
+ */
+export const VOICE_GAIN = 0.66;
+
+/** The pause between two names of a shared first place. */
+export const NAME_GAP_MS = 300;
+
+/** The pause between the last name and the phrase: the board's (`NAME_GAP_MS` of `voice.ts`, ADR 016 decision 4). */
+export const PHRASE_GAP_MS = 150;
+
+/**
+ * How long before its time the screen settles which names it says: a clip
+ * that has not arrived by then is skipped, and one arriving later dropped.
+ */
+export const NAME_LEAD_MS = 250;
 
 export type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -175,7 +205,17 @@ export type RoomSoundPlayer = {
     resume: () => void;
     /** The page is gone: the context is closed; the decoded files stay for a next one. */
     release: () => void;
+    /**
+     * The screen's cheer (ADR 030): fetches the clips of `names` and of
+     * `phrase` now and, `at` ms from now, says those that arrived — the
+     * names one after another, then the phrase; nothing on a phone, while
+     * muted, hidden or locked. They stop with the moment.
+     */
+    say: (names: string[], phrase: string | null, at: number) => void;
 };
+
+/** Runs `run` in `ms`; the function it gives cancels it. */
+export type Later = (run: () => void, ms: number) => () => void;
 
 type Scheduled = {
     source: AudioSourceLike;
@@ -195,16 +235,20 @@ export function roomSoundPlayer({
     storage = deviceStorage,
     createContext = browserContext,
     load = fetchBytes,
+    later = browserLater,
 }: {
     speaker: RoomSpeaker;
     urls: RoomSoundUrls;
     storage?: () => StorageLike | null;
     createContext?: () => AudioContextLike | null;
     load?: (url: string) => Promise<ArrayBuffer>;
+    later?: Later;
 }): RoomSoundPlayer {
     const listeners = new Set<() => void>();
     const buffers = new Map<RoomSoundName, AudioBufferLike>();
     const scheduled = new Set<Scheduled>();
+    /** The names waiting for their time: each one's cancel. */
+    const sayings = new Set<() => void>();
     let context: AudioContextLike | null = null;
     let loading = false;
     let hidden = false;
@@ -253,6 +297,10 @@ export function roomSoundPlayer({
         const now = context?.currentTime ?? 0;
         const end = now + STOP_MS / 1000;
 
+        // Names not yet due are dropped with their clips.
+        sayings.forEach((cancel) => cancel());
+        sayings.clear();
+
         for (const cue of scheduled) {
             try {
                 if (cue.startsAt > now) {
@@ -268,6 +316,28 @@ export function roomSoundPlayer({
 
             scheduled.delete(cue);
         }
+    };
+
+    /** Starts `buffer` at `startsAt` on the context's clock, from `offset`, at the speaker's level times `factor`. */
+    const start = (
+        audio: AudioContextLike,
+        buffer: AudioBufferLike,
+        startsAt: number,
+        offset: number,
+        factor: number,
+    ) => {
+        const source = audio.createBufferSource();
+        const gain = audio.createGain();
+        const level = SPEAKER_GAIN[speaker] * factor;
+        source.buffer = buffer;
+        gain.gain.value = level;
+        source.connect(gain);
+        gain.connect(audio.destination);
+
+        const cue = { source, gain, level, startsAt };
+        scheduled.add(cue);
+        source.onended = () => scheduled.delete(cue);
+        source.start(startsAt, offset);
     };
 
     const unlock = () => {
@@ -339,8 +409,6 @@ export function roomSoundPlayer({
 
             try {
                 const audio = context;
-                const source = audio.createBufferSource();
-                const gain = audio.createGain();
                 let wait = at / 1000;
                 let offset = 0;
 
@@ -358,21 +426,7 @@ export function roomSoundPlayer({
                     return;
                 }
 
-                const level = SPEAKER_GAIN[speaker];
-                source.buffer = buffer;
-                gain.gain.value = level;
-                source.connect(gain);
-                gain.connect(audio.destination);
-
-                const cue = {
-                    source,
-                    gain,
-                    level,
-                    startsAt: audio.currentTime + wait,
-                };
-                scheduled.add(cue);
-                source.onended = () => scheduled.delete(cue);
-                source.start(cue.startsAt, offset);
+                start(audio, buffer, audio.currentTime + wait, offset, 1);
             } catch {
                 // A cue that cannot play is skipped.
             }
@@ -393,6 +447,86 @@ export function roomSoundPlayer({
                 .resume()
                 .catch(() => null)
                 .then(emit);
+        },
+        say: (names, phrase, at) => {
+            const urls = phrase === null ? names : [...names, phrase];
+
+            if (
+                speaker !== 'screen' ||
+                urls.length === 0 ||
+                muted ||
+                hidden ||
+                !running() ||
+                context === null
+            ) {
+                return;
+            }
+
+            const audio = context;
+            const due = audio.currentTime + Math.max(0, at) / 1000;
+            const clips: (AudioBufferLike | null)[] = urls.map(() => null);
+            let settled = false;
+
+            urls.forEach((url, index) => {
+                void load(url)
+                    .then((bytes) =>
+                        settled ? null : audio.decodeAudioData(bytes),
+                    )
+                    .then((clip) => {
+                        if (!settled && clip !== null) {
+                            clips[index] = clip;
+                        }
+                    })
+                    .catch(() => {
+                        // That clip stays silent: a name off the list, or the network.
+                    });
+            });
+
+            let cancelLater = () => {};
+            const cancel = () => {
+                settled = true;
+                cancelLater();
+            };
+
+            sayings.add(cancel);
+            cancelLater = later(
+                () => {
+                    sayings.delete(cancel);
+                    settled = true;
+
+                    if (muted || hidden || !running() || context !== audio) {
+                        return;
+                    }
+
+                    let startsAt = Math.max(due, audio.currentTime);
+                    let said = false;
+
+                    clips.forEach((clip, index) => {
+                        if (clip === null) {
+                            // Not here in time: skipped.
+                            return;
+                        }
+
+                        const isPhrase =
+                            phrase !== null && index === names.length;
+
+                        if (said) {
+                            startsAt +=
+                                (isPhrase ? PHRASE_GAP_MS : NAME_GAP_MS) / 1000;
+                        }
+
+                        try {
+                            start(audio, clip, startsAt, 0, VOICE_GAIN);
+                        } catch {
+                            // A clip that cannot play is skipped.
+                        }
+
+                        startsAt += clip.duration;
+                        said = true;
+                    });
+                },
+                Math.max(0, at - NAME_LEAD_MS),
+            );
         },
         release: () => {
             stopAll();
@@ -428,7 +562,14 @@ function browserContext(): AudioContextLike | null {
     }
 }
 
-/** A file from this host (a `/content/…` URL from the props). */
+/** The browser's timer. */
+function browserLater(run: () => void, ms: number): () => void {
+    const timer = setTimeout(run, ms);
+
+    return () => clearTimeout(timer);
+}
+
+/** A file from this host (a `/content/…` URL from the props, or a name clip's route by ids). */
 function fetchBytes(url: string): Promise<ArrayBuffer> {
     return fetch(url, { credentials: 'same-origin' }).then((response) => {
         if (!response.ok) {

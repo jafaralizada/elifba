@@ -113,7 +113,7 @@ it('has the section for rooms in both languages when the switch is on', function
     preg_match('/const ROOMS = \[(.*?)\];/s', (string) file_get_contents(resource_path('js/pages/privacy.tsx')), $list);
     preg_match_all("/'([a-z_]+)'/", $list[1] ?? '', $parts);
 
-    expect($parts[1])->toBe(['what', 'camera', 'stored', 'not_stored', 'why', 'who', 'contact', 'how_long', 'delete', 'where']);
+    expect($parts[1])->toBe(['what', 'camera', 'stored', 'not_stored', 'why', 'who', 'voice', 'contact', 'how_long', 'delete', 'where']);
 
     $request->get(route('privacy'))
         ->assertOk()
@@ -181,6 +181,25 @@ it('says what a taunt is, what it costs, who sees it and how it is hidden', func
 })->with([
     'az' => [null, ['mesaj, çat və ya dəvət göndərilmir', 'yalnız hazır siyahıdan atmaca', 'hər atmaca atana 1 xal başa gəlir', '4 saniyə yalnız hədəf olan oyunçu və aparıcının böyük ekranı görür', 'öz cihazında gizlədə', 'otaqda bağlaya bilər'], 'kimə atıldığı bir gündən sonra silinir'],
     'en' => ['en', ['no message, chat or invitation is sent', 'only a taunt from a ready-made list', 'each costs the thrower 1 point', "only the player it is aimed at and the host's big screen see it, for 4 seconds", 'hide taunts on their own device', 'switch them off for the room'], 'whom it was aimed at is erased after a day'],
+]);
+
+it('says that the screen may say the winner\'s name from the list, and sends it nowhere', function (?string $locale, string $winner, string $list, string $nowhere): void {
+    Rooms::on();
+    $request = $locale === null ? $this : $this->withSession(['locale' => $locale]);
+
+    // ADR 030 decision 8: one paragraph, after who sees a name.
+    $request->get(route('privacy'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('privacy')
+            ->where('translations', fn ($translations): bool => str_contains($translations['privacy.rooms.voice'], $winner)
+                && str_contains($translations['privacy.rooms.voice'], $list)
+                && str_contains($translations['privacy.rooms.voice'], $nowhere)
+                // The screen's toggle, by the name it has there.
+                && str_contains($translations['privacy.rooms.voice'], $translations['rooms.sound.label'])));
+})->with([
+    'az' => [null, 'qalibin adını', 'hazır ad lüğətindədirsə', 'heç bir xidmətə göndərilmir və bunun üçün heç nə saxlanılmır'],
+    'en' => ['en', "the winner's first name", 'built-in name list', 'sent to no service and nothing is stored for it'],
 ]);
 
 it('says what the camera does with the picture', function (?string $locale, string $optional, string $asks, string $nowhere): void {

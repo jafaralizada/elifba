@@ -169,6 +169,8 @@ function isolationCases(): array
         'GET rooms/{room}' => ['rooms.show', $roomA, $none],
         'GET rooms/{room}/state' => ['rooms.state', $roomA, $none],
         'GET rooms/{room}/screen' => ['rooms.screen', $roomA, $none],
+        // The winner's name for the screen (ADR 030): a member of the room, by ids.
+        'GET rooms/{room}/members/{member}/voice' => ['rooms.members.voice', static fn (array $w): array => ['room' => $w['roomA']->id, 'member' => $w['memberA']->id], $none],
         'POST rooms/{room}/leave' => ['rooms.leave', $roomA, $none],
         'PATCH rooms/{room}' => ['rooms.update', $roomA, static fn (array $w): array => ['locked' => true]],
         'DELETE rooms/{room}/members/{member}' => ['rooms.members.destroy', static fn (array $w): array => ['room' => $w['roomA']->id, 'member' => $w['memberA']->id], $none],

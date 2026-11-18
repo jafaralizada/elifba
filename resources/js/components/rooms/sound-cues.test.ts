@@ -6,7 +6,9 @@ import { finalTimeline } from './final';
 import { REVEAL_MS } from './motion';
 import {
     CLOCK_MS,
+    FANFARE_MS,
     LEAD_MS,
+    MAX_NAMES,
     roomCues,
     sameMoment,
     STALE_MS,
@@ -21,7 +23,8 @@ import { standingGroups } from './standing-groups';
  * page opened on; the countdown and the clock are one file each, placed to
  * end at `opens_ms` and `bell_ms`; the screen plays the room's moments and
  * the same whatever anyone answered; a phone plays its own answer sent,
- * one sound for every answer, and its verdict only from the reveal.
+ * one sound for every answer, and its verdict only from the reveal. After
+ * the final's fanfare the screen alone cheers the first place (ADR 030).
  */
 const fixtures = import.meta.glob<unknown>(
     '../../../../tests/Fixtures/rooms/state.*.json',
@@ -148,6 +151,8 @@ const overTimeline = finalTimeline(standingGroups(over.ranking, []), 'screen');
 const winnerAt = overTimeline.winnerAt ?? -1;
 /** The fixture's final has a first and a second place, then two players without points. */
 const secondAt = overTimeline.opensAt[1];
+/** Who holds the fixture's first place: the name said after the fanfare. */
+const winner = over.ranking[0].player_id;
 
 describe('roomCues on the screen', () => {
     it("plays each of the room's moments once, however often the state comes again", () => {
@@ -163,6 +168,15 @@ describe('roomCues on the screen', () => {
             [20, { sound: 'place', at: secondAt }],
             [20, { sound: 'roll', at: winnerAt, ends: true }],
             [20, { sound: 'fanfare', at: winnerAt }],
+            [
+                20,
+                {
+                    sound: 'cheer',
+                    at: winnerAt + FANFARE_MS,
+                    players: [winner],
+                    many: false,
+                },
+            ],
         ]);
     });
 
@@ -338,6 +352,12 @@ describe('roomCues on the screen', () => {
             { sound: 'place', at: timeline.opensAt[1] },
             { sound: 'roll', at: timeline.winnerAt, ends: true },
             { sound: 'fanfare', at: timeline.winnerAt },
+            {
+                sound: 'cheer',
+                at: (timeline.winnerAt ?? 0) + FANFARE_MS,
+                players: ['p1'],
+                many: false,
+            },
         ]);
     });
 
@@ -413,6 +433,113 @@ describe('roomCues on the screen', () => {
                 { state: lobby, now: 1 },
                 { state: joined(lobby), now: 2 },
                 'phone',
+            ),
+        ).toEqual([]);
+    });
+});
+
+describe("roomCues and the winner's cheer (ADR 030)", () => {
+    /** The fixture's final with `first` holding the first place together, in this order, and the rest after them. */
+    function sharedFirst(first: string[]): State {
+        return {
+            ...over,
+            ranking: [
+                ...first.map((player_id) => ({
+                    player_id,
+                    points: 74,
+                    place: 1,
+                })),
+                { player_id: 'p9', points: 20, place: 2 },
+            ],
+        } as State;
+    }
+
+    const finalOf = (shown: State, speaker: RoomSpeaker = 'screen') =>
+        roomCues(
+            { state: reveal, now: closes + 100 },
+            { state: shown, now: closes + 3100 },
+            speaker,
+        );
+
+    it('cheers the winner after the fanfare: the first name, then «Əla oynadın!»', () => {
+        const cues = finalOf(over);
+        const fanfare = cues.findIndex(({ sound }) => sound === 'fanfare');
+        const said = cues.findIndex(({ sound }) => sound === 'cheer');
+
+        expect(said).toBe(fanfare + 1);
+        // One winner: the singular phrase.
+        expect(cues[said]).toEqual({
+            sound: 'cheer',
+            at: winnerAt + FANFARE_MS,
+            players: [winner],
+            many: false,
+        });
+        expect(cues[said].at).toBeGreaterThan(cues[fanfare].at);
+        // The fanfare is the README's 2.30 s (scripts/room-sounds/README.md).
+        expect(FANFARE_MS).toBe(2300);
+    });
+
+    it("names two or three who share the first place in the state's order, then «Əla oynadınız!», and none of four", () => {
+        const cheered = (first: string[]) =>
+            finalOf(sharedFirst(first)).find(({ sound }) => sound === 'cheer');
+
+        // The server's order, never re-sorted; a shared place, the plural phrase.
+        expect(cheered(['p2', 'p1'])).toMatchObject({
+            players: ['p2', 'p1'],
+            many: true,
+        });
+        expect(cheered(['p3', 'p1', 'p2'])).toMatchObject({
+            players: ['p3', 'p1', 'p2'],
+            many: true,
+        });
+        expect(MAX_NAMES).toBe(3);
+
+        // Four share it: nobody is named, and «Əla oynadınız!» is said alone.
+        expect(cheered(['p1', 'p2', 'p3', 'p4'])).toMatchObject({
+            players: [],
+            many: true,
+        });
+    });
+
+    it('says nothing on a reload of the final, or when the state comes again', () => {
+        // The page opened on the final: the first thing it hears.
+        expect(roomCues(null, { state: over, now: 1000 }, 'screen')).toEqual(
+            [],
+        );
+        // The final fetched again, a poll or a `room.changed`, is the same moment.
+        expect(
+            roomCues(
+                { state: over, now: 1000 },
+                { state: over, now: 4000 },
+                'screen',
+            ),
+        ).toEqual([]);
+    });
+
+    it('cheers nobody when nobody holds the first place', () => {
+        const nobody = {
+            ...over,
+            ranking: over.ranking.map((row) => ({
+                ...row,
+                points: 0,
+                place: null,
+            })),
+        } as State;
+
+        expect(finalOf(nobody)).toEqual([]);
+    });
+
+    it('never cheers on a phone, not even the winner on their own', () => {
+        const mine = {
+            ...over,
+            me: { ...over.me, player_id: winner },
+        } as State;
+
+        expect(finalOf(over, 'phone')).toEqual([]);
+        expect(finalOf(mine, 'phone')).toEqual([]);
+        expect(
+            names(heard(game('right'), 'phone')).filter(
+                (sound) => sound === 'cheer',
             ),
         ).toEqual([]);
     });
