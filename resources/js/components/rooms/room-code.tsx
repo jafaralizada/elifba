@@ -22,9 +22,19 @@ export function spacedCode(code: string): string {
     return code.replace(/^(\d{3})(\d{3})$/, '$1 $2');
 }
 
-/** The address of the code field without its scheme, as a person types it. */
+/**
+ * The address of the code field as a person types it: no scheme, and no
+ * port a browser adds by itself — an `APP_URL` of `https://elifba.io:443`
+ * reads «elifba.io/oyun».
+ */
 export function typedAddress(url: string): string {
-    return url.replace(/^https?:\/\//, '');
+    try {
+        const address = new URL(url);
+
+        return `${address.host}${address.pathname === '/' ? '' : address.pathname}`;
+    } catch {
+        return url.replace(/^https?:\/\//, '');
+    }
 }
 
 /**
