@@ -261,3 +261,36 @@ it('shows rooms only when the switch is on', function (): void {
         ->and(resource_path('images/welcome/rooms-screen.webp'))->toBeFile()
         ->and(resource_path('images/welcome/rooms-phone.webp'))->toBeFile();
 });
+
+it('names the voice on the welcome page only while its switch is on', function (): void {
+    // The rooms switch alone: the section as before, no word of the voice.
+    Rooms::on();
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('welcome')->has('rooms')->missing('rooms.voice'));
+
+    // The voice switch too (ADR 031 decision 15): `voice` in the prop, for a guest and a player.
+    Rooms::voiceOn();
+
+    foreach ([null, User::factory()->player()->create()] as $account) {
+        ($account === null ? $this : $this->actingAs($account))
+            ->get(route('home'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('welcome')->where('rooms.voice', true));
+    }
+
+    // The line keeps what it said and adds the voice: off until the host turns it on, never recorded.
+    foreach (['az' => ['Aparıcı açsa', 'mikrofonu hər kəs özü açır', 'səs yazılmır'], 'en' => ['If the host turns it on', 'everyone turns their own microphone on', 'the voice is not recorded']] as $locale => $words) {
+        $translations = json_decode((string) file_get_contents(lang_path("{$locale}.json")), true);
+
+        expect($translations['welcome.rooms.names_voice'])->toStartWith($translations['welcome.rooms.names'])
+            ->toContain(...$words)
+            ->and($translations['welcome.rooms.names'])->not->toContain($words[2]);
+    }
+
+    // The section draws the voice's line only from its prop.
+    $section = (string) file_get_contents(resource_path('js/components/welcome/rooms-section.tsx'));
+
+    expect($section)->toMatch("/facts\\.voice\\s*\\?\\s*'welcome\\.rooms\\.names_voice'\\s*:\\s*'welcome\\.rooms\\.names'/")
+        ->and(substr_count($section, 'names_voice'))->toBe(1);
+});

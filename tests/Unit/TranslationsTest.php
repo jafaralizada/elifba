@@ -140,8 +140,9 @@ it('ships the same framework files and keys in every language', function (string
 })->with(otherLocales());
 
 /*
- * The three agreements (docs/architecture.md §7 "Agreements", ADR 013): the
- * privacy note at registration and one sentence per role, each its own key
+ * The agreements (docs/architecture.md §7 "Agreements", ADR 013): the
+ * privacy note at registration, one sentence per role and, from C3, the
+ * live voice's (ADR 031 decision 14), which is no role — each its own key
  * in every language, never merged.
  */
 it('keeps each agreement its own sentence', function (string $locale): void {
@@ -149,7 +150,7 @@ it('keeps each agreement its own sentence', function (string $locale): void {
     $agreements = ['auth.register.terms', ...array_map(
         static fn (Role $role): string => "roles.agreement.{$role->value}",
         Role::cases(),
-    )];
+    ), 'rooms.voice.agreement'];
 
     foreach ($agreements as $key) {
         expect($translations)->toHaveKey($key);
@@ -161,6 +162,8 @@ it('keeps each agreement its own sentence', function (string $locale): void {
 
     foreach (Role::cases() as $role) {
         expect($translations['auth.register.terms'])->not->toContain($translations["roles.agreement.{$role->value}"])
+            ->and($translations['rooms.voice.agreement'])->not->toContain($translations["roles.agreement.{$role->value}"])
+            ->and($translations["roles.agreement.{$role->value}"])->not->toContain($translations['rooms.voice.agreement'])
             ->and($translations)->toHaveKeys(["roles.{$role->value}.title", "roles.{$role->value}.description", "roles.settings.add.{$role->value}"]);
     }
 })->with(fn (): array => [BASE_LOCALE, ...otherLocales()]);

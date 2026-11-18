@@ -133,7 +133,12 @@ export function RoomsSection({ rooms: facts }: { rooms: WelcomeRooms }) {
                         </Button>
                     </div>
                     <p className="mt-6 max-w-2xl text-pretty text-muted-foreground">
-                        {t('welcome.rooms.names')}{' '}
+                        {/* The voice's form only while the instance's live voice is on (ADR 031 decision 15). */}
+                        {t(
+                            facts.voice
+                                ? 'welcome.rooms.names_voice'
+                                : 'welcome.rooms.names',
+                        )}{' '}
                         <Link
                             href={`${privacy().url}#rooms`}
                             className="font-medium text-foreground underline underline-offset-4 hover:decoration-2"

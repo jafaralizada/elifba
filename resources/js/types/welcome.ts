@@ -38,6 +38,12 @@ export type WelcomeRooms = {
     maxPlayers: number;
     /** `elifba.rooms.rounds`: how many rounds a game may have. */
     rounds: { min: number; max: number };
+    /**
+     * Only while the instance's live voice is on (`RoomsArea::voice()`):
+     * then the section says it, with `welcome.rooms.names_voice` (ADR 031
+     * decision 15).
+     */
+    voice?: true;
 };
 
 export type WelcomeProps = {

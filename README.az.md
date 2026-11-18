@@ -67,6 +67,7 @@ Server böyüklər üçün ayrıca bir bölmə də aça bilər: Elifba hesabı o
     - _Məntiq və ardıcıllıq:_ «Sıranı davam etdir» (sonra hansı ədəd gəlir) və «Artıq olanı tap» (ədədlər və ya sözlər arasında);
     - _Söz oyunları:_ «Anaqram» (sözün qarışıq hərflərinə toxunub sözü yığmaq) və «Düzgün yazılış» (bir Azərbaycan sözü dörd cür yazılıb).
 - **Kodu bölüşən insanlar arasında yalnız ad.** Yaş, ləqəb, çat və profil yoxdur. Nəticələr adlarla yalnız hər otağın içində saxlanılır, oyunçu isə bağlanmış otaqdan adını silə bilər. Müəllimin şagirdləri və valideynin uşaqları otağa heç vaxt düşmür.
+- **Canlı səs — server və aparıcı onu açanda.** Oyunçular oynaya-oynaya, hər kəs öz telefonundan danışa bilər: aparıcı açana qədər səs sönülüdür, hər kəs səsə özü qoşulur və mikrofonunu özü açır, aparıcı isə istənilən oyunçunu susdura bilər və sonradan gələni səsə o buraxır. Səs yalnız serverin öz səs serverindən keçir və heç vaxt yazılmır; böyük ekran onu nə səsləndirir, nə də dinləyir. Onun öz açarı var — `ELIFBA_ROOMS_VOICE` ([canlı səs](#öz-serverinizdə)); onsuz canlı səs yoxdur.
 - **Böyük ekran.** Aparıcı oyunu eyni hesabla noutbukda və ya televizorda aça bilər: kod və QR kod, qoşulan oyunçular, oyun, onun çətinliyi və raund sayı — bunlar oradan da dəyişdirilir və başladılır — sonra hər raund, gələn cavablar, sıralama və yekun.
 
 Bu bölmə **server `ELIFBA_ROOMS=true` təyin etməyənə qədər bağlıdır** ([Öz serverinizdə](#öz-serverinizdə)). Bağlı olanda ondan heç yerdə heç nə görünmür və məktəblər üçün server olduğu kimi qalır.
@@ -223,7 +224,7 @@ iPhone-da faylı telefona göndərin (AirDrop və ya e-poçt), Ayarlar → Ümum
 
 ## Məxfilik
 
-Elifba uşaqlar haqqında minimum məlumat saxlayır: ad (iki eyni adlı uşağı ayırmaq üçün yalnız soyadın ilk hərfi) və cizgi avatarı — hamısı bir müəllimə aiddir. Valideynin uşağı da belədir: ad və avatar, bir valideynə aiddir, yaş və doğum tarixi yoxdur. Şagird girişi, şəkil, doğum tarixi, üçüncü tərəf skriptləri, şriftləri və analitikası yoxdur. Şagirdi, sinfi və ya uşağı silmək onu həqiqətən silir. Ətraflı: [arxitektura §7](docs/architecture.md#7-childrens-privacy). Böyüklər üçün oyunlarda (server onları açanda) böyüyün hesabdakı adını yalnız həmin otağın aparıcısı və oyunçuları görür; yaş, ləqəb və çat yoxdur, kodu oxuyan kamera isə heç yerə şəkil göndərmir: [arxitektura §12](docs/architecture.md#adults-privacy).
+Elifba uşaqlar haqqında minimum məlumat saxlayır: ad (iki eyni adlı uşağı ayırmaq üçün yalnız soyadın ilk hərfi) və cizgi avatarı — hamısı bir müəllimə aiddir. Valideynin uşağı da belədir: ad və avatar, bir valideynə aiddir, yaş və doğum tarixi yoxdur. Şagird girişi, şəkil, doğum tarixi, üçüncü tərəf skriptləri, şriftləri və analitikası yoxdur. Şagirdi, sinfi və ya uşağı silmək onu həqiqətən silir. Ətraflı: [arxitektura §7](docs/architecture.md#7-childrens-privacy). Böyüklər üçün oyunlarda (server onları açanda) böyüyün hesabdakı adını yalnız həmin otağın aparıcısı və oyunçuları görür; yaş, ləqəb və çat yoxdur, canlı səs (server və aparıcı onu açanda) yazılmır, kodu oxuyan kamera isə heç yerə şəkil göndərmir: [arxitektura §12](docs/architecture.md#adults-privacy).
 
 ## Təhlükəsizlik
 

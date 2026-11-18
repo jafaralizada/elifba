@@ -93,6 +93,23 @@ const privacy = {
     operator: { name: 'Məktəb', email: null },
 };
 
+/**
+ * The parts of «Böyüklərin oyunları» that only the live voice draws (ADR
+ * 031 decisions 16–17), and the three each of the first three replaces.
+ */
+const VOICE_ONLY = [
+    'privacy.rooms.contact_voice',
+    'privacy.rooms.not_stored_voice',
+    'privacy.rooms.where_voice',
+    'privacy.rooms.live_voice_title',
+    'privacy.rooms.live_voice',
+];
+const REPLACED = [
+    'privacy.rooms.contact',
+    'privacy.rooms.not_stored',
+    'privacy.rooms.where',
+];
+
 /** Every string of a group, with the replacements the pages give it. */
 function strings(translations: Dictionary, prefix: string): string[] {
     return Object.entries(translations)
@@ -167,12 +184,28 @@ describe.each([
         expect(html).toContain('href="/rooms"');
         expect(html).toContain('href="/oyun"');
         expect(html).toContain('href="/privacy#rooms"');
+        // The line of the instance without live voice (ADR 031 decision 15).
+        expect(html).toContain(t('welcome.rooms.names'));
+        expect(html).not.toContain(t('welcome.rooms.names_voice'));
         // After the children's data and before the price (rule 10).
         expect(html.indexOf('id="welcome-privacy"')).toBeLessThan(
             html.indexOf('id="welcome-rooms"'),
         );
         expect(html.indexOf('id="welcome-rooms"')).toBeLessThan(
             html.indexOf('id="welcome-free"'),
+        );
+    });
+
+    it('names the live voice on the welcome page only from its prop', () => {
+        const html = renderToStaticMarkup(
+            createElement(Welcome, {
+                ...welcome,
+                rooms: { ...rooms, voice: true },
+            }),
+        );
+
+        expect(html).toContain(
+            escaped(translations['welcome.rooms.names_voice']),
         );
     });
 
@@ -207,11 +240,19 @@ describe.each([
         const html = renderToStaticMarkup(
             createElement(Privacy, { ...privacy, rooms: { idleHours: 3 } }),
         );
-        const parts = Object.keys(translations).filter((key) =>
-            key.startsWith('privacy.rooms.'),
+        const parts = Object.keys(translations).filter(
+            (key) =>
+                key.startsWith('privacy.rooms.') && !VOICE_ONLY.includes(key),
         );
 
         expect(parts.length).toBeGreaterThan(5);
+        expect(html).not.toContain('id="live-voice"');
+
+        for (const key of VOICE_ONLY) {
+            expect(html).not.toContain(
+                escaped(translations[key].split('\n')[0]),
+            );
+        }
 
         for (const key of parts) {
             const text = translations[key]
@@ -233,5 +274,41 @@ describe.each([
         expect(html).toContain(escaped(translations['privacy.home.title']));
         expect(html).toContain(escaped(translations['privacy.parents.title']));
         expect(html.match(/<strong>Məktəb<\/strong>/g)).toHaveLength(2);
+    });
+
+    it('draws the live voice on the privacy page only while its switch is on', () => {
+        const html = renderToStaticMarkup(
+            createElement(Privacy, {
+                ...privacy,
+                rooms: { idleHours: 3, voice: true },
+            }),
+        );
+
+        // The part «Canlı səs», a paragraph a line, inside the section and before the operator.
+        expect(html).toContain('id="live-voice"');
+        expect(html).toContain(
+            escaped(translations['privacy.rooms.live_voice_title']),
+        );
+
+        for (const line of translations['privacy.rooms.live_voice'].split(
+            '\n',
+        )) {
+            expect(html).toContain(
+                `<p class="leading-relaxed">${escaped(line)}</p>`,
+            );
+        }
+
+        expect(html.indexOf('id="live-voice"')).toBeGreaterThan(
+            html.indexOf('id="rooms"'),
+        );
+        expect(html.indexOf('id="live-voice"')).toBeLessThan(
+            html.indexOf('<strong>Məktəb</strong>', html.indexOf('id="rooms"')),
+        );
+
+        // The three sentences in their voice forms, never in both.
+        REPLACED.forEach((key) => {
+            expect(html).toContain(escaped(translations[`${key}_voice`]));
+            expect(html).not.toContain(`>${escaped(translations[key])}<`);
+        });
     });
 });

@@ -241,7 +241,74 @@ it('says nothing of rooms when it is off', function (): void {
     $page = (string) file_get_contents(resource_path('js/pages/privacy.tsx'));
     preg_match_all('/privacy\.rooms\./', $page, $uses);
 
-    expect($uses[0])->toHaveCount(3)
+    expect($uses[0])->toHaveCount(5)
         ->and($page)->toContain("{rooms && ` \${t('privacy.rooms.intro')}`}")
         ->toMatch('/\{rooms && \(\s*<section[^>]*data-test="rooms"/s');
 });
+
+it('says what the live voice is, that it is not recorded and what the operator could hear, only while the voice switch is on', function (?string $locale, array $part, string $stored, string $where, string $contact): void {
+    $request = $locale === null ? $this : $this->withSession(['locale' => $locale]);
+    config(['elifba.rooms.idle_hours' => 3]);
+
+    // The rooms switch alone: the section as before, without a word of the voice.
+    Rooms::on();
+    $request->get(route('privacy'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('privacy')->where('rooms', ['idleHours' => 3]));
+
+    // The voice switch too (ADR 031 decisions 16–17): `voice` in the prop.
+    Rooms::voiceOn();
+    $request->get(route('privacy'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('privacy')
+            ->where('rooms', ['idleHours' => 3, 'voice' => true])
+            ->where('translations', function ($translations) use ($part, $stored, $where, $contact): bool {
+                $voice = $translations['privacy.rooms.live_voice'];
+
+                foreach ($part as $words) {
+                    if (! str_contains($voice, $words)) {
+                        return false;
+                    }
+                }
+
+                // Five paragraphs, a line each; the three sentences in their voice forms.
+                return substr_count($voice, "\n") === 4
+                    && str_contains($translations['privacy.rooms.not_stored_voice'], $translations['privacy.rooms.not_stored'])
+                    && str_contains($translations['privacy.rooms.not_stored_voice'], $stored)
+                    && str_contains($translations['privacy.rooms.where_voice'], $where)
+                    && str_contains($translations['privacy.rooms.contact_voice'], $contact)
+                    // Without the voice they stay as they were: nothing of it there.
+                    && ! str_contains($translations['privacy.rooms.not_stored'], $stored)
+                    && ! str_contains($translations['privacy.rooms.where'], $where)
+                    && ! str_contains($translations['privacy.rooms.contact'], $contact);
+            }));
+
+    // The page draws the part and the three voice forms only from `rooms.voice`,
+    // inside the section and before the operator, who closes it.
+    $page = (string) file_get_contents(resource_path('js/pages/privacy.tsx'));
+
+    expect($page)->toMatch("/const VOICE_FORMS = \\['contact', 'not_stored', 'where'\\];/")
+        ->toContain('rooms.voice && VOICE_FORMS.includes(part)')
+        ->toMatch('/data-test="rooms".*?\{rooms\.voice && \(\s*<div[^>]*data-test="live-voice".*?privacy\.rooms\.live_voice_title.*?privacy\.rooms\.live_voice\'.*?<Operator \{\.\.\.operator\} \/>/s')
+        ->and(substr_count($page, 'rooms.voice'))->toBe(2);
+})->with([
+    'az' => [null, [
+        'Canlı səs hər otaqda sönülü olur; onu yalnız aparıcı aça',
+        'Mikrofon həmişə sönülü başlayır və onu yalnız oyunçu özü açır',
+        'Səs yazılmır, mətnə çevrilmir və saxlanılmır',
+        'Böyük ekran səsi nə səsləndirir, nə də dinləyir',
+        'Uçdan-uca şifrələmə yoxdur: serveri idarə edən, hər bir zəng serverində olduğu kimi, texniki cəhətdən canlı səsə çıxış əldə edə bilər',
+        'hesabda razılığın verildiyi vaxt',
+        'ad və səs yox',
+    ], 'Canlı səs də saxlanılmır', 'öz səs serverindən keçir', 'canlı səsdən dərhal kəsilir'],
+    'en' => ['en', [
+        'The live voice is off in every room; only the host can turn it on',
+        'The microphone always starts off and only the player turns it on',
+        'The voice is not recorded, not turned into text and not kept',
+        'The big screen neither plays the voice nor listens',
+        'There is no end-to-end encryption: whoever runs the server could technically get access to the live voice, as with any call server',
+        'with the account, the moment it agreed',
+        'no name and no voice',
+    ], 'The live voice is not stored either', "this instance's own voice server", 'cut from the live voice at once'],
+]);

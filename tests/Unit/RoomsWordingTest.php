@@ -144,3 +144,156 @@ it('words the rivalry strip in exactly the strings ADR 027 lists, in both langua
             ->and(array_filter(array_map(promisesInRoomText(...), $rivalry)))->toBe([], $locale);
     }
 });
+
+/**
+ * The live voice's words as ADR 031 writes them, read from the record
+ * itself so that a sentence changes in the decision first: the table
+ * "Words" (a row may name several keys, `.state.away`, `.muted`, …, whose
+ * texts it parts with « · »; a short key takes the first one's parent),
+ * decision 14's sentence and its three notes, decision 15's welcome line,
+ * decision 16's three voice forms, decision 17's part «Canlı səs» (its five
+ * paragraphs a line each) and decision 25's two words of the cue toggle.
+ *
+ * @return array{az: array<string, string>, en: array<string, string>}
+ */
+function liveVoiceWordsOfAdr031(): array
+{
+    $adr = (string) file_get_contents(base_path('docs/decisions/031-live-voice-in-rooms.md'));
+    $between = static function (string $from, string $to) use ($adr): string {
+        $start = strpos($adr, $from);
+        expect($start)->not->toBeFalse("ADR 031 has no «{$from}»");
+        $end = strpos($adr, $to, (int) $start + strlen($from));
+
+        return substr($adr, (int) $start, $end === false ? null : $end - (int) $start);
+    };
+    $cells = static fn (string $line): array => array_map(trim(...), explode('|', trim(trim($line), '|')));
+    $words = ['az' => [], 'en' => []];
+
+    foreach (explode("\n", $between("\n## Words\n", "\n## Routes\n")) as $line) {
+        if (! str_starts_with($line, '| `.')) {
+            continue;
+        }
+
+        [$keys, $az, $en] = $cells($line);
+        $keys = array_map(static fn (string $key): string => trim($key, ' `'), explode(',', $keys));
+        $parent = substr($keys[0], 0, (int) strrpos($keys[0], '.'));
+        $keys = array_map(static fn (string $key, int $at): string => 'rooms.voice'.($at > 0 && substr_count($key, '.') === 1 ? $parent : '').$key, $keys, array_keys($keys));
+        [$az, $en] = [explode(' · ', $az), explode(' · ', $en)];
+
+        expect($az)->toHaveCount(count($keys), $line)->and($en)->toHaveCount(count($keys), $line);
+
+        foreach ($keys as $at => $key) {
+            [$words['az'][$key], $words['en'][$key]] = [$az[$at], $en[$at]];
+        }
+    }
+
+    $table = static function (string $part, string $key) use ($cells, &$words): void {
+        foreach (explode("\n", $part) as $line) {
+            if (preg_match('/^\s*\| (az|en) +\|/', $line) === 1) {
+                [$locale, $text] = $cells($line);
+                $words[$locale][$key] = $text;
+            }
+        }
+    };
+
+    $decision14 = $between("\n14. ", "\n15. ");
+    $table($decision14, 'rooms.voice.agreement');
+    preg_match_all('/`rooms\.voice\.note\.(\w+)` «(.+?)» \/ "(.+?)"/u', $decision14, $notes, PREG_SET_ORDER);
+
+    foreach ($notes as [, $key, $az, $en]) {
+        [$words['az']["rooms.voice.note.{$key}"], $words['en']["rooms.voice.note.{$key}"]] = [$az, $en];
+    }
+
+    $table($between("\n15. ", "\n16. "), 'welcome.rooms.names_voice');
+
+    foreach (explode("\n", $between("\n16. ", "\n17. ")) as $line) {
+        if (preg_match('/^\s*\| `(privacy\.rooms\.\w+_voice)`/', $line, $key) === 1) {
+            [, $words['az'][$key[1]], $words['en'][$key[1]]] = $cells($line);
+        }
+    }
+
+    $decision17 = $between("\n17. ", "\n### ");
+    preg_match('/`privacy\.rooms\.live_voice_title` «(.+?)» \/ "(.+?)"/u', $decision17, $title);
+    [, $words['az']['privacy.rooms.live_voice_title'], $words['en']['privacy.rooms.live_voice_title']] = $title;
+
+    foreach (['az' => ['**az**', '**en**'], 'en' => ['**en**', '`privacy.rooms.contact_voice`']] as $locale => [$from, $to]) {
+        $part = substr($decision17, (int) strpos($decision17, $from), (int) strpos($decision17, $to) - (int) strpos($decision17, $from));
+        preg_match_all('/^\s*> (\S.*)$/mu', $part, $paragraphs);
+
+        expect($paragraphs[1])->toHaveCount(5, "ADR 031 decision 17 ({$locale})");
+        $words[$locale]['privacy.rooms.live_voice'] = implode("\n", $paragraphs[1]);
+    }
+
+    preg_match('/`rooms\.sound\.label` «(.+?)» \/ "(.+?)", `rooms\.sound\.unlock` «(.+?)» \/ "(.+?)"/u', $between('**Two words apart.**', "\n26. "), $sound);
+    [, $words['az']['rooms.sound.label'], $words['en']['rooms.sound.label'], $words['az']['rooms.sound.unlock'], $words['en']['rooms.sound.unlock']] = $sound;
+
+    return $words;
+}
+
+it('words the live voice in exactly the strings ADR 031 lists, in both languages', function (): void {
+    // ADR 031 "Words" and decisions 14–17 and 25; docs/frontend.md rule 15 "Live voice" → "Words".
+    $adr = liveVoiceWordsOfAdr031();
+
+    expect($adr['az'])->toHaveCount(61)->and(array_keys($adr['en']))->toBe(array_keys($adr['az']));
+
+    foreach (['az', 'en'] as $locale) {
+        /** @var array<string, string> $translations */
+        $translations = json_decode((string) file_get_contents(lang_path("{$locale}.json")), true);
+        $voice = array_filter($translations, static fn (string $key): bool => str_starts_with($key, 'rooms.voice.'), ARRAY_FILTER_USE_KEY);
+        $listed = array_filter($adr[$locale], static fn (string $key): bool => str_starts_with($key, 'rooms.voice.'), ARRAY_FILTER_USE_KEY);
+
+        // No key the record does not list, and every text as it writes it.
+        expect(array_keys($voice))->toEqualCanonicalizing(array_keys($listed), $locale);
+
+        foreach ($adr[$locale] as $key => $text) {
+            expect($translations[$key] ?? null)->toBe($text, "{$locale}: {$key}");
+        }
+
+        expect(array_filter(array_map(promisesInRoomText(...), $voice)))->toBe([], $locale);
+    }
+
+    // «otaq» is in none of the voice's words, nor in the welcome page's line
+    // (ADR 026 decision 2); `/privacy` names the room, as it does everywhere.
+    $named = array_filter(
+        $adr['az'],
+        static fn (string $text, string $key): bool => ! str_starts_with($key, 'privacy.') && preg_match('/\botaq|\botağ/u', Az::lower($text)) === 1,
+        ARRAY_FILTER_USE_BOTH,
+    );
+
+    expect($named)->toBe([]);
+});
+
+it('says that the voice is not recorded wherever it is offered', function (): void {
+    // ADR 031 decisions 14, 15, 17 and "Words": the sentence one agrees to,
+    // the host's switch, the welcome page's line and `/privacy`'s part.
+    $said = ['az' => 'yazılmır', 'en' => 'not recorded'];
+
+    foreach ($said as $locale => $words) {
+        /** @var array<string, string> $translations */
+        $translations = json_decode((string) file_get_contents(lang_path("{$locale}.json")), true);
+
+        foreach (['rooms.voice.agreement', 'rooms.voice.host_off', 'welcome.rooms.names_voice', 'privacy.rooms.live_voice'] as $key) {
+            expect(str_contains(mb_strtolower($translations[$key]), $words))->toBeTrue("{$locale}: {$key}");
+        }
+    }
+});
+
+it('leaves the player role\'s sentence word for word', function (): void {
+    // ADR 031 decision 14: the voice has a sentence of its own; the player
+    // role's stays as architecture §7 "Agreements" quotes it (ADR 019).
+    $architecture = (string) file_get_contents(base_path('docs/architecture.md'));
+
+    preg_match('/a fourth moment, offered only while `elifba\.rooms\.enabled` is on: taking the player role, on the same pages — «(.+?)» \/ "(.+?)"/u', $architecture, $quoted);
+
+    expect($quoted)->toHaveCount(3);
+
+    foreach (['az' => $quoted[1], 'en' => $quoted[2]] as $locale => $sentence) {
+        /** @var array<string, string> $translations */
+        $translations = json_decode((string) file_get_contents(lang_path("{$locale}.json")), true);
+
+        expect($translations['roles.agreement.player'])->toBe($sentence)
+            ->and($translations['rooms.voice.agreement'])->not->toBe($sentence)
+            ->and($translations['rooms.voice.agreement'])->not->toContain($sentence)
+            ->and($sentence)->not->toContain($translations['rooms.voice.agreement']);
+    }
+});

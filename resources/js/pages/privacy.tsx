@@ -21,8 +21,11 @@ type Props = {
      * Only while the rooms switch is on (ADR 019 decision 4): then the
      * notice has the section «Böyüklərin oyunları» (architecture §12 "Adults' privacy").
      * `idleHours`: how long a room with no activity keeps its code.
+     * `voice`: only while the instance's live voice is on (ADR 031
+     * decisions 16–17) — then three parts take their voice forms and the
+     * part «Canlı səs» follows the others, before the operator.
      */
-    rooms?: { idleHours: number };
+    rooms?: { idleHours: number; voice?: true };
 };
 
 /**
@@ -61,6 +64,13 @@ const ROOMS = [
     'delete',
     'where',
 ];
+
+/**
+ * The parts that say something else while the live voice is on, each with
+ * its `_voice` form (ADR 031 decision 16): who may talk, what is not
+ * stored, where it passes. With the voice off they keep their texts.
+ */
+const VOICE_FORMS = ['contact', 'not_stored', 'where'];
 
 /**
  * The privacy notice (docs/architecture.md §7), public and in every
@@ -173,12 +183,38 @@ export default function Privacy({
                                     key={part}
                                     className="leading-relaxed whitespace-pre-line"
                                 >
-                                    {t(`privacy.rooms.${part}`, {
-                                        ...days,
-                                        hours: rooms.idleHours,
-                                    })}
+                                    {t(
+                                        `privacy.rooms.${rooms.voice && VOICE_FORMS.includes(part) ? `${part}_voice` : part}`,
+                                        { ...days, hours: rooms.idleHours },
+                                    )}
                                 </p>
                             ))}
+                            {/* Only while the instance's live voice is on (ADR 031 decision 17); the contact part points «below» to it. */}
+                            {rooms.voice && (
+                                <div
+                                    className="scroll-mt-6 space-y-3 border-l-2 border-border pl-4"
+                                    id="live-voice"
+                                    aria-labelledby="live-voice-title"
+                                    data-test="live-voice"
+                                >
+                                    <h3
+                                        id="live-voice-title"
+                                        className="text-lg font-semibold"
+                                    >
+                                        {t('privacy.rooms.live_voice_title')}
+                                    </h3>
+                                    {t('privacy.rooms.live_voice')
+                                        .split('\n')
+                                        .map((paragraph) => (
+                                            <p
+                                                key={paragraph}
+                                                className="leading-relaxed"
+                                            >
+                                                {paragraph}
+                                            </p>
+                                        ))}
+                                </div>
+                            )}
                             <p className="leading-relaxed">
                                 <Operator {...operator} />
                             </p>
