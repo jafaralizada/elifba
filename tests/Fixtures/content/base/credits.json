@@ -47,6 +47,13 @@
             "license": "MIT"
         },
         {
+            "files": ["content/assets/rooms/sounds/*"],
+            "title": "Sample room sounds",
+            "author": "Elifba",
+            "source": "https://github.com/nijataliyev7/elifba",
+            "license": "MIT"
+        },
+        {
             "files": ["content/assets/rooms/*"],
             "title": "Sample shapes",
             "author": "Elifba",

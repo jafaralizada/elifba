@@ -17,6 +17,7 @@ import { tap, untap } from '@/components/rooms/taps';
 import { TimeBar, URGENT_MS } from '@/components/rooms/time-bar';
 import { useCountUp, usePreviousReveal } from '@/components/rooms/use-motion';
 import type { RoomMotion } from '@/components/rooms/use-motion';
+import type { RoomSound } from '@/components/rooms/use-room-sound';
 import { secondsUntil, useServerNow } from '@/components/rooms/use-server-now';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -70,6 +71,9 @@ type Sent = {
  * page saw it begin (`motion`), so a state fetched again replays nothing
  * and the moment the page opened on stands still. The answer sent moves
  * the same for every answer; right and wrong show only from the reveal.
+ * A tap sounds the same for every item, and a tap taken back («Geri», a
+ * cell tapped again) has its own sound (`sound`, the page's: rule 15
+ * "Sound"); the answer sent and the verdict sound from the state.
  */
 export function LiveRound({
     roomId,
@@ -82,6 +86,7 @@ export function LiveRound({
     onGone,
     aside = null,
     motion,
+    sound = null,
 }: {
     roomId: string;
     state: RoomState;
@@ -95,6 +100,8 @@ export function LiveRound({
     aside?: ReactNode;
     /** Whether the page saw this round and this phase begin (`useRoomMotion()`). */
     motion: RoomMotion;
+    /** The page's sound, for the viewer's own taps. */
+    sound?: RoomSound | null;
 }) {
     const { t } = useTranslation();
     const now = useServerNow(clock, true);
@@ -164,6 +171,11 @@ export function LiveRound({
         }
 
         const next = tap(round.ask, picked, id);
+        // The same sound for every item; a cell tapped again is taken back.
+        if (next.ids.length !== picked.length) {
+            sound?.tap(next.ids.length > picked.length ? 'tap' : 'undo');
+        }
+
         setDraft({ round: round.id, ids: next.ids });
 
         if (next.send) {
@@ -254,12 +266,13 @@ export function LiveRound({
                                             variant="outline"
                                             className="h-11"
                                             disabled={picked.length === 0}
-                                            onClick={() =>
+                                            onClick={() => {
+                                                sound?.tap('undo');
                                                 setDraft({
                                                     round: round.id,
                                                     ids: untap(picked),
-                                                })
-                                            }
+                                                });
+                                            }}
                                         >
                                             <Undo2 />
                                             {t('rooms.game.undo')}

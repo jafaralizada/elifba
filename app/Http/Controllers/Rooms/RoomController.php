@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Rooms;
 
+use App\Domain\Content\Enums\RoomSpeaker;
+use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Rooms\Actions\DeleteRoom;
 use App\Domain\Rooms\Actions\LockRoom;
 use App\Domain\Rooms\Actions\OpenRoom;
@@ -42,7 +44,10 @@ use Inertia\Response;
  * gets `join`, the addresses its QR and its code field are at
  * (`RoomJoinLink`); and everyone who was in a closed room gets `games`,
  * each game with its ranking (`RoomResults`), named from the state's
- * players. `rooms/index` lists the account's rooms (`RoomList`). No other
+ * players. Whoever follows an open room's state also gets `sounds`, the
+ * URLs of a phone's own quiet cues (ADR 025 "Sound": its taps, its answer
+ * sent and its verdict; never the room's moments, which are the
+ * screen's). `rooms/index` lists the account's rooms (`RoomList`). No other
  * account's id or address reaches a room page — the shared `auth.user` is
  * the viewer's own — and no name goes into a URL or a flash.
  */
@@ -60,7 +65,7 @@ final class RoomController extends Controller
         return to_route('rooms.show', $room);
     }
 
-    public function show(Room $room, #[CurrentUser] User $account): Response
+    public function show(Room $room, #[CurrentUser] User $account, ContentRepository $content): Response
     {
         $gate = Gate::forUser($account);
         $open = $room->isOpen();
@@ -73,6 +78,7 @@ final class RoomController extends Controller
             'setup' => $open && $gate->allows('host', $room) ? RoomGameSetupData::options() : null,
             'join' => $open && $watches ? RoomJoinLink::of($room) : null,
             'games' => $open ? null : RoomResults::games($room, RoomClock::nowMs()),
+            'sounds' => $open && $watches ? $content->roomSounds()->urls(RoomSpeaker::Phone) : null,
             'can' => [
                 'host' => $gate->allows('host', $room),
                 'leave' => $gate->allows('play', $room),

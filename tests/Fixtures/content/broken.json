@@ -1699,5 +1699,56 @@
         "file": "credits.json",
         "set": { "credits.5.files": ["content/assets/rooms/*"] },
         "problem": "credits.json: content/rooms/words.json has no entry"
+    },
+    "rooms sounds: no file": {
+        "file": "rooms/sounds.json",
+        "delete": ["rooms/sounds.json"],
+        "problem": "rooms/sounds.json: is missing"
+    },
+    "rooms sounds: no version": {
+        "file": "rooms/sounds.json",
+        "unset": ["version"],
+        "problem": "rooms/sounds.json: the file needs `version`"
+    },
+    "rooms sounds: a version below 1": {
+        "file": "rooms/sounds.json",
+        "set": { "version": 0 },
+        "problem": "rooms/sounds.json: version must be a whole number from 1"
+    },
+    "rooms sounds: a sound without a file": {
+        "file": "rooms/sounds.json",
+        "unset": ["sounds.fanfare"],
+        "problem": "rooms/sounds.json: sounds needs `fanfare`"
+    },
+    "rooms sounds: a sound of no moment": {
+        "file": "rooms/sounds.json",
+        "set": { "sounds.buzzer": "rooms/sounds/wrong.mp3" },
+        "problem": "rooms/sounds.json: sounds has an unknown key `buzzer`"
+    },
+    "rooms sounds: a children's sound": {
+        "file": "rooms/sounds.json",
+        "set": { "sounds.tap": "sounds/pop.ogg" },
+        "problem": "rooms/sounds.json: sounds.tap \"sounds/pop.ogg\" must be under content/assets/rooms/sounds/"
+    },
+    "rooms sounds: a file that is not there": {
+        "file": "rooms/sounds.json",
+        "set": { "sounds.tap": "rooms/sounds/nothing.mp3" },
+        "problem": "rooms/sounds.json: sounds.tap: content/assets/rooms/sounds/nothing.mp3 does not exist"
+    },
+    "rooms sounds: a file that is no MP3": {
+        "file": "rooms/sounds.json",
+        "set": { "sounds.tap": "rooms/sounds/tap.wav" },
+        "write": { "assets/rooms/sounds/tap.wav": "RIFF" },
+        "problem": "rooms/sounds.json: sounds.tap \"rooms/sounds/tap.wav\" must end in .mp3"
+    },
+    "rooms sounds: one file for two sounds": {
+        "file": "rooms/sounds.json",
+        "set": { "sounds.wrong": "rooms/sounds/right.mp3" },
+        "problem": "rooms/sounds.json: sounds.wrong \"rooms/sounds/right.mp3\" is already the file of sounds.right"
+    },
+    "rooms sounds: a file that is no sound of the list": {
+        "file": "rooms/sounds.json",
+        "write": { "assets/rooms/sounds/buzzer.mp3": "ID3" },
+        "problem": "rooms/sounds.json: assets/rooms/sounds/buzzer.mp3 is no sound of the list"
     }
 }

@@ -744,6 +744,8 @@
     "rooms.show.unlock": "Kilidi aç",
     "rooms.show.waiting": "Oyunun başlamasını gözləyin.",
     "rooms.show.you": "siz",
+    "rooms.sound.label": "Səs",
+    "rooms.sound.unlock": "Səsi aç",
     "settings.appearance.dark": "Qaranlıq",
     "settings.appearance.description": "Hesabınızın görünüşünü seçin",
     "settings.appearance.light": "İşıqlı",

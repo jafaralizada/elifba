@@ -8,6 +8,7 @@ import { MECHANIC_VIEWS } from '@/components/rooms/mechanics/views';
 import { REVEAL_MS } from '@/components/rooms/motion';
 import { RoomQr, spacedCode, typedAddress } from '@/components/rooms/room-code';
 import type { JoinLink } from '@/components/rooms/room-code';
+import { SoundToggle } from '@/components/rooms/sound-toggle';
 import { Standing } from '@/components/rooms/standing';
 import { useLiveRoom } from '@/components/rooms/use-live-room';
 import {
@@ -15,6 +16,7 @@ import {
     useRoomMotion,
 } from '@/components/rooms/use-motion';
 import type { RoomMotion } from '@/components/rooms/use-motion';
+import { useRoomSound } from '@/components/rooms/use-room-sound';
 import { useServerNow } from '@/components/rooms/use-server-now';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
@@ -27,6 +29,7 @@ import type {
     RoomRound,
     RoomState,
 } from '@/rooms/contract';
+import type { RoomSoundUrls } from '@/rooms/sound';
 
 type Props = {
     room: { id: string; status: 'open' | 'closed' };
@@ -35,6 +38,8 @@ type Props = {
     place_labels: string[];
     /** Where a phone joins: the QR's address and the code field's. */
     join: JoinLink | null;
+    /** The room's moments it plays as the room's speaker, by name (ADR 025). */
+    sounds: RoomSoundUrls;
 };
 
 /**
@@ -50,13 +55,17 @@ type Props = {
  *
  * It is the room's show (ADR 025): every moment it saw begin moves, larger
  * than on a phone, and a game's end is the final, with its confetti. A
- * moment it was opened on stands still.
+ * moment it was opened on stands still. It is also the room's speaker:
+ * once its «Səsi aç» is pressed (browsers allow no sound before a
+ * gesture), it plays the moments everybody shares (`useRoomSound()`) —
+ * and the same whatever anyone answered, since it has no viewer.
  */
 export default function RoomsScreen({
     room,
     state: initial,
     place_labels: placeLabels,
     join,
+    sounds,
 }: Props) {
     const { t } = useTranslation();
     // A closed room has no screen: its results are on the room's page.
@@ -66,6 +75,7 @@ export default function RoomsScreen({
         onClosed: () => router.visit(show(room.id)),
     });
     const motion = useRoomMotion(state);
+    const sound = useRoomSound({ speaker: 'screen', sounds, state, clock });
     const game = state?.game ?? null;
     const round = state?.round ?? null;
     const playing = game !== null && game.phase === 'live' && round !== null;
@@ -89,6 +99,7 @@ export default function RoomsScreen({
                     </span>
                 )}
                 <span className="flex-1" />
+                <SoundToggle sound={sound} big />
                 <FullscreenToggle />
                 <Button asChild variant="ghost" className="h-11">
                     <Link href={show(room.id)}>

@@ -2,6 +2,8 @@
 
 use App\Domain\Content\Enums\Effect;
 use App\Domain\Content\Enums\ItemStyle;
+use App\Domain\Content\Enums\RoomSound;
+use App\Domain\Content\Enums\RoomSpeaker;
 use App\Domain\Content\Enums\Sound;
 use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Content\Support\ContentValidator;
@@ -38,6 +40,45 @@ it('requires a picture for every word since A5 switched it on', function (): voi
         ->toBe(['packs/sample.json: words[1] "ata" needs an `image`'])
         ->and((new ContentValidator($root, wordPicturesRequired: false))->validate())
         ->toBe([]);
+});
+
+it('keeps every room sound small enough to fetch once sound is unlocked', function (): void {
+    $limit = ContentValidator::MAX_ROOM_SOUND_BYTES;
+    $root = ContentFixture::make(['write' => ['assets/rooms/sounds/roll.mp3' => str_repeat('x', $limit + 1)]]);
+
+    expect((new ContentValidator($root))->validate())
+        ->toBe(['rooms/sounds.json: sounds.roll "rooms/sounds/roll.mp3" holds '.($limit + 1).' bytes; a room sound holds at most '.$limit]);
+
+    foreach (RoomSound::cases() as $sound) {
+        expect(filesize(base_path('content/assets/rooms/sounds/'.$sound->value.'.mp3')))->toBeLessThanOrEqual($limit);
+    }
+});
+
+it('sends a page only its own speaker\'s room sounds, as content URLs with the file\'s version', function (): void {
+    $sounds = (new ContentRepository(base_path('content')))->roomSounds();
+    $screen = $sounds->urls(RoomSpeaker::Screen);
+    $phone = $sounds->urls(RoomSpeaker::Phone);
+
+    expect(array_keys($screen))->toBe(['count', 'study', 'question', 'tick', 'close', 'ranking', 'roll', 'fanfare'])
+        ->and(array_keys($phone))->toBe(['tap', 'undo', 'sent', 'right', 'wrong'])
+        ->and($phone['tap'])->toBe(asset('content/rooms/sounds/tap.mp3').'?v='.$sounds->version);
+});
+
+it('names the same room sounds on the page as the content does, each for one speaker', function (): void {
+    $source = (string) file_get_contents(resource_path('js/rooms/sound.ts'));
+    preg_match('/export const ROOM_SOUNDS = \{(.*?)\} as const;/s', $source, $block);
+    $page = [];
+
+    foreach (RoomSpeaker::cases() as $speaker) {
+        preg_match('/'.$speaker->value.': \[(.*?)\]/s', $block[1] ?? '', $list);
+        preg_match_all("/'([a-z]+)'/", $list[1] ?? '', $names);
+        $page[$speaker->value] = $names[1];
+    }
+
+    expect($page)->toBe(array_map(
+        static fn (RoomSpeaker $speaker): array => array_map(static fn (RoomSound $sound): string => $sound->value, RoomSound::of($speaker)),
+        ['screen' => RoomSpeaker::Screen, 'phone' => RoomSpeaker::Phone],
+    ));
 });
 
 it('gives every pack a sound for every moment an account may choose, a chime instead of a pop where the effect is sparkle', function (): void {

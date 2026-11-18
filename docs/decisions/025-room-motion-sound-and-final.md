@@ -1,6 +1,6 @@
 # 025 — A room game's motion, its sound and its final
 
-- **Status:** Accepted, 2026-11-18 (the owner's three decisions of that day; "Motion" built on the branch `feat/rooms-polish`, "Sound" by the next step)
+- **Status:** Accepted, 2026-11-18 (the owner's three decisions of that day; "Motion", "The final" and "Sound" built on the branch `feat/rooms-polish`, sound as "As built" below says)
 - **Sections:** architecture.md §12 "Room games", "Guard tests"; docs/frontend.md rule 15
 - **Amends:** [023](023-room-games-and-content.md) decision 11 ("No Phaser, no sound and no voice in a room in the first stage"): Phaser and voice stay out; motion is designed and sound comes, as below. docs/frontend.md rule 15: the ranking's "No medal colours, podium or confetti" and the last bullet's "No sound, voice, Phaser, confetti or vibration" give way to the final and to the two parts below. [021](021-room-race-protocol.md) and [022](022-room-scoring-and-history.md) are unchanged: the device still never judges, scores or keeps the time.
 - **Why it is hard to reverse:** a room is played by several people in one room at once. What moves, what sounds and on which device are habits the players learn, and a sound or a movement that told one phone's owner something before the others would break the race's fairness, which no later fix can take back from a game already played.
@@ -33,7 +33,7 @@ Two things constrain all three. The state is all a page knows (§12 "The state")
 9. **Confetti is short and has a place.** `canvas-confetti` (the package the podium uses, never a children's component) bursts once when the first place opens and is gone within two seconds: on the screen always, on a phone only for a player who holds the first place. Never on a reload, never with reduced motion, never in a reveal.
 10. **Only there.** The reveal's «Sıralama», the lobby's list of players and a closed room's results keep the plain `Standing`. Still no total, rating or profile across rooms: the final shows one room's standing, as the lobby did.
 
-### Sound (the next step builds it)
+### Sound (built on `feat/rooms-polish`)
 
 11. **The screen is the room's speaker.** It plays the moments everybody shares: the countdown's seconds, the start of the study and of the question, a soft tick in the last 3 s of an answer, one neutral sound when the round closes, the reveal and the ranking, and in the final a roll while the places open and a short fanfare when the first place opens. Its reveal sound is the same whatever anyone answered: the screen has no viewer.
 12. **A phone plays only quiet cues of its own:** its own tap, its own answer sent — one sound for every answer — and, from the reveal, its own verdict. A phone never plays the room's moments, so twenty phones never ring together.
@@ -45,7 +45,7 @@ Two things constrain all three. The state is all a page knows (§12 "The state")
 - The motion of a moment is the same on every device that saw it begin, so a room watching the screen and its phones sees one game.
 - A page opened in the middle of a game shows less motion than one that was there from the start. That is the price of never replaying a moment; a moment is never shown half-built.
 - The final celebrates the room's standing after the game. For a room's first game it is that game's result; after several games the first place is the room's leader. If the owner wants each game's own winner, the state needs that game's ranking once it is over — a change of `RoomStateData` and its fixtures, decided separately.
-- Sound has a place for every moment before it is built: the next step adds files and a player, not new triggers.
+- Sound was built on the places above: files and a player, and no trigger the motion did not already have. A page opened in the middle of a moment is silent until the next one, as it is still.
 
 ## Alternatives rejected
 
@@ -60,3 +60,34 @@ Two things constrain all three. The state is all a page knows (§12 "The state")
 ## What would make us revisit
 
 A wish to celebrate each game's own winner after several games (the state's ranking at `over`), a room played without a screen often enough that phones should carry the room's sounds, or a player who asks for less motion than the system setting gives.
+
+## As built (sound, 2026-11-18)
+
+Built on `feat/rooms-polish` after the motion, from the owner's split of 2026-11-18 — the screen: the countdown, the question opening, the last seconds, the round closing, the reveal, the final; the phone: its own taps and undo, "answer accepted", its own result at the reveal, quietly. Where the decisions above leave a choice, it was made so:
+
+1. **The cues.** Thirteen files, one per `Content\Enums\RoomSound`, each played by one speaker (`RoomSound::speaker()`):
+
+    | Cue        | Device | When                                                                          | File                            |
+    | ---------- | ------ | ----------------------------------------------------------------------------- | ------------------------------- |
+    | `count`    | screen | each second of the countdown (3, 2, 1)                                        | a clear pip, 180 ms             |
+    | `study`    | screen | the study opens (memory games)                                                | a soft chord swell, 650 ms      |
+    | `question` | screen | the question opens                                                            | a zip into a bell, 420 ms       |
+    | `tick`     | screen | each of the last three seconds of an answer, as `TimeBar` turns red           | a wood-block tick, 80 ms        |
+    | `close`    | screen | the round closes and the reveal opens, the same whatever anyone answered      | a two-note chime, 850 ms        |
+    | `ranking`  | screen | the reveal's ranking comes in (`REVEAL_MS.ranking`, 420 ms after)             | plucks over a breath, 450 ms    |
+    | `roll`     | screen | the final: it ends where the first place opens (`finalTimeline().winnerAt`)   | a snare roll, 2.4 s             |
+    | `fanfare`  | screen | the final's first place opens                                                 | a brass fanfare, 1.55 s         |
+    | `tap`      | phone  | the viewer's tap that adds an item, the same for every item                   | a soft tock, 70 ms              |
+    | `undo`     | phone  | «Geri», or a cell tapped again                                                | a lower glide, 90 ms            |
+    | `sent`     | phone  | the state says `answered` within the answer phase: one sound for every answer | an airy swoosh, 240 ms          |
+    | `right`    | phone  | the reveal, `reveal.mine.correct`                                             | two bells rising, 480 ms        |
+    | `wrong`    | phone  | the reveal, `reveal.mine` not correct                                         | two round notes falling, 400 ms |
+
+    Not sounded: the count of answers (twenty answers would be twenty blips), the study's covering (the question follows it at once), a reveal without the viewer's answer, a host who does not play, and the final on a phone (the screen's fanfare is the room's; the winner's phone has its confetti).
+
+2. **One pure function decides.** `roomCues(previous, current, speaker)` (`components/rooms/sound-cues.ts`, Vitest) takes two consecutive things a page heard — the state and the estimated server clock — and returns the cues to play now: a moment's (the game, the round, the phase: `momentKey()`) when a new one began, a beat's (a countdown second, a last second, the answer sent) when a new one came within the same moment, nothing otherwise. The first thing a page hears plays nothing, so a reload, a late join or the screen opened mid-game replays nothing, and a state fetched again is the same moment. A moment heard more than `STALE_MS` (4 s, a poll and some) after it began — `opens_ms`, `answer_from_ms`, `closes_ms` — is joined silently. The screen's cues never read `reveal.mine`; a phone reads it only in the reveal (Vitest: a proxy records every read before it). The player (`rooms/sound.ts`) drops a cue scheduled for a moment that ended before it played.
+3. **"Sent" comes from the state.** It plays when the state the receipt's `refresh()` brings says `answered`, not on the receipt, so a retried answer or a second tab sounds once. A last answer that closes the round goes straight to the reveal, so its phone hears the verdict without `sent` before it — the same for a right and a wrong answer.
+4. **Unlocking.** Browsers refuse sound before a gesture. Each page makes its `AudioContext` inside one and only then fetches its files (about 100 KB in all): the first `pointerup`, `touchend`, `keydown` or `click` anywhere on the page, at once where the document already had one (`navigator.userActivation`, kept across Inertia visits, as after «Qoşul»), and never while the device is muted. On iOS a silent sample is started inside the gesture. The screen's top bar has «Səsi aç», filled, while it waits, then «Səs» (`aria-pressed`); a press on it is the toggle's own, never the page's first-gesture unlock, so it means what it shows. `visibilitychange` resumes a context the browser suspended where it lets it; where audio is missing, refused or a file fails, nothing throws and the game plays on in silence.
+5. **The mute** is this device's: `localStorage` `elifba.rooms.screen.muted` or `elifba.rooms.phone.muted` (`rooms/sound.ts`, every read and write in `try`/`catch`), separate from the board's `elifba.board.muted`, never sent anywhere, no account setting, route or migration. A muted device makes no audio context at all. The phone's toggle is a 44px round icon in the round's head beside the code chip; the screen's sits before «Tam ekran».
+6. **Loudness.** One loudness for the set, −20 LUFS "while it sounds" (EBU R128 of the cue played back to back for 4 s, since a 70 ms tap is shorter than R128's blocks), true peak at most −1 dBFS; the screen plays at full level, a phone at half (`SPEAKER_GAIN`, −6 dB).
+7. **The files** are our own: synthesised by `scripts/room-sounds/make.py` (standard-library Python and ffmpeg, seeded; its README has the numbers), mono MP3 at 96 kb/s, in `content/assets/rooms/sounds/`, MIT, one `content/credits.json` entry. `content/rooms/sounds.json` names one file per cue; `ContentValidator` requires every cue and no other, an MP3 under `assets/rooms/sounds/` that exists, is used once and holds at most 48 KB, and no file there outside the list. A page gets only its own speaker's URLs, as `sounds` in its props (`RoomSoundsData::urls()`): `rooms/screen` the room's, `rooms/show` a phone's while it follows an open room, null otherwise.

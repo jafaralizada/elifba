@@ -88,6 +88,13 @@ The app shows the same list on its `/credits` page.
 - License: [MIT License](https://opensource.org/license/mit) (`MIT`)
 - Source: <https://github.com/nijataliyev7/elifba>
 
+### Sounds of the adults' room games: the screen's countdown, question, last seconds, reveal and final, and a phone's taps, answer and verdict, synthesised by scripts/room-sounds/make.py
+
+- Files: `content/assets/rooms/sounds/*`
+- Author: Elifba contributors
+- License: [MIT License](https://opensource.org/license/mit) (`MIT`)
+- Source: <https://github.com/nijataliyev7/elifba>
+
 ### The adults' word list: everyday Azerbaijani nouns and adjectives for the word games, starting from the theme packs' words, with the spellings that are correct too; written for Elifba, copied from no dictionary or list
 
 - Files: `content/rooms/words.json`

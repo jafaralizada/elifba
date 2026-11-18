@@ -16,6 +16,7 @@ use App\Domain\Content\Enums\Mechanic;
 use App\Domain\Content\Enums\RoomItemKind;
 use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Content\Enums\RoomSequenceRule;
+use App\Domain\Content\Enums\RoomSound;
 use App\Domain\Content\Enums\RoomSource;
 use App\Domain\Content\Enums\SlotStyle;
 use App\Domain\Content\Enums\Sound;
@@ -35,8 +36,8 @@ use SplFileInfo;
  * Checks a content root (docs/architecture.md §3, §8): `alphabet.json`,
  * `avatars.json`, `sounds.json`, `levels.json`, `prompts.json`, `names.json`,
  * `voice.json` with `voice-clips.json`, `credits.json`, `packs/*.json`,
- * `rooms/levels.json`, `rooms/shapes.json`, `rooms/categories.json` and
- * `rooms/words.json` (§12 "Room content"),
+ * `rooms/levels.json`, `rooms/shapes.json`, `rooms/categories.json`,
+ * `rooms/words.json` and `rooms/sounds.json` (§12 "Room content"),
  * `tests/syllables.json` and every file under `assets/`, `voice-names/`
  * and `resources/fonts/` (credits; SVG files are also checked for anything
  * that could run or load). `validate()` lists every problem, one line each;
@@ -184,6 +185,18 @@ final class ContentValidator
     public const string ROOM_SHAPES_FOLDER = 'rooms/';
 
     /**
+     * Where the sounds of a room game are, under `assets/` (§12 "Room
+     * content", ADR 025 "Sound").
+     */
+    public const string ROOM_SOUNDS_FOLDER = 'rooms/sounds/';
+
+    /**
+     * A room sound is short, so a page can fetch its speaker's set as soon
+     * as sound is unlocked: no file above this many bytes (ADR 025).
+     */
+    public const int MAX_ROOM_SOUND_BYTES = 48 * 1024;
+
+    /**
      * A `next_in_sequence` row shows at most seven terms, and every number
      * of a round is 1–999 — three digits, short enough for seven terms and
      * the «?» to fit one row of a 375px phone (§12 "Room games", B5).
@@ -309,6 +322,7 @@ final class ContentValidator
         $this->names();
         $this->roomCategories();
         $this->roomLevels($this->roomShapes(), $this->roomWords());
+        $this->roomSounds();
         $this->voice();
         $credits = $this->credits();
 
@@ -1361,6 +1375,85 @@ final class ContentValidator
         sort($files, SORT_STRING);
 
         return $files;
+    }
+
+    // ── rooms/sounds.json ───────────────────────────────────────────────
+
+    /**
+     * The sounds of a room game (§12 "Room content", ADR 025 "Sound"):
+     * `version` and `sounds`, an object with one file for every
+     * `RoomSound` and no other key. Each is an MP3 under
+     * `assets/rooms/sounds/` that exists, no other sound uses and holds at
+     * most `MAX_ROOM_SOUND_BYTES`; and every file in that folder is a
+     * sound of the list. The files need a credits entry like every asset.
+     */
+    private function roomSounds(): void
+    {
+        $file = ContentRepository::ROOM_SOUNDS;
+        $data = $this->object($this->read($file), $file, '', ['version', 'sounds']);
+
+        if ($data === null) {
+            return;
+        }
+
+        if (! is_int($data['version']) || $data['version'] < 1) {
+            $this->problem($file, 'version must be a whole number from 1');
+        }
+
+        $sounds = $this->object($data['sounds'], $file, 'sounds', array_map(static fn (RoomSound $sound): string => $sound->value, RoomSound::cases()));
+
+        if ($sounds === null) {
+            return;
+        }
+
+        /** @var array<string, string> $used sound path → the entry that has it */
+        $used = [];
+
+        foreach ($sounds as $name => $path) {
+            $where = "sounds.{$name}";
+
+            if (is_string($path) && ! str_starts_with($path, self::ROOM_SOUNDS_FOLDER)) {
+                $this->problem($file, "{$where} \"{$path}\" must be under {$this->contentFolder()}/assets/".self::ROOM_SOUNDS_FOLDER);
+
+                continue;
+            }
+
+            $path = $this->asset($path, ['mp3'], $file, $where);
+
+            if ($path === null || pathinfo($path, PATHINFO_EXTENSION) !== 'mp3' || ! self::exists("{$this->root}/assets/{$path}")) {
+                continue;
+            }
+
+            if (isset($used[$path])) {
+                $this->problem($file, "{$where} \"{$path}\" is already the file of {$used[$path]}");
+
+                continue;
+            }
+
+            $used[$path] = $where;
+            $bytes = (int) filesize("{$this->root}/assets/{$path}");
+
+            if ($bytes > self::MAX_ROOM_SOUND_BYTES) {
+                $this->problem($file, "{$where} \"{$path}\" holds {$bytes} bytes; a room sound holds at most ".self::MAX_ROOM_SOUND_BYTES);
+            }
+        }
+
+        $folder = "{$this->root}/assets/".rtrim(self::ROOM_SOUNDS_FOLDER, '/');
+        $files = [];
+
+        foreach (glob("{$folder}/*") ?: [] as $path) {
+            if (is_file($path) && ! str_starts_with(basename($path), '.')) {
+                $files[] = self::ROOM_SOUNDS_FOLDER.basename($path);
+            }
+        }
+
+        sort($files, SORT_STRING);
+
+        foreach ($files as $path) {
+            if (! isset($used[$path])) {
+                $this->problem($file, "assets/{$path} is no sound of the list");
+            }
+        }
     }
 
     // ── rooms/categories.json ───────────────────────────────────────────

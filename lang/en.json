@@ -744,6 +744,8 @@
     "rooms.show.unlock": "Unlock",
     "rooms.show.waiting": "Wait for the game to start.",
     "rooms.show.you": "you",
+    "rooms.sound.label": "Sound",
+    "rooms.sound.unlock": "Turn sound on",
     "settings.appearance.dark": "Dark",
     "settings.appearance.description": "Update the appearance settings for your account",
     "settings.appearance.light": "Light",

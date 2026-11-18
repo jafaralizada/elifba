@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Rooms;
 
+use App\Domain\Content\Enums\RoomSpeaker;
+use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Support\RoomJoinLink;
 use App\Domain\Rooms\Support\RoomPlaces;
@@ -19,19 +21,22 @@ use Inertia\Response;
  * gets what the room page gets to follow the room — the state
  * (`RoomState`, which it then reads from `GET /rooms/{room}/state` as a
  * host may) and the place labels — and `join`, the addresses of the QR and
- * the code field (`RoomJoinLink`), built on the server. It writes nothing,
+ * the code field (`RoomJoinLink`), built on the server; and `sounds`, the
+ * URLs of the room's moments it plays as the room's speaker (ADR 025
+ * "Sound"), never a phone's own cues. It writes nothing,
  * and it is not the guest board: `/lovhe`, the `board` guard and its
  * bearer never show a room. The page is docs/frontend.md rule 15's.
  */
 final class RoomScreenController extends Controller
 {
-    public function __invoke(Room $room, #[CurrentUser] User $account): Response
+    public function __invoke(Room $room, #[CurrentUser] User $account, ContentRepository $content): Response
     {
         return Inertia::render('rooms/screen', [
             'room' => ['id' => $room->id, 'status' => $room->status()->value],
             'state' => RoomState::for($room, $account)->toArray(),
             'place_labels' => RoomPlaces::labels($room, app()->getLocale()),
             'join' => RoomJoinLink::of($room),
+            'sounds' => $content->roomSounds()->urls(RoomSpeaker::Screen),
         ]);
     }
 }

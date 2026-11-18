@@ -25,9 +25,11 @@ import type { JoinLink } from '@/components/rooms/room-code';
 import { FinalStanding } from '@/components/rooms/final-standing';
 import { RoomConfirm } from '@/components/rooms/room-confirm';
 import { Standing } from '@/components/rooms/standing';
+import { SoundToggle } from '@/components/rooms/sound-toggle';
 import { useLiveRoom } from '@/components/rooms/use-live-room';
 import { useRoomMotion } from '@/components/rooms/use-motion';
 import type { RoomMotion } from '@/components/rooms/use-motion';
+import { useRoomSound } from '@/components/rooms/use-room-sound';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
@@ -50,6 +52,7 @@ import type {
     RoomRankedPlayer,
     RoomState,
 } from '@/rooms/contract';
+import type { RoomSoundUrls } from '@/rooms/sound';
 import { roomRequest } from '@/rooms/http';
 
 /** A game of a closed room, with its ranking (`Rooms\Support\RoomResults`). */
@@ -75,6 +78,8 @@ type Props = {
     join: JoinLink | null;
     /** A closed room's games, each with its ranking; null while the room is open. */
     games: RoomResultGame[] | null;
+    /** This phone's own quiet cues by name (ADR 025); null when it follows no open room. */
+    sounds: RoomSoundUrls | null;
     can: Can;
 };
 
@@ -89,7 +94,11 @@ type Props = {
  * The page follows the state with `useLiveRoom()`; it sends no client
  * event, and draws what the latest state says: it never derives a phase,
  * a solution or a point. A moment moves only when the page saw it begin
- * (`useRoomMotion()`, ADR 025): the one it opened on stands still.
+ * (`useRoomMotion()`, ADR 025): the one it opened on stands still. Its
+ * sound is the viewer's own and quiet (`useRoomSound()`): a tap, the
+ * answer sent — one sound for every answer — and, from the reveal, the
+ * verdict; the room's moments are the screen's. The first tap unlocks it,
+ * and the round's head holds its mute.
  */
 export default function RoomsShow({
     room,
@@ -98,11 +107,13 @@ export default function RoomsShow({
     setup,
     join,
     games,
+    sounds,
     can,
 }: Props) {
     const { t } = useTranslation();
     const { state, clock, refresh } = useLiveRoom({ room, initial });
     const motion = useRoomMotion(state);
+    const sound = useRoomSound({ speaker: 'phone', sounds, state, clock });
     // The host's last choice of a game, for the next «Yeni oyun».
     const [choice, setChoice] = useState<SetupChoice | null>(null);
 
@@ -170,13 +181,19 @@ export default function RoomsShow({
                             refresh={refresh}
                             onGone={() => router.reload()}
                             motion={motion}
+                            sound={sound}
                             aside={
-                                state.room.code !== null ? (
-                                    <CodeChip
-                                        code={state.room.code}
-                                        join={join}
-                                    />
-                                ) : null
+                                <>
+                                    {sounds !== null && (
+                                        <SoundToggle sound={sound} />
+                                    )}
+                                    {state.room.code !== null && (
+                                        <CodeChip
+                                            code={state.room.code}
+                                            join={join}
+                                        />
+                                    )}
+                                </>
                             }
                         />
                         {can.host && (

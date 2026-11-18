@@ -409,6 +409,33 @@ it('gives the screen only to the host', function (): void {
     $this->get(route('rooms.screen', $watched))->assertRedirect(route('login'));
 });
 
+it('sends the screen the room\'s sounds and a phone only its own, and a closed room none', function (): void {
+    $room = Rooms::open($this->resad);
+    Rooms::join($room, $this->aygun);
+    $folder = asset('content/rooms/sounds').'/';
+    $screen = ['count', 'study', 'question', 'tick', 'close', 'ranking', 'roll', 'fanfare'];
+    $phone = ['tap', 'undo', 'sent', 'right', 'wrong'];
+
+    $sounds = pagesProps($this->actingAs($this->resad)->get(route('rooms.screen', $room)))['sounds'];
+
+    expect(array_keys($sounds))->toBe($screen)
+        ->and($sounds)->each->toStartWith($folder);
+
+    // The host and a player on their phones: their own quiet cues, none of the room's moments.
+    foreach ([$this->resad, $this->aygun] as $account) {
+        $sounds = pagesProps($this->actingAs($account)->get(route('rooms.show', $room)))['sounds'];
+
+        expect(array_keys($sounds))->toBe($phone)
+            ->and($sounds)->each->toStartWith($folder);
+    }
+
+    // A player who left follows nothing, and a closed room plays nothing.
+    $this->actingAs($this->aygun)->post(route('rooms.leave', $room))->assertRedirect();
+    $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('sounds', null));
+    $this->actingAs($this->resad)->post(route('rooms.close', $room))->assertRedirect();
+    $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('sounds', null));
+});
+
 it('names the family of each game the setup offers and what each level holds', function (): void {
     $room = Rooms::open($this->resad);
     Rooms::join($room, $this->aygun);

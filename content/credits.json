@@ -107,6 +107,13 @@
             "license": "MIT"
         },
         {
+            "files": ["content/assets/rooms/sounds/*"],
+            "title": "Sounds of the adults' room games: the screen's countdown, question, last seconds, reveal and final, and a phone's taps, answer and verdict, synthesised by scripts/room-sounds/make.py",
+            "author": "Elifba contributors",
+            "source": "https://github.com/nijataliyev7/elifba",
+            "license": "MIT"
+        },
+        {
             "files": ["content/rooms/words.json"],
             "title": "The adults' word list: everyday Azerbaijani nouns and adjectives for the word games, starting from the theme packs' words, with the spellings that are correct too; written for Elifba, copied from no dictionary or list",
             "author": "Elifba contributors",
