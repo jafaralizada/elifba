@@ -328,6 +328,9 @@ A row holds no name and nothing about a child (ADR 013): a mode, level keys, cas
 | `revision`         | int, default 0       | raised by every action that changes what the room sees; the signal carries it (§12) |
 | `last_activity_at` | timestamp            | a join, a game started, an answer; idle for `elifba.rooms.idle_hours` → closed      |
 | `closed_at`        | timestamp null       | final                                                                               |
+| `setup_mechanic`   | string(32) null      | G2: the host's choice of the next game (`RoomMechanic`), §12 "Games first"          |
+| `setup_difficulty` | tinyint null         | G2: its difficulty, 1–4                                                             |
+| `setup_rounds`     | tinyint null         | G2: its rounds, inside `elifba.rooms.rounds`; all three null in a room before G2    |
 | timestamps         |                      | `created_at` is what the retention period counts from                               |
 
 **`room_players`** (`Rooms\Models\RoomPlayer`, B2) — an account in a room
@@ -2304,6 +2307,18 @@ Routes (the player group; a route not listed is as "Rooms and joining" lists it)
 **Why.** People come to play a game, so the game is what they are offered and the room is how it is carried. A choice every device can read needs to be a fact on the server: a row's columns under the room's lock, announced by the signal the pages already hear, cost no new channel, credential or client event. Keeping «otaq» for the thing itself keeps two actions apart that a single word would merge.
 
 **Rejected.** A page per game before the room, or one hub with «yarış» (the other two prototypes); a «Hazır oyun»; no name for the room; `/otaq` as the shown address, or dropping it; the choice as a client event or in the broadcast; a second room for a host who has one; the last choice stored on the account; the choice in the start's body; a ready button; scanning through a third party or an upload; the children's catalog's components (ADR 026).
+
+**As built (G2, 2026-11-18).** The server and the state are as above; where the build says more, or other, it is this:
+
+- **Opening while a game runs.** `OpenRoom` throws `Rooms\Exceptions\RoomGameRunning` (with the room) and writes nothing; `RoomController::store` answers with the redirect to the room and an error toast (`Inertia::flash('toast', …)`) saying `rooms.errors.game_running`. The `rooms-open` limiter (6 a minute) counts a game chosen for the open room too. `rooms.errors.already_open` is gone from both languages.
+- **The open room taking a game** keeps its difficulty and rounds only while the game has a level at that difficulty (`RoomGameSetupData::withMechanic()`); otherwise it takes `RoomDefaults` for that game, as a new room would.
+- **`RoomDefaults`** reads the newest game of the rooms the account hosted — the newest room that has one, its last game — not only the newest room, so a room opened and left without a game does not reset the defaults; a game the account played in someone else's room never counts. When the chosen game has no level at the default difficulty it takes the game's lowest.
+- **`Room::setup()`** reads a stored choice only while it is still playable (`RoomGameSetupData::isPlayable()`: a level `RoomPlayable` plays, rounds inside the bounds), since content and config may change under an open room; else the latest game's, else `RoomDefaults` for the stored game or the first one.
+- **`ChooseRoomGame`** changes nothing and signals nothing when the room already has that choice, as `LockRoom` does for the lock. **`SetHostPlays`** refuses a closed room and a running game under the lock as well (403), changes nothing when the host already is where asked, and marks the room active when it changes.
+- **The state.** `RoomStateData` holds `setup` null exactly when the room is closed (its constructor refuses the rest), and `fromArray()` refuses another `v`. On the page side `ROOM_STATE_VERSION` is 2, and `fetchState` (`resources/js/rooms/http.ts`) answers `refused` for a state whose `v` is another number, so the page reloads — through Inertia, whose asset version brings the new pages after a deploy — rather than ask again and again.
+- **The lists.** `RoomList::open()` (each open room with `mechanic`, its choice's, and `running`) and `RoomList::past()` replace `RoomList::of()`; `RoomJoinLink::entrance()` is the code field's address `rooms/index` gets as `entrance`.
+- **Pages, plain until G3.** `rooms/index` lists the games by family as buttons that post `{mechanic}`, the open rooms with their game, the code field and a link to `rooms/past`, which lists the past rooms as `rooms/index` did. `rooms/show`'s dialog (`components/rooms/game-setup.tsx`) shows the state's `setup`, sends each tap as the whole choice to `rooms.setup.update` (its failure is `rooms.setup.change_failed`, the one other key G2 adds) and starts with no body. `rooms/screen` gets `catalog` and draws nothing of it yet; nothing calls `rooms.plays.update` yet. Neither the navigation nor any text changed besides the keys named here.
+- **Tests' helpers.** `Tests\Support\Rooms::open($host, $plays, $mechanic)` opens through `OpenRoom` and steps the host out through `SetHostPlays`; `playing()` chooses through `ChooseRoomGame` and starts through `StartRoomGame`, so a started game is one revision later than before G2.
 
 **Guard tests** (beside the table above, which holds):
 

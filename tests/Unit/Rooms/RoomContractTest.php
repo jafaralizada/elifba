@@ -61,6 +61,8 @@ it('has every phase\'s fixture, the answer and the receipt', function (): void {
         // B6: each word game's question, answer and reveal.
         'state.answer.anagram', 'answer.anagram', 'state.reveal.anagram',
         'state.answer.spelling', 'answer.spelling', 'state.reveal.spelling',
+        // G2: a game over and another chosen.
+        'state.chosen',
     ]);
 });
 
@@ -69,7 +71,7 @@ it('has no solution in any state before the reveal', function (): void {
     $study = roomFixture('state.study');
     $answer = roomFixture('state.answer');
 
-    foreach (['state.lobby', 'state.countdown', 'state.study', 'state.answer', 'state.over'] as $name) {
+    foreach (['state.lobby', 'state.countdown', 'state.study', 'state.answer', 'state.over', 'state.chosen'] as $name) {
         $wire = (string) json_encode(roomFixture($name));
 
         expect($wire)->not->toMatch('/"(solution|accept|correct|mine|results|picked|elapsed_ms|seed)"/', $name)
@@ -127,4 +129,28 @@ it('has no solution in any state before the reveal', function (): void {
     expect(fn () => RoomStateData::fromArray([...roomFixture('state.over'), 'round' => $answer['round']]))->toThrow(InvalidArgumentException::class)
         ->and(fn () => RoomStateData::fromArray([...$answer, 'game' => null]))->toThrow(InvalidArgumentException::class)
         ->and(fn () => RoomStateData::fromArray([...$answer, 'round' => null]))->toThrow(InvalidArgumentException::class);
+});
+
+it('says the choice of the next game in every open room\'s state, and nothing else in it', function (): void {
+    foreach (array_filter(array_keys(roomPayloads()), static fn (string $name): bool => str_starts_with($name, 'state.')) as $name) {
+        $state = roomFixture($name);
+
+        expect($state['v'])->toBe(RoomStateData::VERSION)
+            ->and(array_keys($state['setup']))->toBe(['mechanic', 'difficulty', 'rounds', 'played'], $name)
+            // Played only once the game is over and was this very choice.
+            ->and($state['setup']['played'])->toBe($state['game'] !== null && $state['game']['phase'] === 'over'
+                && [$state['game']['mechanic'], $state['game']['difficulty'], $state['game']['rounds']] === [$state['setup']['mechanic'], $state['setup']['difficulty'], $state['setup']['rounds']], $name);
+    }
+
+    expect(roomFixture('state.over')['setup']['played'])->toBeTrue()
+        ->and(roomFixture('state.chosen')['setup'])->toBe(['mechanic' => 'anagram', 'difficulty' => 2, 'rounds' => 5, 'played' => false]);
+
+    // An open room has a choice and a closed one none; a state of another version is refused.
+    $lobby = roomFixture('state.lobby');
+    $closed = [...$lobby, 'room' => [...$lobby['room'], 'status' => 'closed', 'code' => null]];
+
+    expect(fn () => RoomStateData::fromArray([...$lobby, 'setup' => null]))->toThrow(InvalidArgumentException::class, 'choice')
+        ->and(fn () => RoomStateData::fromArray($closed))->toThrow(InvalidArgumentException::class, 'choice')
+        ->and(RoomStateData::fromArray([...$closed, 'setup' => null])->setup)->toBeNull()
+        ->and(fn () => RoomStateData::fromArray([...$lobby, 'v' => 1]))->toThrow(InvalidArgumentException::class, 'version');
 });

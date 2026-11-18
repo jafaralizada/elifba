@@ -106,7 +106,7 @@ it('treats an idle room as closed before the scheduler runs', function (): void 
     $this->actingAs($this->player)->get(route('rooms.show', $room))->assertOk();
 
     // Its host may open the next room.
-    $this->actingAs($this->host)->post(route('rooms.store'))->assertSessionHasNoErrors();
+    $this->actingAs($this->host)->post(route('rooms.store'), ['mechanic' => 'recall_order'])->assertSessionHasNoErrors();
     expect(Room::query()->open()->count())->toBe(1);
 });
 

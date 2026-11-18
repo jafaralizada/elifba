@@ -3,55 +3,97 @@
 namespace App\Domain\Rooms\Actions;
 
 use App\Domain\Rooms\Data\OpenRoomData;
+use App\Domain\Rooms\Exceptions\RoomGameRunning;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomPlayer;
+use App\Domain\Rooms\Support\RoomClock;
 use App\Domain\Rooms\Support\RoomCode;
+use App\Domain\Rooms\Support\RoomDefaults;
 use App\Domain\Rooms\Support\RoomLock;
+use App\Domain\Rooms\Support\RoomSignal;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 /**
- * Opens a room (docs/architecture.md §12 "Rooms and joining", ADR 020): a
- * `rooms` row with a code from `RoomCode`, and the host as its first player
- * unless the host does not play. One open room per host, checked under the
- * lock on the host's `users` row; an idle room no longer counts.
+ * A game chosen on «Oyunlar» (docs/architecture.md §12 "Rooms and joining",
+ * "Games first", ADRs 020 and 026 decision 7). One open room per host,
+ * checked under the lock on the host's `users` row; an idle room no longer
+ * counts.
+ *
+ * - The account hosts no open room: a `rooms` row with a code from
+ *   `RoomCode` and the choice — this game at the host's defaults
+ *   (`RoomDefaults`) — and the host as its first player.
+ * - It hosts an open room with no game running: no second room. That
+ *   room's choice takes this game and keeps its difficulty and rounds
+ *   (the game's defaults when it has no level at that difficulty), under
+ *   the room row's lock; the room is active, its revision rises and it is
+ *   signalled.
+ * - It hosts an open room with a game running: nothing is written
+ *   (`RoomGameRunning`).
  */
 final readonly class OpenRoom
 {
     public function __construct(private RoomCode $codes) {}
 
     /**
-     * @throws ValidationException on `room` when the host has an open room
+     * @throws RoomGameRunning when a game is running in the host's open room
      */
     public function handle(User $host, OpenRoomData $data): Room
     {
         return DB::transaction(function () use ($host, $data): Room {
             RoomLock::host($host->id);
 
-            if (Room::query()->open()->where('user_id', $host->id)->exists()) {
-                throw ValidationException::withMessages(['room' => __('rooms.errors.already_open')]);
+            $open = Room::query()->open()->where('user_id', $host->id)->first();
+
+            if ($open !== null) {
+                return self::choose($open, $data);
             }
 
-            $room = $this->codes->issue(static fn (string $code): Room => DB::transaction(static function () use ($host, $code): Room {
+            $setup = RoomDefaults::for($host, $data->mechanic);
+
+            $room = $this->codes->issue(static fn (string $code): Room => DB::transaction(static function () use ($host, $code, $setup): Room {
                 $room = new Room;
                 $room->user_id = $host->id;
                 $room->code = $code;
+                $room->setup_mechanic = $setup->mechanic;
+                $room->setup_difficulty = $setup->difficulty;
+                $room->setup_rounds = $setup->rounds;
                 $room->last_activity_at = now();
                 $room->save();
 
                 return $room;
             }));
 
-            if ($data->plays) {
-                $player = new RoomPlayer;
-                $player->room_id = $room->id;
-                $player->user_id = $host->id;
-                $player->joined_at = now();
-                $player->save();
-            }
+            $player = new RoomPlayer;
+            $player->room_id = $room->id;
+            $player->user_id = $host->id;
+            $player->joined_at = now();
+            $player->save();
 
             return $room;
         });
+    }
+
+    /**
+     * The host's open room takes the game, unless one is running.
+     *
+     * @throws RoomGameRunning
+     */
+    private static function choose(Room $open, OpenRoomData $data): Room
+    {
+        $locked = RoomLock::room($open) ?? $open;
+
+        if ($locked->runningGame(RoomClock::nowMs()) !== null) {
+            throw new RoomGameRunning($locked);
+        }
+
+        $setup = $locked->setup()->withMechanic($data->mechanic) ?? RoomDefaults::for($locked->host, $data->mechanic);
+        $locked->setup_mechanic = $setup->mechanic;
+        $locked->setup_difficulty = $setup->difficulty;
+        $locked->setup_rounds = $setup->rounds;
+        $locked->last_activity_at = now();
+        RoomSignal::raise($locked);
+
+        return $locked;
     }
 }

@@ -11,7 +11,7 @@ use RuntimeException;
  * Every room code (docs/architecture.md §12 "Rooms and joining", ADR 020
  * decision 3): 6 digits, unique by the `rooms.code` column, valid while its
  * room is open and cleared when it closes. A code space and an entrance of
- * its own (`/otaq`): it knows nothing of the pairing codes, so the same six
+ * its own (`/oyun`; `/otaq` redirects there): it knows nothing of the pairing codes, so the same six
  * digits may be a room and a board at once, each unknown at the other's
  * entrance. A code admits a signed-in, confirmed player into that one room
  * (`JoinRoom`), and nothing else.

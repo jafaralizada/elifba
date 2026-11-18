@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test';
 import type { z } from 'zod';
 import {
+    ROOM_STATE_VERSION,
     RoomAnswer,
     RoomAnswerReceipt,
     RoomChangedEvent,
@@ -77,6 +78,7 @@ describe('room fixtures', () => {
             'state.answer.spelling',
             'state.reveal.spelling',
             'answer.spelling',
+            'state.chosen',
         ]) {
             expect(fixture(name), name).toBeDefined();
         }
@@ -353,6 +355,46 @@ describe('what a state never carries', () => {
         expect(sequence.ask.shown.length).toBeGreaterThan(0);
         expect(sequence.ask.items).toHaveLength(4);
         expect(odd.ask.shown).toEqual([]);
+    });
+
+    it('says the choice of the next game, played only once it is the game over', () => {
+        const over = fixture('state.over') as State;
+        const chosen = fixture('state.chosen') as State;
+
+        expect(lobby.v).toBe(ROOM_STATE_VERSION);
+        expect(lobby.setup).toEqual({
+            mechanic: 'recall_order',
+            difficulty: 2,
+            rounds: 10,
+            played: false,
+        });
+        expect(over.setup?.played).toBe(true);
+        expect(RoomState.safeParse(chosen).success).toBe(true);
+        expect(chosen.game?.phase).toBe('over');
+        expect(chosen.setup).toEqual({
+            mechanic: 'anagram',
+            difficulty: 2,
+            rounds: 5,
+            played: false,
+        });
+
+        // A strict object: nothing of a person, no other key, no other version.
+        for (const setup of [
+            { ...lobby.setup, player_id: lobby.me.player_id },
+            { ...lobby.setup, name: 'Rəşad' },
+            { ...lobby.setup, difficulty: 5 },
+            { ...lobby.setup, mechanic: 'find' },
+            { mechanic: 'recall_order', difficulty: 2, rounds: 10 },
+        ]) {
+            expect(RoomState.safeParse({ ...lobby, setup }).success).toBe(
+                false,
+            );
+        }
+
+        expect(RoomState.safeParse({ ...lobby, setup: null }).success).toBe(
+            true,
+        );
+        expect(RoomState.safeParse({ ...lobby, v: 1 }).success).toBe(false);
     });
 
     it('holds a round only while a game is live', () => {

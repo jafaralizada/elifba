@@ -173,7 +173,10 @@ function isolationCases(): array
         'PATCH rooms/{room}' => ['rooms.update', $roomA, static fn (array $w): array => ['locked' => true]],
         'DELETE rooms/{room}/members/{member}' => ['rooms.members.destroy', static fn (array $w): array => ['room' => $w['roomA']->id, 'member' => $w['memberA']->id], $none],
         'POST rooms/{room}/close' => ['rooms.close', $roomA, $none],
-        'POST rooms/{room}/games' => ['rooms.games.store', $roomA, static fn (array $w): array => ['mechanic' => 'recall_order', 'difficulty' => 1, 'rounds' => 5]],
+        // The host's choice of the next game and «Mən də oynayıram» (G2); the start takes no body.
+        'PUT rooms/{room}/setup' => ['rooms.setup.update', $roomA, static fn (array $w): array => ['mechanic' => 'anagram', 'difficulty' => 1, 'rounds' => 5]],
+        'PUT rooms/{room}/plays' => ['rooms.plays.update', $roomA, static fn (array $w): array => ['plays' => false]],
+        'POST rooms/{room}/games' => ['rooms.games.store', $roomA, $none],
         'DELETE rooms/{room}/game' => ['rooms.game.destroy', static fn (array $w): array => ['room' => $w['playingRoomA']->id], $none],
         // A present player's answer: a round of another room is only late for A.
         'POST rooms/{room}/answers' => ['rooms.answers.store', $roomA, static fn (array $w): array => [
@@ -394,6 +397,25 @@ it('lists only the teacher\'s own classes', function (): void {
             ->component('classes/index')
             ->where('classes', [['id' => $world['classB']->id, 'name' => '1A', 'grade' => $world['classB']->grade, 'students_count' => 1]])
             ->where('archivedClasses', []));
+});
+
+it('lists only the account\'s own rooms on «Oyunlar» and «Keçmiş oyunlar»', function (): void {
+    $world = isolationWorld();
+
+    $this->actingAs($world['b'])->get(route('rooms.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('rooms/index')
+            ->where('open', [['id' => $world['roomB']->id, 'code' => $world['roomB']->code, 'host' => true, 'players' => 2, 'mechanic' => 'recall_order', 'running' => false]]));
+    $this->get(route('rooms.past'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('rooms/past')->where('past', []));
+
+    // The entrance at `/oyun` and its old address know a room only by its own code: a class's, a game's or a pairing code is unknown.
+    foreach ([$world['classA']->id, $world['gameA']->id, '000000'] as $code) {
+        $this->get('/oyun/'.$code)->assertStatus(preg_match('/^\d{6}$/', (string) $code) === 1 ? 302 : 404);
+    }
+    $this->get(route('rooms.join.old', ['code' => $world['roomA']->code]))->assertRedirect(route('rooms.join', ['code' => $world['roomA']->code]));
 });
 
 it('lets the policies refuse another teacher on their own', function (): void {

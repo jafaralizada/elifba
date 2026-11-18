@@ -107,14 +107,16 @@ it('names no one who took their name out', function (): void {
     expect($row->refresh()->user_id)->toBeNull();
 
     // The room is gone from the account's list and its page is not found.
-    $this->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('past', []));
+    $this->get(route('rooms.past'))->assertInertia(fn (Assert $page) => $page->where('past', []));
     $this->get(route('rooms.show', $room))->assertNotFound();
 
     // The others see the row without a name.
     $this->actingAs($host)->get(route('rooms.show', $room))
         ->assertInertia(fn (Assert $page) => $page
             ->where('state.players.1', ['id' => $row->id, 'name' => null, 'present' => false, 'host' => false])
-            ->where('state.me.player_id', RoomPlayer::query()->where('user_id', $host->id)->value('id')));
+            ->where('state.me.player_id', RoomPlayer::query()->where('user_id', $host->id)->value('id'))
+            // A closed room has no choice of a next game (G2).
+            ->where('state.setup', null));
     expect((string) $this->get(route('rooms.show', $room))->getContent())->not->toContain('Aygün');
 });
 

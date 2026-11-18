@@ -4,6 +4,7 @@ use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Content\Enums\RoomSequenceRule;
 use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Language\Support\Ordinal;
+use App\Domain\Rooms\Data\RoomGameSetupData;
 use App\Domain\Rooms\Enums\RoomPhase;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomAnswer;
@@ -20,7 +21,7 @@ use Tests\Support\Rooms;
 /*
  * The room pages' data (docs/architecture.md §12 "Rooms and joining",
  * "Scoring and what is kept", "The big screen", "Adults' privacy"):
- * «Otaqlar» lists an account's own rooms, open and past, a past one with
+ * «Oyunlar» lists an account's own open rooms and «Keçmiş oyunlar» its past ones, a past one with
  * its games and the account's own place; a closed room is its results, game
  * by game, named from the accounts as they are now; a name taken out is
  * null and its points stay; a deleted room is gone for everyone; the
@@ -118,7 +119,11 @@ it('lists an account\'s open and past rooms and nobody else\'s', function (): vo
     $this->actingAs($this->resad)->get(route('rooms.index'))
         ->assertInertia(fn (Assert $page) => $page
             ->component('rooms/index')
-            ->where('open', [['id' => $open->id, 'code' => $open->code, 'host' => true, 'players' => 2]])
+            ->where('open', [['id' => $open->id, 'code' => $open->code, 'host' => true, 'players' => 2, 'mechanic' => 'recall_order', 'running' => false]])
+            ->missing('past'));
+    $this->get(route('rooms.past'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('rooms/past')
             ->where('past', [[
                 'id' => $past->id,
                 'date' => '24 noyabr 2026',
@@ -131,7 +136,9 @@ it('lists an account\'s open and past rooms and nobody else\'s', function (): vo
 
     $this->actingAs($this->aygun)->get(route('rooms.index'))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('open', [['id' => $open->id, 'code' => $open->code, 'host' => false, 'players' => 2]])
+            ->where('open', [['id' => $open->id, 'code' => $open->code, 'host' => false, 'players' => 2, 'mechanic' => 'recall_order', 'running' => false]]));
+    $this->get(route('rooms.past'))
+        ->assertInertia(fn (Assert $page) => $page
             ->where('past', [[
                 'id' => $past->id,
                 'date' => '24 noyabr 2026',
@@ -143,30 +150,30 @@ it('lists an account\'s open and past rooms and nobody else\'s', function (): vo
 
     // In English the place is labelled in English, by the server.
     $this->aygun->forceFill(['locale' => 'en'])->save();
-    $this->actingAs($this->aygun)->get(route('rooms.index'))
+    $this->actingAs($this->aygun)->get(route('rooms.past'))
         ->assertInertia(fn (Assert $page) => $page->where('past.0.mine.place', '1st')->where('past.0.date', '24 November 2026'));
 
     // Tural sees his own room only; Nigar the same one; nobody else's.
     $this->actingAs($this->tural)->get(route('rooms.index'))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('open', [['id' => $turals->id, 'code' => $turals->code, 'host' => true, 'players' => 2]])
-            ->where('past', []));
+            ->where('open', [['id' => $turals->id, 'code' => $turals->code, 'host' => true, 'players' => 2, 'mechanic' => 'recall_order', 'running' => false]]));
+    $this->get(route('rooms.past'))->assertInertia(fn (Assert $page) => $page->where('past', []));
     $this->actingAs($nigar)->get(route('rooms.index'))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('open', [['id' => $turals->id, 'code' => $turals->code, 'host' => false, 'players' => 2]])
-            ->where('past', []));
+            ->where('open', [['id' => $turals->id, 'code' => $turals->code, 'host' => false, 'players' => 2, 'mechanic' => 'recall_order', 'running' => false]]));
+    $this->get(route('rooms.past'))->assertInertia(fn (Assert $page) => $page->where('past', []));
 
     // A player who left an open room finds it under the past ones, with what the room has played so far.
     $this->actingAs($this->aygun)->post(route('rooms.leave', $open))->assertRedirect();
-    $this->get(route('rooms.index'))
+    $this->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('open', []));
+    $this->get(route('rooms.past'))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('open', [])
             ->where('past.0', ['id' => $open->id, 'date' => '25 November 2026', 'host' => false, 'players' => 2, 'games' => [], 'mine' => ['points' => 0, 'place' => null]]));
 
     // A player the host removed sees the room no more.
     $this->actingAs($this->tural)->delete(route('rooms.members.destroy', [$turals, pagesRow($turals, $nigar)]))->assertRedirect();
-    $this->actingAs($nigar)->get(route('rooms.index'))
-        ->assertInertia(fn (Assert $page) => $page->where('open', [])->where('past', []));
+    $this->actingAs($nigar)->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('open', []));
+    $this->get(route('rooms.past'))->assertInertia(fn (Assert $page) => $page->where('past', []));
 });
 
 it('gives a closed room its games and rankings by name', function (): void {
@@ -199,7 +206,7 @@ it('gives a closed room its games and rankings by name', function (): void {
 
         expect($props['room'])->toBe(['id' => $room->id, 'status' => 'closed'])
             ->and($props['join'])->toBeNull()
-            ->and($props['setup'])->toBeNull()
+            ->and($props['catalog'])->toBeNull()
             ->and(array_map(static fn (array $game): array => [$game['id'], $game['mechanic'], $game['difficulty'], $game['rounds']], $props['games']))->toBe([
                 [$first->id, 'recall_order', 1, 5],
                 [$second->id, 'recall_cells', 3, 5],
@@ -307,8 +314,8 @@ it('sends no account id, address or solution to any room page', function (): voi
     config(['app.url' => 'http://192.168.1.20:8000']);
     $this->actingAs($this->tural)->get(route('rooms.show', $other))
         ->assertInertia(fn (Assert $page) => $page->where('join', [
-            'url' => 'http://192.168.1.20:8000/otaq/'.$other->code,
-            'entry_url' => 'http://192.168.1.20:8000/otaq',
+            'url' => 'http://192.168.1.20:8000/oyun/'.$other->code,
+            'entry_url' => 'http://192.168.1.20:8000/oyun',
         ]));
 });
 
@@ -328,7 +335,7 @@ it('takes a player\'s name out of a closed room and keeps the points', function 
     expect($aygun->refresh()->user_id)->toBeNull();
 
     // Gone from her list and her reach.
-    $this->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('past', []));
+    $this->get(route('rooms.past'))->assertInertia(fn (Assert $page) => $page->where('past', []));
     $this->get(route('rooms.show', $room))->assertNotFound();
 
     // The host still sees her points and her place, without a name.
@@ -339,8 +346,8 @@ it('takes a player\'s name out of a closed room and keeps the points', function 
         ->and($props['state']['ranking'][0])->toBe(['player_id' => $aygun->id, 'points' => $points, 'place' => 1])
         ->and(json_encode($props, JSON_UNESCAPED_UNICODE))->not->toContain('Aygün');
 
-    // And on «Otaqlar» the host, who scored nothing, has no place.
-    $this->get(route('rooms.index'))
+    // And on «Keçmiş oyunlar» the host, who scored nothing, has no place.
+    $this->get(route('rooms.past'))
         ->assertInertia(fn (Assert $page) => $page->where('past.0.mine', ['points' => 0, 'place' => null]));
 });
 
@@ -365,7 +372,8 @@ it('deletes a closed room for everyone', function (): void {
         ->and(DB::table('room_answers')->count())->toBe(0);
 
     foreach ([$this->resad, $this->aygun] as $account) {
-        $this->actingAs($account)->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('past', [])->where('open', []));
+        $this->actingAs($account)->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('open', []));
+        $this->get(route('rooms.past'))->assertInertia(fn (Assert $page) => $page->where('past', []));
         $this->get(route('rooms.show', $room))->assertNotFound();
     }
 });
@@ -380,7 +388,7 @@ it('gives the screen only to the host', function (): void {
     expect(array_keys($props))->toContain('room', 'state', 'place_labels', 'join')
         ->and($props['room'])->toBe(['id' => $room->id, 'status' => 'open'])
         ->and($props['state'])->toBe($this->getJson(route('rooms.state', $room), ['Referer' => route('rooms.screen', $room)])->json())
-        ->and($props['join']['url'])->toBe(rtrim((string) config('app.url'), '/').'/otaq/'.$room->code);
+        ->and($props['join']['url'])->toBe(rtrim((string) config('app.url'), '/').'/oyun/'.$room->code);
     $this->get(route('rooms.screen', $room))->assertInertia(fn (Assert $page) => $page->component('rooms/screen'));
 
     // In a game it follows the same state, and writes nothing.
@@ -443,7 +451,7 @@ it('names the family of each game the setup offers and what each level holds', f
     Rooms::join($room, $this->aygun);
     $content = app(ContentRepository::class);
 
-    $setup = pagesProps($this->actingAs($this->resad)->get(route('rooms.show', $room)))['setup'];
+    $setup = pagesProps($this->actingAs($this->resad)->get(route('rooms.show', $room)))['catalog'];
 
     expect(array_column($setup['mechanics'], 'mechanic'))->toBe(['recall_order', 'recall_cells', 'next_in_sequence', 'odd_one_out', 'anagram', 'spelling'])
         ->and(array_column($setup['mechanics'], 'family'))->toBe(['memory', 'memory', 'logic', 'logic', 'words', 'words']);
@@ -504,7 +512,64 @@ it('names the family of each game the setup offers and what each level holds', f
         ->and($rows['levels'][0]['letters'])->toBeNull();
 
     // Nobody else gets it: a player, and the host once the room is closed.
-    $this->actingAs($this->aygun)->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('setup', null));
+    $this->actingAs($this->aygun)->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('catalog', null));
     $this->actingAs($this->resad)->post(route('rooms.close', $room));
-    $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('setup', null));
+    $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('catalog', null));
+});
+
+it('sends the home the catalog and the open rooms, and the past rooms to their own page', function (): void {
+    $past = Rooms::open($this->resad);
+    $game = pagesPlay($past, RoomMechanic::RecallCells, 2, right: [$this->resad]);
+    $this->actingAs($this->resad)->post(route('rooms.close', $past));
+    $open = Rooms::open($this->resad, mechanic: RoomMechanic::Spelling);
+    $root = rtrim((string) config('app.url'), '/');
+
+    // «Oyunlar»: the games as the server offers them, the open room with the game of its choice, the code field's address.
+    $home = pagesProps($this->get(route('rooms.index')));
+    expect(array_keys($home))->toContain('catalog', 'open', 'entrance')
+        ->and($home)->not->toHaveKey('past')
+        ->and($home['catalog'])->toBe(RoomGameSetupData::options())
+        ->and(array_column($home['catalog']['mechanics'], 'mechanic'))->toBe(array_map(static fn (RoomMechanic $mechanic): string => $mechanic->value, RoomGameSetupData::mechanics()))
+        ->and($home['open'])->toBe([['id' => $open->id, 'code' => $open->code, 'host' => true, 'players' => 1, 'mechanic' => 'spelling', 'running' => false]])
+        ->and($home['entrance'])->toBe($root.'/oyun');
+
+    // While a game runs there, the home says so.
+    Rooms::playing($open);
+    expect(pagesProps($this->get(route('rooms.index')))['open'][0]['running'])->toBeTrue();
+
+    // «Keçmiş oyunlar»: the past rooms alone.
+    $this->get(route('rooms.past'))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('rooms/past')
+        ->where('past', [[
+            'id' => $past->id,
+            'date' => '24 noyabr 2026',
+            'host' => true,
+            'players' => 1,
+            'games' => [['mechanic' => 'recall_cells', 'difficulty' => 2]],
+            'mine' => ['points' => pagesPoints($game, pagesRow($past, $this->resad)), 'place' => Ordinal::label(1, 'az')],
+        ]])
+        ->missing('open')
+        ->missing('catalog'));
+});
+
+it('sends the screen what it needs to choose and start', function (): void {
+    $room = Rooms::open($this->resad);
+    Rooms::join($room, $this->aygun);
+
+    // The catalog the host's phone gets, and the choice in the state.
+    $screen = pagesProps($this->actingAs($this->resad)->get(route('rooms.screen', $room)));
+    $phone = pagesProps($this->get(route('rooms.show', $room)));
+
+    expect($screen['catalog'])->toBe($phone['catalog'])
+        ->and($screen['catalog'])->toBe(RoomGameSetupData::options())
+        ->and($screen['state']['setup'])->toBe(['mechanic' => 'recall_order', 'difficulty' => 2, 'rounds' => 10, 'played' => false])
+        ->and($screen['state']['setup'])->toBe($phone['state']['setup']);
+
+    // With them it changes the choice and starts, through the host's own routes.
+    $this->putJson(route('rooms.setup.update', $room), ['mechanic' => 'recall_cells', 'difficulty' => 1, 'rounds' => 5])->assertNoContent();
+    $this->postJson(route('rooms.games.store', $room))->assertNoContent();
+    $game = $room->latestGame();
+
+    expect([$game?->mechanic, $game?->difficulty])->toBe([RoomMechanic::RecallCells, 1])
+        ->and(pagesProps($this->get(route('rooms.screen', $room)))['state']['game']['mechanic'])->toBe('recall_cells');
 });

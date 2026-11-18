@@ -1,16 +1,20 @@
 <?php
 
+use App\Domain\Rooms\Enums\RoomPhase;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomPlayer;
 use App\Models\User;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\Rooms;
 
 /*
- * The host's tools (docs/architecture.md §12 "Rooms and joining", ADR 020
- * decision 8): «Kilidlə», «Çıxar», closing — the host's alone
- * (`RoomPolicy::host`), each raising the revision and signalling the room.
+ * The host's tools (docs/architecture.md §12 "Rooms and joining", "Games
+ * first", ADR 020 decision 8, ADR 026 decision 12): «Kilidlə», «Çıxar»,
+ * closing — the host's alone (`RoomPolicy::host`) — and «Mən də
+ * oynayıram» before a game (`RoomPolicy::start`), each raising the
+ * revision and signalling the room.
  */
 
 beforeEach(function (): void {
@@ -89,7 +93,8 @@ it('removes a player for good', function (): void {
     $this->post(route('rooms.leave', $this->room))->assertNotFound();
     Rooms::assertRefused($this->get(route('rooms.join', (string) $this->room->code)));
     Rooms::assertRefused($this->post(route('rooms.join.store', (string) $this->room->code)));
-    $this->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('open', [])->where('past', []));
+    $this->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('open', []));
+    $this->get(route('rooms.past'))->assertInertia(fn (Assert $page) => $page->where('past', []));
     expect(hostSnapshot())->toBe($before);
 
     // Removing again changes nothing.
@@ -172,7 +177,8 @@ it('deletes a closed room for everyone, and never an open one', function (): voi
         ->and(User::query()->whereKey([$this->host->id, $this->player->id])->count())->toBe(2);
 
     $this->actingAs($this->player)->get(route('rooms.show', $this->room))->assertNotFound();
-    $this->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('open', [])->where('past', []));
+    $this->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('open', []));
+    $this->get(route('rooms.past'))->assertInertia(fn (Assert $page) => $page->where('past', []));
 });
 
 it('lets only the host do any of it', function (): void {
@@ -190,4 +196,61 @@ it('lets only the host do any of it', function (): void {
 
     expect(hostSnapshot())->toBe($before)
         ->and($this->reverb->sent)->toBe([]);
+});
+
+it('lets the host step out of playing and back in', function (): void {
+    $this->actingAs($this->host);
+
+    // Out: the host's row is left, as a leave leaves it; the host's tools stay, a player's go.
+    $this->putJson(route('rooms.plays.update', $this->room), ['plays' => false])->assertNoContent();
+    expect($this->hostRow->refresh()->left_at)->not->toBeNull()
+        ->and($this->room->refresh()->revision)->toBe(2);
+    $this->getJson(route('rooms.state', $this->room))
+        ->assertJsonPath('players.0', ['id' => $this->hostRow->id, 'name' => 'Rəşad Quliyev', 'present' => false, 'host' => true]);
+    $this->get(route('rooms.show', $this->room))->assertInertia(fn (Assert $page) => $page->where('can.host', true)->where('can.leave', false));
+
+    // Asking for what already is changes nothing.
+    $this->putJson(route('rooms.plays.update', $this->room), ['plays' => '0'])->assertNoContent();
+    expect($this->room->refresh()->revision)->toBe(2);
+
+    // A game without the host: never waited for, never answering.
+    $game = Rooms::playing($this->room);
+    $this->travelTo(Rooms::at($game, RoomPhase::Answer));
+    $this->postJson(route('rooms.answers.store', $this->room), Rooms::answer(Rooms::round($game, 0), ['zzzzzzzz']))->assertForbidden();
+    $this->travelTo(Rooms::at($game, RoomPhase::Over));
+
+    // Back in: the same row, present again.
+    $revision = $this->room->refresh()->revision;
+    $this->putJson(route('rooms.plays.update', $this->room), ['plays' => true])->assertNoContent();
+    expect($this->hostRow->refresh()->isPresent())->toBeTrue()
+        ->and(RoomPlayer::query()->where('user_id', $this->host->id)->count())->toBe(1)
+        ->and($this->room->refresh()->revision)->toBe($revision + 1)
+        ->and(signalledRevisions($this->reverb->sent))->toContain(2, $revision + 1);
+
+    // A room the host opened without a row of their own gets one.
+    $bare = Room::factory()->for($this->host, 'host')->create();
+    $this->putJson(route('rooms.plays.update', $bare), ['plays' => true])->assertNoContent();
+    expect($bare->rowOf($this->host)?->isPresent())->toBeTrue();
+
+    // Only the host, before a game; a value is required.
+    $this->putJson(route('rooms.plays.update', $this->room), [])->assertJsonValidationErrors('plays');
+    $this->actingAs($this->player)->putJson(route('rooms.plays.update', $this->room), ['plays' => false])->assertForbidden();
+});
+
+it('does not let the lock keep the host out', function (): void {
+    $this->actingAs($this->host);
+    $this->putJson(route('rooms.plays.update', $this->room), ['plays' => false])->assertNoContent();
+    $this->patch(route('rooms.update', $this->room), ['locked' => true]);
+
+    // The lock stops new players, not the host.
+    $this->putJson(route('rooms.plays.update', $this->room), ['plays' => true])->assertNoContent();
+    expect($this->hostRow->refresh()->isPresent())->toBeTrue();
+
+    // A full room does.
+    $this->putJson(route('rooms.plays.update', $this->room), ['plays' => false])->assertNoContent();
+    Config::set('elifba.rooms.max_players', 1);
+    $before = hostSnapshot();
+    $this->putJson(route('rooms.plays.update', $this->room), ['plays' => true])
+        ->assertJsonValidationErrors(['plays' => __('rooms.errors.full')]);
+    expect(hostSnapshot())->toBe($before);
 });

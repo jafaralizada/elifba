@@ -15,6 +15,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import { store as startGame } from '@/routes/rooms/games';
+import { update as chooseGame } from '@/routes/rooms/setup';
 import type { RoomMechanic } from '@/rooms/contract';
 import { roomRequest } from '@/rooms/http';
 
@@ -49,7 +50,7 @@ export type GameSetupOptions = {
     rounds: { min: number; max: number };
 };
 
-/** The host's last choice, kept by the page while it is open. */
+/** The room's choice of the next game: the state's `setup` without `played`. */
 export type SetupChoice = {
     mechanic: RoomMechanic;
     difficulty: number;
@@ -73,29 +74,36 @@ export function roundSteps(bounds: { min: number; max: number }): number[] {
 
 /**
  * The host's choice of a new game (docs/frontend.md rule 15, "The setup";
- * architecture §12 "Starting a game"): «Yeni oyun» opens a dialog, full
- * screen on a phone, with the games grouped by family, the difficulty with
- * what its level holds, and the rounds as steps — all as the server offers
- * them (`setup` in the page's props). Starting answers 204; every device,
- * the host's too, then learns the game from the state.
+ * architecture §12 "Starting a game", "Games first"): «Yeni oyun» opens a
+ * dialog, full screen on a phone, with the games grouped by family, the
+ * difficulty with what its level holds, and the rounds as steps — all as
+ * the server offers them (`catalog` in the page's props). The choice is the
+ * room's (the state's `setup`): each tap sends the whole of it to
+ * `rooms.setup.update`, and every device follows it from the state; the
+ * dialog shows the tap at once. Starting sends no body: the server starts
+ * the room's choice. Both answer 204. G3 redesigns this as the start
+ * screen; until then it is the same dialog writing through the new routes.
  */
 export function GameSetup({
     roomId,
     options,
     choice,
-    onChoice,
-    onStarted,
+    onChanged,
 }: {
     roomId: string;
     options: GameSetupOptions;
-    choice: SetupChoice | null;
-    onChoice: (choice: SetupChoice) => void;
-    onStarted: () => void;
+    /** The room's choice, from the state. */
+    choice: SetupChoice;
+    /** After a write: the page asks for the state now rather than wait for the signal. */
+    onChanged: () => void;
 }) {
     const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [processing, setProcessing] = useState(false);
+    // The tap not yet in the state, so the dialog answers at once; the start waits for it.
+    const [tapped, setTapped] = useState<SetupChoice | null>(null);
+    const [saving, setSaving] = useState(false);
     const first = options.mechanics[0];
 
     if (first === undefined) {
@@ -103,11 +111,7 @@ export function GameSetup({
     }
 
     const steps = roundSteps(options.rounds);
-    const chosen: SetupChoice = choice ?? {
-        mechanic: first.mechanic,
-        difficulty: first.difficulties[0] ?? 1,
-        rounds: options.rounds.min,
-    };
+    const chosen: SetupChoice = tapped ?? choice;
     const offer =
         options.mechanics.find((one) => one.mechanic === chosen.mechanic) ??
         first;
@@ -117,31 +121,66 @@ export function GameSetup({
     const families = [...new Set(options.mechanics.map((one) => one.family))];
     const mark = t('rooms.decimal_mark');
 
-    const choose = (next: Partial<SetupChoice>) =>
-        onChoice({ ...chosen, ...next });
+    const refused = (reply: { status: number; body: unknown }): boolean => {
+        if (reply.status === 422) {
+            const body = reply.body as {
+                errors?: Record<string, string[]>;
+            } | null;
+            setErrors(
+                Object.fromEntries(
+                    Object.entries(body?.errors ?? {}).map(
+                        ([key, messages]) => [key, messages[0] ?? ''],
+                    ),
+                ),
+            );
+
+            return true;
+        }
+
+        return false;
+    };
+
+    const choose = async (next: Partial<SetupChoice>) => {
+        const whole = { ...chosen, ...next };
+        setTapped(whole);
+        setSaving(true);
+        setErrors({});
+
+        try {
+            const reply = await roomRequest(
+                'PUT',
+                chooseGame.url(roomId),
+                whole,
+            );
+
+            if (!refused(reply) && reply.status !== 204) {
+                // 403: a game started meanwhile; the state says so.
+                setErrors({ form: t('rooms.setup.change_failed') });
+            }
+
+            if (reply.status !== 204) {
+                // Not the room's choice: show the one it has.
+                setTapped(null);
+            }
+        } catch {
+            setErrors({ form: t('rooms.setup.change_failed') });
+            setTapped(null);
+        } finally {
+            setSaving(false);
+        }
+
+        onChanged();
+    };
 
     const submit = async () => {
         setProcessing(true);
         setErrors({});
 
         try {
-            const reply = await roomRequest('POST', startGame.url(roomId), {
-                mechanic: chosen.mechanic,
-                difficulty: chosen.difficulty,
-                rounds: chosen.rounds,
-            });
+            const reply = await roomRequest('POST', startGame.url(roomId));
 
-            if (reply.status === 422) {
-                const body = reply.body as {
-                    errors?: Record<string, string[]>;
-                } | null;
-                setErrors(
-                    Object.fromEntries(
-                        Object.entries(body?.errors ?? {}).map(
-                            ([key, messages]) => [key, messages[0] ?? ''],
-                        ),
-                    ),
-                );
+            if (refused(reply)) {
+                // Nothing to add: the field's own message says it.
             } else if (reply.status !== 204 && reply.status !== 403) {
                 setErrors({ form: t('rooms.setup.failed') });
             } else {
@@ -149,7 +188,7 @@ export function GameSetup({
             }
 
             // Started, or another start won: the state says which.
-            onStarted();
+            onChanged();
         } catch {
             setErrors({ form: t('rooms.setup.failed') });
         } finally {
@@ -158,7 +197,13 @@ export function GameSetup({
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+            open={open}
+            onOpenChange={(next) => {
+                setOpen(next);
+                setTapped(null);
+            }}
+        >
             <DialogTrigger asChild>
                 <Button type="button" className="h-13 w-full text-base">
                     <Plus />
@@ -411,7 +456,7 @@ export function GameSetup({
                         <Button
                             type="submit"
                             className="h-13 w-full text-base"
-                            disabled={processing}
+                            disabled={processing || saving}
                         >
                             {processing && <Spinner />}
                             {t('rooms.setup.start')}

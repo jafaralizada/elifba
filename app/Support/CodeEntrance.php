@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * How an entrance with a code says no — `/pult` (docs/architecture.md §4
- * "Codes") and `/otaq` (§12 "Rooms and joining"): one sentence on the code
+ * "Codes") and `/oyun` (§12 "Rooms and joining", "Games first"): one sentence on the code
  * field, never an error page, the same sentence whatever the reason. The
  * two entrances share this way of answering and nothing else: each has its
  * own codes, routes, sentences and limit.

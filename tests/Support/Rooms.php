@@ -3,9 +3,12 @@
 namespace Tests\Support;
 
 use App\Domain\Content\Enums\RoomMechanic;
+use App\Domain\Rooms\Actions\ChooseRoomGame;
 use App\Domain\Rooms\Actions\JoinRoom;
 use App\Domain\Rooms\Actions\OpenRoom;
+use App\Domain\Rooms\Actions\SetHostPlays;
 use App\Domain\Rooms\Actions\StartRoomGame;
+use App\Domain\Rooms\Data\HostPlaysData;
 use App\Domain\Rooms\Data\OpenRoomData;
 use App\Domain\Rooms\Data\RoomGameSetupData;
 use App\Domain\Rooms\Enums\RoomAnswerShape;
@@ -29,9 +32,9 @@ use Symfony\Component\HttpFoundation\Response;
  * The adults' rooms area for feature tests (docs/architecture.md §12 "The
  * area and the switch", ADR 019). `Tests\TestCase` leaves the switch off,
  * as an instance has it; a test of the area turns it on first. Rooms are
- * opened and joined through their actions (`open()`, `join()`), as a
- * player's requests would, and a game is started through `StartRoomGame`
- * (`playing()`). A test reaches a moment of the game's timetable with
+ * opened behind a chosen game and joined through their actions (`open()`,
+ * `join()`), as a player's requests would, and a game is chosen through
+ * `ChooseRoomGame` and started through `StartRoomGame` (`playing()`). A test reaches a moment of the game's timetable with
  * `$this->travelTo(Rooms::at($game, RoomPhase::Answer, 1))`, and reads a
  * round's hidden solution with `right()` — a device never can.
  */
@@ -44,17 +47,24 @@ final class Rooms
     }
 
     /**
-     * A room opened by `$host` (a new player when null) through `OpenRoom`:
-     * a code, and the host as its first player unless `$plays` is false.
+     * A room opened by `$host` (a new player when null) choosing `$mechanic`
+     * through `OpenRoom`: a code, the choice, and the host as its first
+     * player — stepped out through `SetHostPlays` when `$plays` is false.
      */
-    public static function open(?User $host = null, bool $plays = true): Room
+    public static function open(?User $host = null, bool $plays = true, RoomMechanic $mechanic = RoomMechanic::RecallOrder): Room
     {
-        return app(OpenRoom::class)->handle($host ?? User::factory()->player()->create(), new OpenRoomData($plays));
+        $room = app(OpenRoom::class)->handle($host ?? User::factory()->player()->create(), new OpenRoomData($mechanic));
+
+        if (! $plays) {
+            app(SetHostPlays::class)->handle($room, new HostPlaysData(false));
+        }
+
+        return $room->refresh();
     }
 
     /**
      * The entrance's one refusal of a code that opens no room for the
-     * account (§12 "Rooms and joining"): to the code field at `/otaq`, with
+     * account (§12 "Rooms and joining"): to the code field at `/oyun`, with
      * `rooms.errors.unknown` on `code` — never an error page.
      *
      * @param  TestResponse<Response>  $response
@@ -74,15 +84,17 @@ final class Rooms
     }
 
     /**
-     * A game of `recall_order` (or `$mechanic`) started in `$room` (a new
-     * room when null) through `StartRoomGame`, with its rounds loaded;
-     * round 0 opens after the countdown.
+     * A game of `recall_order` (or `$mechanic`) chosen in `$room` (a new
+     * room when null) through `ChooseRoomGame` and started through
+     * `StartRoomGame`, with its rounds loaded; round 0 opens after the
+     * countdown.
      */
     public static function playing(?Room $room = null, int $rounds = 5, int $difficulty = 1, RoomMechanic $mechanic = RoomMechanic::RecallOrder): RoomGame
     {
-        return app(StartRoomGame::class)
-            ->handle($room ?? self::open(), new RoomGameSetupData($mechanic, $difficulty, $rounds))
-            ->load('rounds');
+        $room ??= self::open();
+        app(ChooseRoomGame::class)->handle($room, new RoomGameSetupData($mechanic, $difficulty, $rounds));
+
+        return app(StartRoomGame::class)->handle($room)->load('rounds');
     }
 
     /**

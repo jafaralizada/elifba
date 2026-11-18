@@ -57,7 +57,7 @@ it('signals a change with the revision and nothing else', function (): void {
     }
 });
 
-it('signals a game\'s start, every answer and an early close', function (): void {
+it('signals the choice of a game, its start, every answer and an early close', function (): void {
     $this->freezeTime();
     $tural = User::factory()->player()->create(['name' => 'Tural Əliyev']);
     Rooms::join($this->room, $this->player);
@@ -65,12 +65,13 @@ it('signals a game\'s start, every answer and an early close', function (): void
     $this->reverb->sent = [];
     $setup = ['mechanic' => 'recall_order', 'difficulty' => 1, 'rounds' => 5];
 
-    // The start: revision 3.
-    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), $setup)->assertNoContent();
+    // The choice: revision 3; the start: revision 4.
+    $this->actingAs($this->host)->putJson(route('rooms.setup.update', $this->room), $setup)->assertNoContent();
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room))->assertNoContent();
     $game = RoomGame::query()->sole();
     [$first, $second] = [Rooms::round($game, 0), Rooms::round($game, 1)];
 
-    // Each accepted answer is a change (the count of answers): revisions 4 and 5. A refused one and the phases time brings: nothing.
+    // Each accepted answer is a change (the count of answers): revisions 5 and 6. A refused one and the phases time brings: nothing.
     $this->travelTo(Rooms::at($game, RoomPhase::Answer));
     RoomPhones::read($this->room, $this->host, $this->player, $tural);
     foreach ([$this->host, $this->player] as $account) {
@@ -78,14 +79,14 @@ it('signals a game\'s start, every answer and an early close', function (): void
     }
     $this->actingAs($this->host)->postJson(route('rooms.answers.store', $this->room), Rooms::answer($first, Rooms::right($first)))->assertJsonPath('status', 'answered');
     $this->getJson(route('rooms.state', $this->room));
-    expect($this->reverb->sent)->toHaveCount(3);
+    expect($this->reverb->sent)->toHaveCount(4);
 
-    // The last present player answers: the answer and the early close are one change, revision 6.
+    // The last present player answers: the answer and the early close are one change, revision 7.
     $this->actingAs($tural)->postJson(route('rooms.answers.store', $this->room), Rooms::answer($first, Rooms::wrong($first)))
-        ->assertExactJson(['status' => 'accepted', 'revision' => 6]);
+        ->assertExactJson(['status' => 'accepted', 'revision' => 7]);
     expect($first->refresh()->closed_ms)->toBe(RoomClock::nowMs());
 
-    // Round 1: two answer (revisions 7 and 8), the third leaves — the leave and the early close are one change, revision 9.
+    // Round 1: two answer (revisions 8 and 9), the third leaves — the leave and the early close are one change, revision 10.
     $this->travelTo(Rooms::at($game, RoomPhase::Answer, 1));
     RoomPhones::read($this->room, $this->host, $this->player, $tural);
     foreach ([$this->host, $this->player] as $account) {
@@ -94,14 +95,14 @@ it('signals a game\'s start, every answer and an early close', function (): void
     $this->actingAs($tural)->post(route('rooms.leave', $this->room));
     expect($second->refresh()->closed_ms)->toBe(RoomClock::nowMs());
 
-    // The host ends the game: revision 10.
+    // The host ends the game: revision 11.
     $this->actingAs($this->host)->deleteJson(route('rooms.game.destroy', $this->room))->assertNoContent();
 
     expect($this->reverb->sent)->toBe(array_map(fn (int $revision): array => [
         'channels' => ['private-room.'.$this->room->id],
         'event' => 'room.changed',
         'data' => ['v' => 1, 'revision' => $revision],
-    ], range(3, 10)))->and($this->room->refresh()->revision)->toBe(10);
+    ], range(3, 11)))->and($this->room->refresh()->revision)->toBe(11);
 
     // No name, item, answer or result on the wire.
     $wire = json_encode($this->reverb->sent, JSON_UNESCAPED_UNICODE);

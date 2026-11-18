@@ -1,12 +1,13 @@
 /**
- * A room page's own requests (docs/architecture.md §12 "The race"): the
- * state, the host's start and end of a game, a player's answer — JSON over
+ * A room page's own requests (docs/architecture.md §12 "The race", "Games
+ * first"): the state, the host's choice of the next game, the start and
+ * end of a game, a player's answer — JSON over
  * the account's session, with the XSRF cookie's token, never a bearer.
  * Each answer carries the local moments it was sent and received, so the
  * page can estimate the server's clock (`clock.ts`); the page never sends
  * its own clock.
  */
-import { RoomState } from './contract';
+import { ROOM_STATE_VERSION, RoomState } from './contract';
 import type { LocalClock } from './clock';
 
 export function xsrfToken(): string | null {
@@ -31,9 +32,9 @@ function headers(json: boolean): Record<string, string> {
     };
 }
 
-/** A write — the host's start or end of a game, an answer; rejects when nothing came back in time. */
+/** A write — the host's choice, start or end of a game, an answer; rejects when nothing came back in time. */
 export async function roomRequest(
-    method: 'POST' | 'DELETE',
+    method: 'POST' | 'PUT' | 'DELETE',
     url: string,
     body?: unknown,
 ): Promise<Reply> {
@@ -59,7 +60,11 @@ export async function roomRequest(
 
 export type FetchedState =
     | { kind: 'state'; state: RoomState; sentAt: number; receivedAt: number }
-    /** Removed, gone, the room closed under the page, the session over: the page reloads to say which. */
+    /**
+     * Removed, gone, the room closed under the page, the session over — or
+     * a state of another version than this page reads, after a deploy: the
+     * page reloads, to say which or to take the new pages.
+     */
     | { kind: 'refused' }
     | { kind: 'failed' };
 
@@ -88,7 +93,13 @@ export async function fetchState(
             return { kind: 'failed' };
         }
 
-        const state = RoomState.safeParse(await response.json());
+        const body: unknown = await response.json();
+
+        if (isOtherVersion(body)) {
+            return { kind: 'refused' };
+        }
+
+        const state = RoomState.safeParse(body);
 
         return state.success
             ? { kind: 'state', state: state.data, sentAt, receivedAt }
@@ -96,4 +107,13 @@ export async function fetchState(
     } catch {
         return { kind: 'failed' };
     }
+}
+
+/** A state whose `v` is a number this page does not read: the server is newer (ADR 026 "Consequences"). */
+function isOtherVersion(body: unknown): boolean {
+    if (typeof body !== 'object' || body === null || !('v' in body)) {
+        return false;
+    }
+
+    return typeof body.v === 'number' && body.v !== ROOM_STATE_VERSION;
 }

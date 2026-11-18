@@ -158,7 +158,7 @@ describe.each([
         }
 
         expect(html).toContain('href="/rooms"');
-        expect(html).toContain('href="/otaq"');
+        expect(html).toContain('href="/oyun"');
         expect(html).toContain('href="/privacy#rooms"');
         // After the children's data and before the price (rule 10).
         expect(html.indexOf('id="welcome-privacy"')).toBeLessThan(

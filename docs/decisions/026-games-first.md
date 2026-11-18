@@ -1,6 +1,6 @@
 # 026 — Games first: the area is «Oyunlar», a game is chosen and the room opens behind it
 
-- **Status:** Accepted, 2026-11-18 (roadmap step G1: the owner's choice among three clickable prototypes and three answers of that day). Built by G2 (the server and the state) and G3 (the pages and every word); until a step lands, nothing of what it is marked with exists, and the area works as ADRs 019–025 describe it.
+- **Status:** Accepted, 2026-11-18 (roadmap step G1: the owner's choice among three clickable prototypes and three answers of that day). Built by G2 (the server and the state; landed 2026-11-18, what it built beyond this text is architecture.md §12 "Games first", "As built (G2)") and G3 (the pages and every word); until a step lands, nothing of what it is marked with exists, and the area works as ADRs 019–025 describe it.
 - **Sections:** architecture.md §12 "Games first"; docs/frontend.md rule 15 "Games first"; glossary.md "Games first"
 - **Amends:**
     - [019](019-rooms-area-and-player-role.md) decision 2: the player's navigation reads «Oyunlar» and gains «Keçmiş oyunlar». The role, its sentence, the group and the switch are untouched.

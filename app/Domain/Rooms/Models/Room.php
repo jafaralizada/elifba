@@ -2,8 +2,11 @@
 
 namespace App\Domain\Rooms\Models;
 
+use App\Domain\Content\Enums\RoomMechanic;
+use App\Domain\Rooms\Data\RoomGameSetupData;
 use App\Domain\Rooms\Enums\RoomStatus;
 use App\Domain\Rooms\Policies\RoomPolicy;
+use App\Domain\Rooms\Support\RoomDefaults;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Database\Factories\RoomFactory;
@@ -32,6 +35,10 @@ use Illuminate\Support\Facades\Config;
  * open until `closed_at` is set, and an idle one already counts as closed
  * (`isOpen()`) before `CloseIdleRooms` writes it.
  *
+ * The `setup_*` columns are the host's choice of the next game (G2, ADR 026
+ * decision 8), written only by `OpenRoom` and `ChooseRoomGame` and read
+ * through `setup()`.
+ *
  * @property string $id
  * @property int $user_id the host
  * @property string|null $code six digits from `RoomCode` while open; null once closed
@@ -39,6 +46,9 @@ use Illuminate\Support\Facades\Config;
  * @property int $revision raised by every change the room sees; `room.changed` carries it
  * @property CarbonImmutable $last_activity_at a join, a game started, an answer
  * @property CarbonImmutable|null $closed_at final
+ * @property RoomMechanic|null $setup_mechanic the choice's game; null in a room opened before G2
+ * @property int|null $setup_difficulty
+ * @property int|null $setup_rounds
  * @property CarbonImmutable $created_at what the retention period counts from
  * @property CarbonImmutable $updated_at
  * @property-read User $host
@@ -98,6 +108,36 @@ class Room extends Model
         $game = $this->latestGame();
 
         return $game !== null && ! $game->timetable()->moment($nowMs)->isOver() ? $game : null;
+    }
+
+    /**
+     * The host's choice of the next game (§12 "Games first", ADR 026
+     * decision 8): the one stored, while it is still a level a room plays;
+     * else — a room opened before G2 — its latest game's; else the first
+     * playable game at the host's defaults (`RoomDefaults`). `StartRoomGame`
+     * starts it, and the state shows it to every device.
+     */
+    public function setup(): RoomGameSetupData
+    {
+        if ($this->setup_mechanic !== null && $this->setup_difficulty !== null && $this->setup_rounds !== null) {
+            $stored = new RoomGameSetupData($this->setup_mechanic, $this->setup_difficulty, $this->setup_rounds);
+
+            if ($stored->isPlayable()) {
+                return $stored;
+            }
+        }
+
+        $latest = $this->games()->reorder()->orderByDesc('position')->withCount('rounds')->first();
+
+        if ($latest !== null) {
+            $played = new RoomGameSetupData($latest->mechanic, $latest->difficulty, (int) $latest->getAttribute('rounds_count'));
+
+            if ($played->isPlayable()) {
+                return $played;
+            }
+        }
+
+        return RoomDefaults::for($this->host, $this->setup_mechanic ?? RoomGameSetupData::firstMechanic());
     }
 
     public function isHostedBy(User $account): bool
@@ -178,6 +218,9 @@ class Room extends Model
             'revision' => 'integer',
             'last_activity_at' => 'datetime',
             'closed_at' => 'datetime',
+            'setup_mechanic' => RoomMechanic::class,
+            'setup_difficulty' => 'integer',
+            'setup_rounds' => 'integer',
         ];
     }
 

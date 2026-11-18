@@ -18,17 +18,21 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * The room's entrance, `/otaq` (docs/architecture.md §12 "Rooms and
- * joining", ADR 020 decisions 3–4): the code field, the join page and
+ * The room's entrance, `/oyun` (docs/architecture.md §12 "Rooms and
+ * joining", "Games first", ADR 020 decisions 3–4, ADR 026 decision 6;
+ * `/otaq`, its address before, redirects to it): the code field, the join page and
  * «Qoşul». A code is its own code space: a pairing code means nothing
  * here. An unknown code, a closed room and an account the host removed get
  * the same refusal, one sentence on the code field (`rooms.errors.unknown`)
- * and never an error page: where the code was typed, and at `/otaq` for a
+ * and never an error page: where the code was typed, and at `/oyun` for a
  * link or a QR that opens nothing. A locked or a full room is said on the
  * join page and nothing else about the room is. The join page shows the
  * code and the account's own name as the room will show it. 10 tries of a
  * code a minute per account, the three ways together (`throttle:room-join`);
- * over it the same field says so, and `/otaq` without a code always opens.
+ * over it the same field says so, and `/oyun` without a code always opens.
+ * `/otaq` and `/otaq/{code}` answer with a permanent redirect to the same
+ * place under `/oyun`, a query kept, so a link, a habit or a README of
+ * before still arrives; they try no code themselves.
  */
 final class RoomJoinController extends Controller
 {
@@ -44,6 +48,16 @@ final class RoomJoinController extends Controller
         }
 
         return Inertia::render('rooms/join', ['code' => null, 'name' => $account->name]);
+    }
+
+    public function oldEntrance(Request $request): RedirectResponse
+    {
+        return redirect()->to(route('rooms.entrance', $request->query()), 301);
+    }
+
+    public function oldJoin(Request $request, string $code): RedirectResponse
+    {
+        return redirect()->to(route('rooms.join', [...$request->query(), 'code' => $code]), 301);
     }
 
     public function show(string $code, #[CurrentUser] User $account): Response|RedirectResponse

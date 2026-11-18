@@ -3,6 +3,7 @@ import { ArrowLeft, Maximize, Minimize, Trophy, Users } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { FinalStanding } from '@/components/rooms/final-standing';
+import type { GameSetupOptions } from '@/components/rooms/game-setup';
 import { Countdown, Counted, RoundHead } from '@/components/rooms/live-round';
 import { MECHANIC_VIEWS } from '@/components/rooms/mechanics/views';
 import { REVEAL_MS } from '@/components/rooms/motion';
@@ -38,6 +39,12 @@ type Props = {
     place_labels: string[];
     /** Where a phone joins: the QR's address and the code field's. */
     join: JoinLink | null;
+    /**
+     * What the room's choice may be, as the host's phone gets it (G2): the
+     * screen sends the host's `rooms.setup.update` and `rooms.games.store`
+     * with it. G3 draws the strip that does (ADR 026 decision 17).
+     */
+    catalog: GameSetupOptions;
     /** The room's moments it plays as the room's speaker, by name (ADR 025). */
     sounds: RoomSoundUrls;
 };

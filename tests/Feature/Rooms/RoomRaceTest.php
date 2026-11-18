@@ -269,8 +269,8 @@ it('counts each player\'s answer once, whatever is sent twice', function (): voi
     $this->travelTo(Rooms::at($game, RoomPhase::Answer));
     $event = Rooms::answer($round, Rooms::right($round))['event_id'];
 
-    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round), $event)->assertExactJson(['status' => 'accepted', 'revision' => 3]);
-    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round), $event)->assertExactJson(['status' => 'duplicate', 'revision' => 3]);
+    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round), $event)->assertExactJson(['status' => 'accepted', 'revision' => 4]);
+    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round), $event)->assertExactJson(['status' => 'duplicate', 'revision' => 4]);
     // The same event with other items, in upper case, or later: the first stays.
     $this->travelTo(RoomClock::at(RoomClock::nowMs() + 2000));
     raceAnswer($this->aygun, $this->room, $round, Rooms::wrong($round), strtoupper($event))->assertJsonPath('status', 'duplicate');
@@ -285,7 +285,7 @@ it('refuses a second answer of the same player', function (): void {
     $this->travelTo(Rooms::at($game, RoomPhase::Answer));
 
     raceAnswer($this->aygun, $this->room, $round, Rooms::wrong($round))->assertJsonPath('status', 'accepted');
-    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertExactJson(['status' => 'answered', 'revision' => 3]);
+    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertExactJson(['status' => 'answered', 'revision' => 4]);
 
     expect(RoomAnswer::query()->sole())->toMatchArray(['room_player_id' => $this->aygunRow->id, 'correct' => false, 'points' => 0]);
 });
@@ -299,8 +299,8 @@ it('refuses an answer after the bell', function (): void {
     // Before the question: late, whatever is picked.
     foreach ([Rooms::at($game, RoomPhase::Countdown), Rooms::at($game, RoomPhase::Study), RoomClock::at($timetable->answerFrom(0) - 1)] as $moment) {
         $this->travelTo($moment);
-        raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertExactJson(['status' => 'late', 'revision' => 2]);
-        raceAnswer($this->aygun, $this->room, $round, ['zzzzzzzz'])->assertExactJson(['status' => 'late', 'revision' => 2]);
+        raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertExactJson(['status' => 'late', 'revision' => 3]);
+        raceAnswer($this->aygun, $this->room, $round, ['zzzzzzzz'])->assertExactJson(['status' => 'late', 'revision' => 3]);
     }
 
     // At the bell and after it: late; the reveal is served from that moment.
@@ -386,7 +386,7 @@ it('measures the time on the server\'s clock', function (): void {
     // Whatever the device says of its own time is not read.
     $this->travelTo(RoomClock::at($from + 2345));
     raceAnswer($this->aygun, $this->room, $round, Rooms::right($round), extra: ['elapsed_ms' => 1, 'sent_ms' => $from, 'client_ms' => $from])
-        ->assertExactJson(['status' => 'accepted', 'revision' => 3]);
+        ->assertExactJson(['status' => 'accepted', 'revision' => 4]);
 
     $this->travelTo(RoomClock::at($from + 9999));
     raceAnswer($this->host, $this->room, $round, Rooms::right($round))->assertJsonPath('status', 'accepted');
@@ -412,8 +412,8 @@ it('never says right or wrong in the receipt', function (): void {
     $wrong = raceAnswer($this->host, $this->room, $round, Rooms::wrong($round))->assertOk()->assertHeader('Cache-Control', 'no-store, private');
 
     // Each accepted answer is one change of the room; the receipts differ by that alone.
-    expect($right->json())->toBe(['status' => 'accepted', 'revision' => 4])
-        ->and($wrong->json())->toBe(['status' => 'accepted', 'revision' => 5])
+    expect($right->json())->toBe(['status' => 'accepted', 'revision' => 5])
+        ->and($wrong->json())->toBe(['status' => 'accepted', 'revision' => 6])
         ->and(RoomAnswer::query()->orderBy('id')->pluck('correct')->all())->toBe([true, false]);
 });
 
@@ -424,16 +424,16 @@ it('closes the round when every present player has answered', function (): void 
     RoomPhones::read($this->room, $this->host, $this->aygun);
     $this->travelTo(RoomClock::at($game->timetable()->answerFrom(0) + 1000));
 
-    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertExactJson(['status' => 'accepted', 'revision' => 3]);
+    raceAnswer($this->aygun, $this->room, $round, Rooms::right($round))->assertExactJson(['status' => 'accepted', 'revision' => 4]);
     expect($round->refresh()->closed_ms)->toBeNull();
 
     $this->travelTo(RoomClock::at(RoomClock::nowMs() + 500));
     $closedAt = RoomClock::nowMs();
-    raceAnswer($this->host, $this->room, $round, Rooms::wrong($round))->assertExactJson(['status' => 'accepted', 'revision' => 4]);
+    raceAnswer($this->host, $this->room, $round, Rooms::wrong($round))->assertExactJson(['status' => 'accepted', 'revision' => 5]);
 
     expect($round->refresh()->closed_ms)->toBe($closedAt);
     ['state' => $state] = raceRead($this->aygun, $this->room);
-    expect($state['revision'])->toBe(4)
+    expect($state['revision'])->toBe(5)
         ->and($state['round'])->toMatchArray(['index' => 0, 'phase' => 'reveal', 'closes_ms' => $closedAt, 'next_ms' => $closedAt + $game->reveal_ms, 'answered_count' => 2])
         ->and($game->refresh()->timetable()->opens(1))->toBe($closedAt + $game->reveal_ms);
 
@@ -719,7 +719,8 @@ it('reveals a round for 3 s in a new game, and a started game keeps its own reve
 
     // The next game reveals each round for 3 s.
     $this->travelTo(Rooms::at($old, RoomPhase::Over));
-    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), ['mechanic' => 'recall_order', 'difficulty' => 1, 'rounds' => 5])->assertNoContent();
+    $this->actingAs($this->host)->putJson(route('rooms.setup.update', $this->room), ['mechanic' => 'recall_order', 'difficulty' => 1, 'rounds' => 5])->assertNoContent();
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room))->assertNoContent();
     $new = $this->room->refresh()->latestGame();
     $this->travelTo(Rooms::at($new, RoomPhase::Reveal, 0));
     ['state' => $state] = raceRead($this->aygun, $this->room);
@@ -746,7 +747,8 @@ it('runs to its end with nobody watching', function (): void {
         ->and(raceSnapshot())->toBe($before);
 
     // The room is a lobby again: the host may start the next game.
-    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), ['mechanic' => 'recall_order', 'difficulty' => 2, 'rounds' => 5])->assertNoContent();
+    $this->actingAs($this->host)->putJson(route('rooms.setup.update', $this->room), ['mechanic' => 'recall_order', 'difficulty' => 2, 'rounds' => 5])->assertNoContent();
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room))->assertNoContent();
     expect(RoomGame::query()->where('room_id', $this->room->id)->orderBy('position')->pluck('position')->all())->toBe([0, 1]);
 });
 
@@ -784,36 +786,31 @@ it('ends when the host ends it', function (): void {
 it('starts no second game while one is running', function (): void {
     $setup = ['mechanic' => 'recall_order', 'difficulty' => 1, 'rounds' => 5];
 
-    // Only the host, and only with a level the room can play.
-    $this->actingAs($this->aygun)->postJson(route('rooms.games.store', $this->room), $setup)->assertForbidden();
-    foreach ([['rounds' => 4], ['rounds' => 21], ['difficulty' => 5], ['mechanic' => 'words'], ['mechanic' => 'find']] as $wrong) {
-        $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), [...$setup, ...$wrong])->assertUnprocessable();
-    }
-
-    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), $setup)->assertNoContent();
+    // Only the host, and only a level the room can play (the choice is ChooseGameTest's).
+    $this->actingAs($this->aygun)->postJson(route('rooms.games.store', $this->room))->assertForbidden();
+    $this->actingAs($this->host)->putJson(route('rooms.setup.update', $this->room), $setup)->assertNoContent();
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room))->assertNoContent();
     $game = $this->room->latestGame();
     expect($game)->toMatchArray(['position' => 0, 'difficulty' => 1, 'reveal_ms' => 3000, 'started_ms' => RoomClock::nowMs() + 3000])
         ->and($game?->rounds)->toHaveCount(5);
 
     // Refused while it runs, by the policy and by the action under the lock.
-    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), $setup)->assertForbidden();
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room))->assertForbidden();
     $this->travelTo(Rooms::at($game, RoomPhase::Reveal, 4));
-    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), $setup)->assertForbidden();
-    expect(fn () => app(StartRoomGame::class)->handle($this->room, new RoomGameSetupData(RoomMechanic::RecallOrder, 1, 5)))
-        ->toThrow(AuthorizationException::class);
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room))->assertForbidden();
+    expect(fn () => app(StartRoomGame::class)->handle($this->room))->toThrow(AuthorizationException::class);
     expect(RoomGame::query()->count())->toBe(1);
 
     // Over: the next one starts.
     $this->travelTo(Rooms::at($game, RoomPhase::Over));
-    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), $setup)->assertNoContent();
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room))->assertNoContent();
     expect(RoomGame::query()->count())->toBe(2);
 
     // Never in a closed room.
     $this->travelTo(Rooms::at($this->room->latestGame(), RoomPhase::Over));
     $this->post(route('rooms.close', $this->room));
-    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), $setup)->assertForbidden();
-    expect(fn () => app(StartRoomGame::class)->handle($this->room, new RoomGameSetupData(RoomMechanic::RecallOrder, 1, 5)))
-        ->toThrow(AuthorizationException::class);
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room))->assertForbidden();
+    expect(fn () => app(StartRoomGame::class)->handle($this->room))->toThrow(AuthorizationException::class);
 });
 
 it('offers the setup of a game to the host of an open room alone, as the server accepts it', function (): void {
@@ -827,13 +824,13 @@ it('offers the setup of a game to the host of an open room alone, as the server 
         ['mechanic' => 'anagram', 'family' => 'words', 'difficulties' => [1, 2, 3, 4]],
         ['mechanic' => 'spelling', 'family' => 'words', 'difficulties' => [1, 2, 3, 4]],
     ], 'rounds' => ['min' => 5, 'max' => 20]];
-    $setup = $this->actingAs($this->host)->get(route('rooms.show', $this->room))->viewData('page')['props']['setup'];
+    $setup = $this->actingAs($this->host)->get(route('rooms.show', $this->room))->viewData('page')['props']['catalog'];
     expect([
         'mechanics' => array_map(static fn (array $offer): array => array_diff_key($offer, ['levels' => true]), $setup['mechanics']),
         'rounds' => $setup['rounds'],
     ])->toBe($offered);
     $this->actingAs($this->aygun)->get(route('rooms.show', $this->room))
-        ->assertInertia(fn (Assert $page) => $page->where('setup', null));
+        ->assertInertia(fn (Assert $page) => $page->where('catalog', null));
 
     foreach ($offered['mechanics'] as $offer) {
         foreach ($offer['difficulties'] as $difficulty) {
@@ -843,7 +840,7 @@ it('offers the setup of a game to the host of an open room alone, as the server 
 
     $this->actingAs($this->host)->post(route('rooms.close', $this->room));
     $this->get(route('rooms.show', $this->room))
-        ->assertInertia(fn (Assert $page) => $page->where('setup', null));
+        ->assertInertia(fn (Assert $page) => $page->where('catalog', null));
 });
 
 it('ends the game when the room closes', function (): void {
@@ -904,7 +901,8 @@ it('limits answers to 30 a minute per account', function (): void {
 // question, which is the whole dark grid with ids of its own, the same
 // whichever cells were lit.
 it('plays a game of cells to its ranking and names no lit cell before the reveal', function (): void {
-    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), ['mechanic' => 'recall_cells', 'difficulty' => 2, 'rounds' => 5])->assertNoContent();
+    $this->actingAs($this->host)->putJson(route('rooms.setup.update', $this->room), ['mechanic' => 'recall_cells', 'difficulty' => 2, 'rounds' => 5])->assertNoContent();
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room))->assertNoContent();
     $game = $this->room->refresh()->latestGame()?->load('rounds');
     $level = app(ContentRepository::class)->roomLevel(RoomMechanic::RecallCells, 2);
     $grid = $level->grid?->toArray();
@@ -1041,7 +1039,8 @@ it('plays a row of shapes and judges it by their pictures', function (): void {
 // `ask.shown`, the options in `ask.items` — and nothing before the reveal
 // tells the right option: not its place, not its id, not a key beside it.
 it('plays a logic game to its ranking', function (string $mechanic, int $difficulty): void {
-    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), ['mechanic' => $mechanic, 'difficulty' => $difficulty, 'rounds' => 5])->assertNoContent();
+    $this->actingAs($this->host)->putJson(route('rooms.setup.update', $this->room), ['mechanic' => $mechanic, 'difficulty' => $difficulty, 'rounds' => 5])->assertNoContent();
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room))->assertNoContent();
     $game = $this->room->refresh()->latestGame()?->load('rounds');
     $level = app(ContentRepository::class)->roomLevel(RoomMechanic::from($mechanic), $difficulty);
 
@@ -1166,7 +1165,8 @@ it('reads a round stored before the question had shown items', function (): void
 // holds the word or marks an option: an anagram's tiles never spell a word
 // they make, and a spelling's four options carry the same keys.
 it('plays a word game to its ranking', function (string $mechanic, int $difficulty): void {
-    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), ['mechanic' => $mechanic, 'difficulty' => $difficulty, 'rounds' => 5])->assertNoContent();
+    $this->actingAs($this->host)->putJson(route('rooms.setup.update', $this->room), ['mechanic' => $mechanic, 'difficulty' => $difficulty, 'rounds' => 5])->assertNoContent();
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room))->assertNoContent();
     $game = $this->room->refresh()->latestGame()?->load('rounds');
     $level = app(ContentRepository::class)->roomLevel(RoomMechanic::from($mechanic), $difficulty);
 
@@ -1281,7 +1281,8 @@ it('plays a word game to its ranking', function (string $mechanic, int $difficul
 // A player never types (ADR 023 decision 4): an answer is item ids of the
 // round, and nothing else a body carries is stored.
 it('stores no text a player wrote', function (string $mechanic): void {
-    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room), ['mechanic' => $mechanic, 'difficulty' => 2, 'rounds' => 5])->assertNoContent();
+    $this->actingAs($this->host)->putJson(route('rooms.setup.update', $this->room), ['mechanic' => $mechanic, 'difficulty' => 2, 'rounds' => 5])->assertNoContent();
+    $this->actingAs($this->host)->postJson(route('rooms.games.store', $this->room))->assertNoContent();
     $game = $this->room->refresh()->latestGame()?->load('rounds');
     $round = Rooms::round($game, 0);
     $this->travelTo(Rooms::at($game, RoomPhase::Answer));

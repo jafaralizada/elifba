@@ -149,7 +149,8 @@ it('leaves the game tables untouched by a whole room game', function (): void {
     $room = Rooms::open($account);
     $friend = User::factory()->player()->create();
     Rooms::join($room, $friend);
-    $this->actingAs($account)->postJson(route('rooms.games.store', $room), ['mechanic' => 'recall_order', 'difficulty' => 2, 'rounds' => 5])->assertNoContent();
+    $this->actingAs($account)->putJson(route('rooms.setup.update', $room), ['mechanic' => 'recall_order', 'difficulty' => 2, 'rounds' => 5])->assertNoContent();
+    $this->actingAs($account)->postJson(route('rooms.games.store', $room))->assertNoContent();
     $game = RoomGame::query()->sole();
 
     foreach (range(0, 4) as $index) {
@@ -178,7 +179,7 @@ it('takes no class, student, child, game or word in any room route', function ()
 
     foreach ($rooms as $key => $route) {
         expect(array_intersect($route->parameterNames(), $children))->toBe([], $key)
-            ->and($route->uri())->toMatch('#^(rooms|otaq)(/|$)#', $key);
+            ->and($route->uri())->toMatch('#^(rooms|oyun|otaq)(/|$)#', $key);
     }
 
     // …and no other route takes a room or one of its players.

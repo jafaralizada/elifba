@@ -2,18 +2,24 @@
 
 namespace App\Domain\Rooms\Data;
 
+use App\Domain\Content\Enums\RoomMechanic;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Opening a room (docs/architecture.md §12 "Rooms and joining", ADR 020):
- * only whether the host plays in it — by default the host is the room's
- * first player. A room has no name, title or anything else typed.
+ * Choosing a game on «Oyunlar» (docs/architecture.md §12 "Games first",
+ * ADR 026 decision 7): the game, one of the mechanics a room plays that
+ * have levels (`RoomGameSetupData::mechanics()`). The room opens behind it,
+ * or the host's open room takes it; its difficulty and rounds are derived
+ * (`RoomDefaults`) or kept. A room has no name, title or anything else
+ * typed, and the host is always its first player (`SetHostPlays` steps
+ * out).
  */
 final readonly class OpenRoomData
 {
     public function __construct(
-        public bool $plays = true,
+        public RoomMechanic $mechanic,
     ) {}
 
     /**
@@ -22,7 +28,10 @@ final readonly class OpenRoomData
     public static function rules(): array
     {
         return [
-            'plays' => ['sometimes', 'boolean'],
+            'mechanic' => ['required', 'string', Rule::in(array_map(
+                static fn (RoomMechanic $mechanic): string => $mechanic->value,
+                RoomGameSetupData::mechanics(),
+            ))],
         ];
     }
 
@@ -33,8 +42,9 @@ final readonly class OpenRoomData
      */
     public static function validate(array $input): self
     {
+        /** @var array{mechanic: string} $validated */
         $validated = Validator::make($input, self::rules())->validate();
 
-        return new self(! array_key_exists('plays', $validated) || in_array($validated['plays'], [true, 1, '1'], true));
+        return new self(RoomMechanic::from($validated['mechanic']));
     }
 }

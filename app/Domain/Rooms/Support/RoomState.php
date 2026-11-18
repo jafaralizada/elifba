@@ -9,6 +9,7 @@ use App\Domain\Rooms\Data\RoomPlayerData;
 use App\Domain\Rooms\Data\RoomResultData;
 use App\Domain\Rooms\Data\RoomRevealData;
 use App\Domain\Rooms\Data\RoomRoundData;
+use App\Domain\Rooms\Data\RoomSetupData;
 use App\Domain\Rooms\Data\RoomStateData;
 use App\Domain\Rooms\Data\RoomSummaryData;
 use App\Domain\Rooms\Data\RoomViewerData;
@@ -44,6 +45,12 @@ use Illuminate\Database\Eloquent\Collection;
  * game counts its closed rounds only; once a game is over it is the
  * room's standing; before the first game there is none. A closed room —
  * an idle one too, before the scheduler writes it — has no live game.
+ *
+ * An open room's state says the host's choice of the next game (`setup`,
+ * §12 "Games first", ADR 026 decision 11) to everyone who gets the state —
+ * after joining, never on the join page — and whether it is the game that
+ * was just played: the latest game is over and its mechanic, difficulty
+ * and number of rounds are the choice's. A closed room has none.
  */
 final class RoomState
 {
@@ -55,6 +62,7 @@ final class RoomState
         $game = $room->latestGame();
         $moment = $game === null || ! $room->isOpen() ? RoomMomentData::over() : $game->timetable()->moment($nowMs);
         $live = $game !== null && ! $moment->isOver();
+        $setup = $room->isOpen() ? $room->setup() : null;
 
         return new RoomStateData(
             revision: $room->revision,
@@ -74,6 +82,15 @@ final class RoomState
                 $live => RoomRanking::ofGame($game, $nowMs, $rows),
                 default => RoomRanking::ofRoom($room, $nowMs, $rows),
             },
+            setup: $setup === null ? null : new RoomSetupData(
+                mechanic: $setup->mechanic,
+                difficulty: $setup->difficulty,
+                rounds: $setup->rounds,
+                played: $game !== null && ! $live
+                    && $game->mechanic === $setup->mechanic
+                    && $game->difficulty === $setup->difficulty
+                    && $game->rounds->count() === $setup->rounds,
+            ),
         );
     }
 

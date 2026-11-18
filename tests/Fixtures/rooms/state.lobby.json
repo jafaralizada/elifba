@@ -1,5 +1,5 @@
 {
-    "v": 1,
+    "v": 2,
     "revision": 3,
     "server_ms": 1795534200000,
     "room": {
@@ -40,5 +40,11 @@
     ],
     "game": null,
     "round": null,
-    "ranking": []
+    "ranking": [],
+    "setup": {
+        "mechanic": "recall_order",
+        "difficulty": 2,
+        "rounds": 10,
+        "played": false
+    }
 }

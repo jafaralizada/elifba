@@ -86,6 +86,14 @@ return [
         ],
         'countdown_ms' => 3_000,
         'reveal_ms' => 3_000,
+
+        // A new room's difficulty and rounds when the host has no game to
+        // take them from (§12 "Games first", ADR 026 decision 10: derived
+        // by `RoomDefaults` at each opening, never stored on the account).
+        'defaults' => [
+            'difficulty' => 2,
+            'rounds' => 10,
+        ],
     ],
 
     // Who runs this instance; shown on /privacy (§7).

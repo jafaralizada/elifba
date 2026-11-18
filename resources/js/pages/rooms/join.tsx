@@ -13,7 +13,7 @@ import { entrance, index } from '@/routes/rooms';
 import { store } from '@/routes/rooms/join';
 
 type Props = {
-    /** The code of an open room; null at `/otaq`, where it is typed. */
+    /** The code of an open room; null at `/oyun`, where it is typed. */
     code: string | null;
     /** The account's own name, as the room will show it. */
     name: string;
@@ -22,7 +22,7 @@ type Props = {
 /**
  * The room's entrance (docs/frontend.md rule 15, "The entrance";
  * architecture §12 "Rooms and joining", ADR 020 decision 4): the code
- * field at `/otaq`; at `/otaq/{code}` the code, the account's own name as
+ * field at `/oyun`; at `/oyun/{code}` the code, the account's own name as
  * the room will show it, and «Qoşul» at the bottom of the screen. A
  * locked or a full room is said here and nothing else about it.
  */

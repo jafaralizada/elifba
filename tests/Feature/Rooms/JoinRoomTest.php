@@ -14,7 +14,9 @@ use Tests\Support\Rooms;
 
 /*
  * Joining a room with its code (docs/architecture.md §12 "Rooms and
- * joining", ADR 020 decisions 3–4): `/otaq`, `/otaq/{code}` and «Qoşul»
+ * joining", "Games first", ADR 020 decisions 3–4, ADR 026 decision 6):
+ * `/oyun`, `/oyun/{code}` and «Qoşul» — `/otaq` and `/otaq/{code}` lead
+ * there —
  * admit a signed-in, confirmed account with the player role into that one
  * room. An unknown code, a closed room and an account the host removed get
  * the same refusal, a sentence on the code field and never an error page; a
@@ -347,4 +349,45 @@ it('limits guessing per account, and says so on the code field', function (): vo
     // A minute later the account may try again.
     $this->travel(61)->seconds();
     $this->actingAs($this->player)->post(route('rooms.join.store', $code))->assertRedirect(route('rooms.show', $this->room));
+});
+
+it('joins at /oyun', function (): void {
+    $code = (string) $this->room->code;
+
+    expect(route('rooms.entrance', [], false))->toBe('/oyun')
+        ->and(route('rooms.join', $code, false))->toBe('/oyun/'.$code)
+        ->and(route('rooms.join.store', $code, false))->toBe('/oyun/'.$code);
+
+    $this->actingAs($this->player);
+    $this->get('/oyun')->assertOk()->assertInertia(fn (Assert $page) => $page->component('rooms/join')->where('code', null));
+    $this->get('/oyun?code='.$code)->assertRedirect('/oyun/'.$code);
+    $this->get('/oyun/'.$code)->assertOk()->assertInertia(fn (Assert $page) => $page->where('code', $code));
+    $this->post('/oyun/'.$code)->assertRedirect(route('rooms.show', $this->room));
+
+    expect($this->room->rowOf($this->player)?->isPresent())->toBeTrue();
+
+    // The QR and the line under it name the new address, on `APP_URL`.
+    $root = rtrim((string) config('app.url'), '/');
+    $this->actingAs($this->host)->get(route('rooms.show', $this->room))
+        ->assertInertia(fn (Assert $page) => $page->where('join', ['url' => $root.'/oyun/'.$code, 'entry_url' => $root.'/oyun']));
+    $this->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('entrance', $root.'/oyun'));
+});
+
+it('sends the old /otaq addresses to the new ones', function (): void {
+    $code = (string) $this->room->code;
+    $this->actingAs($this->player);
+
+    // Permanent, with the query kept; a code the old field sent is tried at the new one.
+    $this->get('/otaq')->assertStatus(301)->assertRedirect(route('rooms.entrance'));
+    $this->get('/otaq?code='.$code)->assertStatus(301)->assertRedirect(route('rooms.entrance', ['code' => $code]));
+    $this->get('/otaq/'.$code)->assertStatus(301)->assertRedirect(route('rooms.join', $code));
+    $this->get('/otaq/'.$code.'?from=qr')->assertStatus(301)->assertRedirect(route('rooms.join', ['code' => $code, 'from' => 'qr']));
+
+    // The redirect tries no code and joins nobody; nothing posts to the old address.
+    $this->post('/otaq/'.$code)->assertStatus(405);
+    expect($this->room->rowOf($this->player))->toBeNull();
+
+    // A visitor is sent to the login first, as at the new address.
+    auth()->logout();
+    $this->get('/otaq/'.$code)->assertRedirect(route('login'));
 });

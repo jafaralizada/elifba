@@ -9,14 +9,16 @@ use App\Http\Controllers\Rooms\RoomJoinController;
 use App\Http\Controllers\Rooms\RoomLeaveController;
 use App\Http\Controllers\Rooms\RoomMemberController;
 use App\Http\Controllers\Rooms\RoomNameController;
+use App\Http\Controllers\Rooms\RoomPlaysController;
 use App\Http\Controllers\Rooms\RoomScreenController;
+use App\Http\Controllers\Rooms\RoomSetupController;
 use App\Http\Controllers\Rooms\RoomStateController;
 use Illuminate\Support\Facades\Route;
 
 /*
- * The player area: adults' rooms (docs/architecture.md §1 "Accounts and
- * roles", §12 "The area and the switch", "Rooms and joining", ADR 019,
- * ADR 020). Every room route is here and in no other group, and nothing
+ * The player area: adults' games and their rooms (docs/architecture.md §1
+ * "Accounts and roles", §12 "The area and the switch", "Rooms and joining",
+ * "Games first", ADRs 019, 020 and 026). Every room route is here and in no other group, and nothing
  * here is a class, a student, a child or a game of theirs. `rooms.enabled`
  * comes first: while the instance has the area switched off, every route
  * below is a 404 to everyone, a visitor too. An account without the player
@@ -31,22 +33,31 @@ use Illuminate\Support\Facades\Route;
  * tests/Feature/Classroom/TeacherIsolationTest.php, which fails otherwise.
  */
 Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::middleware(Role::Player)])->group(function () {
-    // «Otaqlar», the area's home: the account's rooms, the code field, «Otaq aç».
+    // «Oyunlar», the area's home: the games, the account's open rooms, the code field.
     Route::get('rooms', [RoomController::class, 'index'])->name('rooms.index');
+    // A game chosen: the room opens behind it, or the host's open room takes it (G2).
     Route::post('rooms', [RoomController::class, 'store'])
         ->middleware('throttle:rooms-open')
         ->name('rooms.store');
+    // «Keçmiş oyunlar»: the rooms the account was in (G2).
+    Route::get('rooms/past', [RoomController::class, 'past'])->name('rooms.past');
 
-    // The entrance with a code: 10 tries of a code a minute per account, the three ways together.
+    // The entrance with a code, `/oyun` (G2): 10 tries of a code a minute per account, the three ways together.
     Route::middleware('throttle:room-join')->group(function () {
-        Route::get('otaq', [RoomJoinController::class, 'entrance'])->name('rooms.entrance');
-        Route::get('otaq/{code}', [RoomJoinController::class, 'show'])
+        Route::get('oyun', [RoomJoinController::class, 'entrance'])->name('rooms.entrance');
+        Route::get('oyun/{code}', [RoomJoinController::class, 'show'])
             ->where('code', '[0-9]{6}')
             ->name('rooms.join');
-        Route::post('otaq/{code}', [RoomJoinController::class, 'store'])
+        Route::post('oyun/{code}', [RoomJoinController::class, 'store'])
             ->where('code', '[0-9]{6}')
             ->name('rooms.join.store');
     });
+
+    // The entrance's address before G2: permanent redirects, a query kept; nothing posts here.
+    Route::get('otaq', [RoomJoinController::class, 'oldEntrance'])->name('rooms.entrance.old');
+    Route::get('otaq/{code}', [RoomJoinController::class, 'oldJoin'])
+        ->where('code', '[0-9]{6}')
+        ->name('rooms.join.old');
 
     Route::get('rooms/{room}', [RoomController::class, 'show'])
         ->whereUlid('room')
@@ -90,7 +101,17 @@ Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::mid
         ->can('host', 'room')
         ->name('rooms.close');
 
-    // A game: started in an open room with none running, ended while it runs (B3).
+    // The host's choice of the next game and «Mən də oynayıram», from the phone or the screen (G2).
+    Route::put('rooms/{room}/setup', RoomSetupController::class)
+        ->whereUlid('room')
+        ->can('start', 'room')
+        ->name('rooms.setup.update');
+    Route::put('rooms/{room}/plays', RoomPlaysController::class)
+        ->whereUlid('room')
+        ->can('start', 'room')
+        ->name('rooms.plays.update');
+
+    // A game: the room's choice started in an open room with none running, ended while it runs (B3, G2).
     Route::post('rooms/{room}/games', [RoomGameController::class, 'store'])
         ->whereUlid('room')
         ->can('start', 'room')

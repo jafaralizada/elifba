@@ -3,7 +3,6 @@
 namespace App\Domain\Rooms\Actions;
 
 use App\Domain\Content\Support\ContentRepository;
-use App\Domain\Rooms\Data\RoomGameSetupData;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomGame;
 use App\Domain\Rooms\Models\RoomRound;
@@ -17,14 +16,18 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 
 /**
- * The host starts a game (docs/architecture.md §12 "The race", ADR 021):
- * under the room row's lock it refuses a closed room and a room whose game
- * is still running — `RoomPolicy::start` refused them already, and two
- * starts at once meet here — then builds every round with the mechanic's
- * builder from a fresh seed (`RoomSeed`), stores each as its `payload` and
- * its `solution`, and sets round 0 to open `elifba.rooms.countdown_ms`
- * from now, with the configured `reveal_ms` kept as the game's. The room
- * is active, its revision rises and it is signalled.
+ * The host starts a game (docs/architecture.md §12 "The race", "Games
+ * first", ADRs 021 and 026 decision 9): under the room row's lock it
+ * refuses a closed room and a room whose game is still running —
+ * `RoomPolicy::start` refused them already, and two starts at once meet
+ * here — then starts what the room's choice says (`Room::setup()`, read
+ * under the lock; the request has no body), so what starts is what every
+ * device was shown, and «Yenidən oyna» is the same start again. It builds
+ * every round with the mechanic's builder from a fresh seed (`RoomSeed`),
+ * stores each as its `payload` and its `solution`, and sets round 0 to
+ * open `elifba.rooms.countdown_ms` from now, with the configured
+ * `reveal_ms` kept as the game's. The choice stays as it is. The room is
+ * active, its revision rises and it is signalled.
  */
 final readonly class StartRoomGame
 {
@@ -33,15 +36,17 @@ final readonly class StartRoomGame
     /**
      * @throws AuthorizationException when the room is closed or a game is running in it
      */
-    public function handle(Room $room, RoomGameSetupData $setup): RoomGame
+    public function handle(Room $room): RoomGame
     {
-        return DB::transaction(function () use ($room, $setup): RoomGame {
+        return DB::transaction(function () use ($room): RoomGame {
             $locked = RoomLock::room($room);
             $nowMs = RoomClock::nowMs();
 
             if ($locked === null || ! $locked->isOpen() || $locked->runningGame($nowMs) !== null) {
                 throw new AuthorizationException;
             }
+
+            $setup = $locked->setup();
 
             $seed = RoomSeed::fresh();
             $built = RoomPlayable::builder($setup->mechanic)->build(

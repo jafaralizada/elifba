@@ -1,5 +1,5 @@
 {
-    "v": 1,
+    "v": 2,
     "revision": 5,
     "server_ms": 1795534226900,
     "room": {
@@ -157,5 +157,11 @@
             "points": 0,
             "place": null
         }
-    ]
+    ],
+    "setup": {
+        "mechanic": "recall_cells",
+        "difficulty": 1,
+        "rounds": 5,
+        "played": false
+    }
 }

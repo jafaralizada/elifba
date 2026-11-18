@@ -3,6 +3,7 @@
 namespace App\Domain\Rooms\Data;
 
 use App\Domain\Rooms\Enums\RoomGamePhase;
+use App\Domain\Rooms\Enums\RoomStatus;
 use InvalidArgumentException;
 
 /**
@@ -17,7 +18,9 @@ use InvalidArgumentException;
  * `round` null, the room's ranking); a live game with its current round
  * (the game's ranking over its closed rounds); a game that is over (no
  * round, the room's standing). What a round serves in each phase is
- * `RoomRoundData`'s rule.
+ * `RoomRoundData`'s rule. An open room also has `setup`, the host's
+ * choice of the next game (G2, ADR 026 decision 11; version 2); a closed
+ * one has none.
  *
  * @phpstan-import-type RoomSummaryArray from RoomSummaryData
  * @phpstan-import-type RoomViewerArray from RoomViewerData
@@ -25,12 +28,13 @@ use InvalidArgumentException;
  * @phpstan-import-type RoomGameArray from RoomGameData
  * @phpstan-import-type RoomRoundArray from RoomRoundData
  * @phpstan-import-type RoomRankedPlayerArray from RoomRankedPlayerData
+ * @phpstan-import-type RoomSetupArray from RoomSetupData
  *
- * @phpstan-type RoomStateArray array{v: int, revision: int, server_ms: int, room: RoomSummaryArray, me: RoomViewerArray, players: list<RoomPlayerArray>, game: RoomGameArray|null, round: RoomRoundArray|null, ranking: list<RoomRankedPlayerArray>}
+ * @phpstan-type RoomStateArray array{v: int, revision: int, server_ms: int, room: RoomSummaryArray, me: RoomViewerArray, players: list<RoomPlayerArray>, game: RoomGameArray|null, round: RoomRoundArray|null, ranking: list<RoomRankedPlayerArray>, setup: RoomSetupArray|null}
  */
 final readonly class RoomStateData
 {
-    public const int VERSION = 1;
+    public const int VERSION = 2;
 
     /**
      * @param  list<RoomPlayerData>  $players
@@ -45,8 +49,13 @@ final readonly class RoomStateData
         public ?RoomGameData $game = null,
         public ?RoomRoundData $round = null,
         public array $ranking = [],
+        public ?RoomSetupData $setup = null,
     ) {
         $live = $game?->phase === RoomGamePhase::Live;
+
+        if (($room->status === RoomStatus::Open) !== ($setup !== null)) {
+            throw new InvalidArgumentException('An open room has its choice of the next game, and a closed one has none.');
+        }
 
         if ($live !== ($round !== null)) {
             throw new InvalidArgumentException('A live game has its current round, and nothing else has one.');
@@ -76,6 +85,7 @@ final readonly class RoomStateData
             game: $data['game'] === null ? null : RoomGameData::fromArray($data['game']),
             round: $data['round'] === null ? null : RoomRoundData::fromArray($data['round']),
             ranking: array_map(RoomRankedPlayerData::fromArray(...), $data['ranking']),
+            setup: $data['setup'] === null ? null : RoomSetupData::fromArray($data['setup']),
         );
     }
 
@@ -94,6 +104,7 @@ final readonly class RoomStateData
             'game' => $this->game?->toArray(),
             'round' => $this->round?->toArray(),
             'ranking' => array_map(static fn (RoomRankedPlayerData $row): array => $row->toArray(), $this->ranking),
+            'setup' => $this->setup?->toArray(),
         ];
     }
 }

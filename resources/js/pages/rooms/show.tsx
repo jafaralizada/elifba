@@ -14,10 +14,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { GameSetup } from '@/components/rooms/game-setup';
-import type {
-    GameSetupOptions,
-    SetupChoice,
-} from '@/components/rooms/game-setup';
+import type { GameSetupOptions } from '@/components/rooms/game-setup';
 import { LiveRound } from '@/components/rooms/live-round';
 import { RoomActionBar } from '@/components/rooms/room-action-bar';
 import { CodeCard, CodeChip } from '@/components/rooms/room-code';
@@ -72,8 +69,8 @@ type Props = {
     state: RoomState | null;
     /** The label of place n at n − 1, from the server. */
     place_labels: string[];
-    /** What a new game may be; for the host of an open room only. */
-    setup: GameSetupOptions | null;
+    /** What the room's choice may be; for the host of an open room only (the choice itself is the state's `setup`). */
+    catalog: GameSetupOptions | null;
     /** Where a phone joins the open room: the QR's address and the code field's. */
     join: JoinLink | null;
     /** A closed room's games, each with its ranking; null while the room is open. */
@@ -104,7 +101,7 @@ export default function RoomsShow({
     room,
     state: initial,
     place_labels: placeLabels,
-    setup,
+    catalog,
     join,
     games,
     sounds,
@@ -114,8 +111,6 @@ export default function RoomsShow({
     const { state, clock, refresh } = useLiveRoom({ room, initial });
     const motion = useRoomMotion(state);
     const sound = useRoomSound({ speaker: 'phone', sounds, state, clock });
-    // The host's last choice of a game, for the next «Yeni oyun».
-    const [choice, setChoice] = useState<SetupChoice | null>(null);
 
     if (room.status === 'closed') {
         return (
@@ -240,13 +235,12 @@ export default function RoomsShow({
 
             {!playing && (
                 <RoomActionBar>
-                    {setup !== null ? (
+                    {catalog !== null && state.setup !== null ? (
                         <GameSetup
                             roomId={room.id}
-                            options={setup}
-                            choice={choice}
-                            onChoice={setChoice}
-                            onStarted={refresh}
+                            options={catalog}
+                            choice={state.setup}
+                            onChanged={refresh}
                         />
                     ) : (
                         <p className="flex min-h-11 items-center justify-center gap-2 text-center text-sm text-muted-foreground">

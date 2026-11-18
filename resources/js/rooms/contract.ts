@@ -1,6 +1,7 @@
 /**
  * A room's contract (docs/architecture.md §12 "The state", "The race",
- * "Room games", ADR 021 decision 6, ADR 023 decision 5): what
+ * "Room games", "Games first", ADR 021 decision 6, ADR 023 decision 5,
+ * ADR 026 decision 11): what
  * `GET /rooms/{room}/state` answers (and the `state` of the room page's
  * props), what a device posts as its answer and the receipt it gets, and
  * what `room.changed` carries. The schemas are the source; every
@@ -234,8 +235,24 @@ export const RoomRankedPlayer = z.strictObject({
     place: z.number().int().positive().nullable(),
 });
 
+/**
+ * The room's choice of the next game (G2): what every device shows before
+ * the start, and `played` — the latest game is over and was exactly this
+ * choice, so a page shows its final rather than the start screen. The
+ * server derives it; a page compares nothing itself.
+ */
+export const RoomSetup = z.strictObject({
+    mechanic: RoomMechanic,
+    difficulty: z.number().int().min(1).max(4),
+    rounds: z.number().int().positive(),
+    played: z.boolean(),
+});
+
+/** The state's version: a page that meets another reloads itself (`fetchState`). */
+export const ROOM_STATE_VERSION = 2;
+
 const stateBase = {
-    v: z.literal(1),
+    v: z.literal(ROOM_STATE_VERSION),
     revision: count,
     server_ms: moment,
     room: RoomSummary,
@@ -243,6 +260,8 @@ const stateBase = {
     players: z.array(RoomPlayer),
     /** The live game's, over its closed rounds; the room's when no game is live. */
     ranking: z.array(RoomRankedPlayer),
+    /** The host's choice of the next game; null in a closed room. */
+    setup: RoomSetup.nullable(),
 };
 
 /** No game yet, a live game with its current round, or a game that is over. */
@@ -292,6 +311,7 @@ export type RoomResult = z.infer<typeof RoomResult>;
 export type RoomReveal = z.infer<typeof RoomReveal>;
 export type RoomRound = z.infer<typeof RoomRound>;
 export type RoomGame = z.infer<typeof RoomGame>;
+export type RoomSetup = z.infer<typeof RoomSetup>;
 export type RoomRankedPlayer = z.infer<typeof RoomRankedPlayer>;
 export type RoomState = z.infer<typeof RoomState>;
 export type RoomAnswer = z.infer<typeof RoomAnswer>;

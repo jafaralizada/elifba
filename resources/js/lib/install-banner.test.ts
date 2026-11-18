@@ -93,8 +93,9 @@ describe('bannerAllowedOn', () => {
             'privacy',
             'pult/guest-board',
             'pult/index',
-            // The player area shows it on «Otaqlar» only (docs/frontend.md rule 15).
+            // The player area shows it on «Otaqlar» only (docs/frontend.md rule 15); G3 decides on «Keçmiş oyunlar».
             'rooms/join',
+            'rooms/past',
             'rooms/screen',
             'rooms/show',
         ]);

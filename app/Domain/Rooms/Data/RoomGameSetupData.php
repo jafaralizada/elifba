@@ -14,10 +14,12 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * The host's choice of a game (docs/architecture.md §12 "The race",
- * "Room games", ADR 023): a mechanic at a difficulty — the pair is a level
- * of `content/rooms/levels.json` — and how many rounds, between
- * `elifba.rooms.rounds.min` and `.max`. Only a level whose mechanic
- * `RoomPlayable` lists is accepted, so content may run ahead of the pages.
+ * "Room games", "Games first", ADRs 023 and 026): a mechanic at a
+ * difficulty — the pair is a level of `content/rooms/levels.json` — and how
+ * many rounds, between `elifba.rooms.rounds.min` and `.max`. Only a level
+ * whose mechanic `RoomPlayable` lists is accepted, so content may run ahead
+ * of the pages. From G2 it is the room's choice (`Room::setup()`), which
+ * `ChooseRoomGame` writes after `rules()` and `StartRoomGame` starts.
  */
 final readonly class RoomGameSetupData
 {
@@ -53,13 +55,77 @@ final readonly class RoomGameSetupData
         $setup = new self(RoomMechanic::from($validated['mechanic']), (int) $validated['difficulty'], (int) $validated['rounds']);
 
         // Each value may be a level's while the pair is none.
-        $pairs = array_map(static fn (RoomLevelData $level): string => $level->mechanic->value.'.'.$level->difficulty, self::playableLevels());
-
-        if (! in_array($setup->mechanic->value.'.'.$setup->difficulty, $pairs, true)) {
+        if (! in_array($setup->mechanic->value.'.'.$setup->difficulty, self::playablePairs(), true)) {
             throw ValidationException::withMessages(['difficulty' => __('validation.in', ['attribute' => 'difficulty'])]);
         }
 
         return $setup;
+    }
+
+    /**
+     * Whether the choice is still one a room plays: its pair is a playable
+     * level and its rounds are inside the bounds — a stored choice is read
+     * through it, since content and config may change under a room.
+     */
+    public function isPlayable(): bool
+    {
+        return in_array($this->mechanic->value.'.'.$this->difficulty, self::playablePairs(), true)
+            && $this->rounds >= Config::integer('elifba.rooms.rounds.min')
+            && $this->rounds <= Config::integer('elifba.rooms.rounds.max');
+    }
+
+    /**
+     * The same difficulty and rounds with another game — «Başqa oyun», or a
+     * game chosen on «Oyunlar» while the host's room is open; null when the
+     * game has no level at that difficulty.
+     */
+    public function withMechanic(RoomMechanic $mechanic): ?self
+    {
+        $other = new self($mechanic, $this->difficulty, $this->rounds);
+
+        return $other->isPlayable() ? $other : null;
+    }
+
+    /**
+     * The mechanics a room plays that have levels, in the order `options()`
+     * lists them: what «Oyunlar» offers and `OpenRoomData::rules()` accepts.
+     *
+     * @return list<RoomMechanic>
+     */
+    public static function mechanics(): array
+    {
+        $mechanics = [];
+
+        foreach (self::playableLevels() as $level) {
+            $mechanics[$level->mechanic->value] ??= $level->mechanic;
+        }
+
+        return array_values($mechanics);
+    }
+
+    /**
+     * The first of `mechanics()`: the game of a room that has no other to
+     * take (a room opened before G2 with none played).
+     */
+    public static function firstMechanic(): RoomMechanic
+    {
+        return self::mechanics()[0] ?? RoomPlayable::mechanics()[0];
+    }
+
+    /**
+     * The difficulties a mechanic has a playable level at, lowest first.
+     *
+     * @return list<int>
+     */
+    public static function difficultiesOf(RoomMechanic $mechanic): array
+    {
+        $difficulties = array_map(
+            static fn (RoomLevelData $level): int => $level->difficulty,
+            array_filter(self::playableLevels(), static fn (RoomLevelData $level): bool => $level->mechanic === $mechanic),
+        );
+        sort($difficulties);
+
+        return array_values(array_unique($difficulties));
     }
 
     /**
@@ -130,6 +196,14 @@ final readonly class RoomGameSetupData
             'letters' => $level->wordLength === null ? null : ['min' => $level->wordLength->min, 'max' => $level->wordLength->max],
             'swaps' => $level->swaps,
         ];
+    }
+
+    /**
+     * @return list<string> `mechanic.difficulty` of every playable level
+     */
+    private static function playablePairs(): array
+    {
+        return array_map(static fn (RoomLevelData $level): string => $level->mechanic->value.'.'.$level->difficulty, self::playableLevels());
     }
 
     /**

@@ -128,8 +128,8 @@ class AppServiceProvider extends ServiceProvider
         // Opening a room: 6 a minute.
         RateLimiter::for('rooms-open', static fn (Request $request): Limit => Limit::perMinute(6)->by($account($request)));
 
-        // A request that tries a room code — `GET /otaq?code=` and both
-        // `/otaq/{code}`: 10 a minute, so a code cannot be guessed by trying.
+        // A request that tries a room code — `GET /oyun?code=` and both
+        // `/oyun/{code}` (G2; `/otaq` only redirects): 10 a minute, so a code cannot be guessed by trying.
         // Over it the answer is a sentence on the code field: where the code
         // was typed, or at the entrance for a link or a QR.
         RateLimiter::for('room-join', static fn (Request $request): Limit => CodeEntrance::limit(
