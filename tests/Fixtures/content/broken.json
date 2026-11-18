@@ -1750,5 +1750,58 @@
         "file": "rooms/sounds.json",
         "write": { "assets/rooms/sounds/buzzer.mp3": "ID3" },
         "problem": "rooms/sounds.json: assets/rooms/sounds/buzzer.mp3 is no sound of the list"
+    },
+    "rooms rivalry: no file": {
+        "file": "rooms/rivalry.json",
+        "delete": ["rooms/rivalry.json"],
+        "problem": "rooms/rivalry.json: is missing"
+    },
+    "rooms rivalry: no version": {
+        "file": "rooms/rivalry.json",
+        "unset": ["version"],
+        "problem": "rooms/rivalry.json: the file needs `version`"
+    },
+    "rooms rivalry: a version below 1": {
+        "file": "rooms/rivalry.json",
+        "set": { "version": 0 },
+        "problem": "rooms/rivalry.json: version must be a whole number from 1"
+    },
+    "rooms rivalry: an icon without a file": {
+        "file": "rooms/rivalry.json",
+        "unset": ["icons.leader"],
+        "problem": "rooms/rivalry.json: icons needs `leader`"
+    },
+    "rooms rivalry: an icon of nothing on the strip": {
+        "file": "rooms/rivalry.json",
+        "set": { "icons.rocket": "fluent/1F525.svg" },
+        "problem": "rooms/rivalry.json: icons has an unknown key `rocket`"
+    },
+    "rooms rivalry: a picture that is no Fluent emoji": {
+        "file": "rooms/rivalry.json",
+        "set": { "icons.clash": "rooms/star.svg" },
+        "problem": "rooms/rivalry.json: icons.clash \"rooms/star.svg\" must be under content/assets/fluent/"
+    },
+    "rooms rivalry: a file that is not there": {
+        "file": "rooms/rivalry.json",
+        "set": { "icons.clash": "fluent/2694.svg" },
+        "problem": "rooms/rivalry.json: icons.clash: content/assets/fluent/2694.svg does not exist"
+    },
+    "rooms rivalry: a file that is no SVG": {
+        "file": "rooms/rivalry.json",
+        "set": { "icons.clash": "fluent/26A1.png" },
+        "write": { "assets/fluent/26A1.png": "PNG" },
+        "problem": "rooms/rivalry.json: icons.clash \"fluent/26A1.png\" must end in .svg"
+    },
+    "rooms rivalry: one file for two icons": {
+        "file": "rooms/rivalry.json",
+        "set": { "icons.overtake": "fluent/1F451.svg" },
+        "problem": "rooms/rivalry.json: icons.overtake \"fluent/1F451.svg\" is already the icon of icons.leader"
+    },
+    "rooms rivalry: an icon that runs a script": {
+        "file": "assets/fluent/26A1.svg",
+        "write": {
+            "assets/fluent/26A1.svg": "<svg width=\"32\" height=\"32\" viewBox=\"0 0 32 32\" xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script><circle cx=\"16\" cy=\"16\" r=\"12\"/></svg>\n"
+        },
+        "problem": "assets/fluent/26A1.svg: has a <script> element; asset SVGs must be plain drawings"
     }
 }

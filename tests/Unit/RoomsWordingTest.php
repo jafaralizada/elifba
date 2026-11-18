@@ -130,3 +130,17 @@ it('says «otaq» only where the thing itself is named', function (): void {
         ->and(Az::lower(roomSectionOf('README.az.md', 'Böyüklər üçün oyunlar')))->not->toContain('«otaq aç»')
         ->and($az)->not->toHaveKey('rooms.show.title');
 });
+
+it('words the rivalry strip in exactly the strings ADR 027 lists, in both languages', function (): void {
+    // ADR 027 decision 19: the strip's and the lanes' words, nothing more.
+    $keys = ['ahead', 'away', 'behind', 'label', 'leads', 'level', 'level_others', 'more', 'more_short', 'no_points', 'took_lead', 'took_lead_you', 'you'];
+
+    foreach (['az', 'en'] as $locale) {
+        /** @var array<string, string> $translations */
+        $translations = json_decode((string) file_get_contents(lang_path("{$locale}.json")), true);
+        $rivalry = array_filter($translations, static fn (string $key): bool => str_starts_with($key, 'rooms.rivalry.'), ARRAY_FILTER_USE_KEY);
+
+        expect(array_keys($rivalry))->toEqualCanonicalizing(array_map(static fn (string $key): string => "rooms.rivalry.{$key}", $keys), $locale)
+            ->and(array_filter(array_map(promisesInRoomText(...), $rivalry)))->toBe([], $locale);
+    }
+});

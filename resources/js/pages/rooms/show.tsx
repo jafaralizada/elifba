@@ -32,6 +32,7 @@ import { RoomActionBar } from '@/components/rooms/room-action-bar';
 import { CodeChip, CodeDialog, InviteCard } from '@/components/rooms/room-code';
 import type { JoinLink } from '@/components/rooms/room-code';
 import { RoomConfirm } from '@/components/rooms/room-confirm';
+import type { RivalryIcons } from '@/components/rooms/rivalry-strip';
 import { RoomTools } from '@/components/rooms/room-tools';
 import { SoundToggle } from '@/components/rooms/sound-toggle';
 import { Standing } from '@/components/rooms/standing';
@@ -88,6 +89,8 @@ type Props = {
     games: RoomResultGame[] | null;
     /** This phone's own quiet cues by name (ADR 025); null when it follows no open room. */
     sounds: RoomSoundUrls | null;
+    /** The rivalry strip's emoji (ADR 027); null when it follows no open room. */
+    rivalry: RivalryIcons | null;
     can: Can;
 };
 
@@ -100,7 +103,8 @@ type Props = {
  * read-only and the waiting line. While the state's `setup.played`, the
  * game just played: its final, then «Yenidən oyna» and the other games for
  * the host, «Aparıcı növbəti oyunu seçir.» for a player. During a game the
- * round, phase by phase. Once closed, its results.
+ * round, phase by phase, under the rivalry strip (ADR 027). Once closed,
+ * its results.
  *
  * The page follows the state with `useLiveRoom()`; it sends no client
  * event, and draws what the latest state says: it never derives a phase,
@@ -117,12 +121,17 @@ export default function RoomsShow({
     join,
     games,
     sounds,
+    rivalry,
     can,
 }: Props) {
     const { t } = useTranslation();
     const { state, clock, refresh } = useLiveRoom({ room, initial });
     const motion = useRoomMotion(state);
     const sound = useRoomSound({ speaker: 'phone', sounds, state, clock });
+    // A game opens at its top, where the rivalry strip stands (ADR 027).
+    useTopOnTurn(
+        state?.game?.phase === 'live' ? `live:${state.game.id}` : 'room',
+    );
 
     if (room.status === 'closed') {
         return (
@@ -171,6 +180,7 @@ export default function RoomsShow({
                         onGone={() => router.reload()}
                         motion={motion}
                         sound={sound}
+                        icons={rivalry}
                         aside={
                             <>
                                 {sounds !== null && (

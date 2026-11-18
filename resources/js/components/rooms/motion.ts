@@ -77,6 +77,17 @@ export function sawBegin(
 }
 
 /**
+ * Whether the rivalry strip moves (ADR 027 decisions 2 and 14): only in a
+ * reveal the page saw begin. During the countdown, the study and the
+ * question it stands still, whatever changed, since nothing on it may say
+ * anything about the open round; on a reveal the page opened on it is
+ * drawn complete and still.
+ */
+export function stripMoves(first: RoomMoment, current: RoomMoment): boolean {
+    return current.phase === 'reveal' && sawBegin(first, current, 'phase');
+}
+
+/**
  * How many rows each player moves, from the order of the previous reveal
  * the page showed to the order of this one: their index then minus their
  * index now (positive: up). Both orders are the server's; nothing is

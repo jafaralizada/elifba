@@ -224,7 +224,7 @@ The adults' area as the owner chose it on 2026-11-18 (ADR 026, architecture §12
 
 ### Rivals face to face (P2)
 
-How a live room game shows its players as rivals (ADR 027, architecture §12 "Rivals face to face (P2)", docs/frontend.md rule 15), designed in P1 on 2026-11-18 and built by P2. Until P2 lands none of the code names exists.
+How a live room game shows its players as rivals (ADR 027, architecture §12 "Rivals face to face (P2)", docs/frontend.md rule 15), designed in P1 on 2026-11-18 and built by P2 the same day.
 
 | Azərbaycanca     | English       | Code                                                            | Notes                                                                                                                                                        |
 | ---------------- | ------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -239,6 +239,7 @@ How a live room game shows its players as rivals (ADR 027, architecture §12 "Ri
 | yarış cərgələri  | race lanes    | `RaceLanes` (`components/rooms/race-lanes.tsx`)                 | The screen's reveal with three players or more: a row per ranking row with a bar of its points against the leader's. Not on the phone.                       |
 | tərəfin rəngi    | side colour   | sky (left), orange (right)                                      | A side's, never a person's; never right's emerald, wrong's red or the study's amber. «Siz» is always the left side on a phone.                               |
 | rəqabət ikonları | rivalry icons | `content/rooms/rivalry.json`, `RoomRivalryData`, prop `rivalry` | ⚡ `clash`, 👑 `leader`, 🔥 `overtake`: Fluent Emoji files in `content/assets/fluent/`; they show the state, never a person.                                 |
+| ekrana sığdırma  | screen fit    | `ScreenFit` (`components/rooms/screen-fit.tsx`)                 | The screen's round under the strip, drawn smaller by CSS `zoom` where it does not fit; never larger, never moved by a player (ADR 027 "As built").           |
 
 ## Project
 

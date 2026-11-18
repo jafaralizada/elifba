@@ -7,6 +7,7 @@ import {
     roomMoment,
     sawBegin,
     stagger,
+    stripMoves,
 } from './motion';
 
 /*
@@ -114,6 +115,28 @@ describe('sawBegin', () => {
         expect(
             sawBegin(roomMoment(state('lobby')), roomMoment(over), 'phase'),
         ).toBe(true);
+    });
+});
+
+describe('stripMoves', () => {
+    it('draws the strip still during a question and on a reveal the page opened on', () => {
+        const countdown = state('countdown');
+        const answer = state('answer');
+        const reveal = moved(answer, { phase: 'reveal' });
+        const opened = roomMoment(countdown);
+
+        // The countdown, the study and the question: still, whatever the page saw begin.
+        expect(stripMoves(opened, roomMoment(countdown))).toBe(false);
+        expect(stripMoves(opened, roomMoment(state('study')))).toBe(false);
+        expect(stripMoves(opened, roomMoment(answer))).toBe(false);
+        // A reveal the page saw begin: it moves, once.
+        expect(stripMoves(opened, roomMoment(reveal))).toBe(true);
+        expect(stripMoves(roomMoment(answer), roomMoment(reveal))).toBe(true);
+        // Opened, reloaded or joined on the reveal: complete and still.
+        expect(stripMoves(roomMoment(reveal), roomMoment(reveal))).toBe(false);
+        expect(
+            stripMoves(roomMoment(reveal), roomMoment(structuredClone(reveal))),
+        ).toBe(false);
     });
 });
 

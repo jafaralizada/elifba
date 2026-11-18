@@ -263,6 +263,9 @@
     --animate-room-lamp: room-lamp 260ms ease-out backwards;
     --animate-room-bump: room-bump 420ms cubic-bezier(0.2, 0.8, 0.2, 1)
         backwards;
+    --animate-room-shine: room-shine 850ms ease-out forwards;
+    --animate-room-drop: room-drop 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2)
+        backwards;
 
     @keyframes room-enter {
         0% {
@@ -378,4 +381,80 @@
             box-shadow: 0 0 0 1.25rem rgb(251 191 36 / 0);
         }
     }
+
+    /* An overtake's one light across the rivalry strip's bar (ADR 027). */
+    @keyframes room-shine {
+        0% {
+            background-position: -80% 0;
+            opacity: 1;
+        }
+        100% {
+            background-position: 180% 0;
+            opacity: 1;
+        }
+    }
+
+    /* The strip's sides taking their new places after an overtake (ADR 027). */
+    @keyframes room-drop {
+        0% {
+            transform: translateY(-40%);
+            opacity: 0;
+        }
+        100% {
+            transform: none;
+            opacity: 1;
+        }
+    }
+}
+
+/*
+ * Rivals face to face (docs/frontend.md rule 15 "Rivals face to face", ADR
+ * 027 decision 8): the rivalry strip's two sides, the left sky and the
+ * right orange in both themes — a fill, its highlight, the side's text and
+ * a tint. They mean a side, never a person, never right or wrong (the
+ * room's emerald and red) and never the study's amber lamp.
+ */
+:root {
+    --rival-left: var(--color-sky-600);
+    --rival-left-hi: var(--color-sky-400);
+    --rival-left-text: var(--color-sky-700);
+    --rival-left-tint: color-mix(
+        in oklab,
+        var(--color-sky-600) 10%,
+        transparent
+    );
+    --rival-right: var(--color-orange-600);
+    --rival-right-hi: var(--color-orange-400);
+    --rival-right-text: var(--color-orange-700);
+    --rival-right-tint: color-mix(
+        in oklab,
+        var(--color-orange-600) 10%,
+        transparent
+    );
+}
+
+.dark {
+    --rival-left-text: var(--color-sky-300);
+    --rival-left-tint: color-mix(
+        in oklab,
+        var(--color-sky-600) 16%,
+        transparent
+    );
+    --rival-right-text: var(--color-orange-300);
+    --rival-right-tint: color-mix(
+        in oklab,
+        var(--color-orange-600) 16%,
+        transparent
+    );
+}
+
+@theme inline {
+    --color-rival-left: var(--rival-left);
+    --color-rival-left-hi: var(--rival-left-hi);
+    --color-rival-left-text: var(--rival-left-text);
+    --color-rival-left-tint: var(--rival-left-tint);
+    --color-rival-right: var(--rival-right);
+    --color-rival-right-hi: var(--rival-right-hi);
+    --color-rival-right-text: var(--rival-right-text);
+    --color-rival-right-tint: var(--rival-right-tint);
 }

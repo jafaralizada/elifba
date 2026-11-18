@@ -25,8 +25,9 @@ use Inertia\Response;
  * place labels — and `join`, the addresses of the QR and the code field
  * (`RoomJoinLink`), built on the server; `catalog`, the games the room's
  * choice may be, as the host's phone gets it (`RoomGameSetupData::
- * options()`); and `sounds`, the URLs of the room's moments it plays as
- * the room's speaker (ADR 025 "Sound"), never a phone's own cues.
+ * options()`); `sounds`, the URLs of the room's moments it plays as the
+ * room's speaker (ADR 025 "Sound"), never a phone's own cues; and
+ * `rivalry`, the URLs of the rivalry strip's three emoji (ADR 027).
  *
  * Opening it writes nothing — not even a read (`RecordRoomRead`): the
  * screen is not the host's phone, and a round never waits for the host
@@ -49,6 +50,7 @@ final class RoomScreenController extends Controller
             'join' => RoomJoinLink::of($room),
             'catalog' => RoomGameSetupData::options(),
             'sounds' => $content->roomSounds()->urls(RoomSpeaker::Screen),
+            'rivalry' => $content->roomRivalry()->urls(),
         ]);
     }
 }

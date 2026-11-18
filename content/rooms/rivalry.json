@@ -1,0 +1,8 @@
+{
+    "version": 1,
+    "icons": {
+        "clash": "fluent/26A1.svg",
+        "leader": "fluent/1F451.svg",
+        "overtake": "fluent/1F525.svg"
+    }
+}

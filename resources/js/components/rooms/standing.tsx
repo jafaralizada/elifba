@@ -188,7 +188,7 @@ function Total({
 }
 
 /** A player's result of the round, as the server judged it: ✓ and the points, ✗, or — without an answer. */
-function RoundResult({
+export function RoundResult({
     result,
     big,
     delay,

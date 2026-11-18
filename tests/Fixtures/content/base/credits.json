@@ -54,6 +54,13 @@
             "license": "MIT"
         },
         {
+            "files": ["content/assets/fluent/*"],
+            "title": "Sample emoji",
+            "author": "Elifba",
+            "source": "https://github.com/nijataliyev7/elifba",
+            "license": "MIT"
+        },
+        {
             "files": ["content/assets/rooms/*"],
             "title": "Sample shapes",
             "author": "Elifba",

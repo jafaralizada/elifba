@@ -8,7 +8,7 @@ import {
     RotateCcw,
     Trophy,
 } from 'lucide-react';
-import { useState, useSyncExternalStore } from 'react';
+import { useCallback, useState, useSyncExternalStore } from 'react';
 import AppLogoIcon from '@/components/app-logo-icon';
 import InputError from '@/components/input-error';
 import { withGame } from '@/components/rooms/catalog';
@@ -24,7 +24,11 @@ import type { RoomChoice } from '@/components/rooms/game-settings';
 import { Countdown, Counted, RoundHead } from '@/components/rooms/live-round';
 import { MECHANIC_VIEWS } from '@/components/rooms/mechanics/views';
 import { REVEAL_MS } from '@/components/rooms/motion';
+import { RaceLanes } from '@/components/rooms/race-lanes';
+import { RivalryStrip, useRivalry } from '@/components/rooms/rivalry-strip';
+import type { RivalryIcons } from '@/components/rooms/rivalry-strip';
 import { RoomQr, spacedCode, typedAddress } from '@/components/rooms/room-code';
+import { ScreenFit } from '@/components/rooms/screen-fit';
 import type { JoinLink } from '@/components/rooms/room-code';
 import { SoundToggle } from '@/components/rooms/sound-toggle';
 import { Standing } from '@/components/rooms/standing';
@@ -63,6 +67,8 @@ type Props = {
     catalog: GameSetupOptions;
     /** The room's moments it plays as the room's speaker, by name (ADR 025). */
     sounds: RoomSoundUrls;
+    /** The rivalry strip's emoji (ADR 027). */
+    rivalry: RivalryIcons;
 };
 
 /**
@@ -74,7 +80,9 @@ type Props = {
  * the room's choice, «Dəyiş» and «Başla»; in a game what every player sees
  * of the round — the countdown, the material while it is studied, the
  * question with the count of answers — then the reveal with the ranking
- * and each player's result; after a game its final beside «Yenidən oyna»
+ * and each player's result, under the rivalry strip of the first two
+ * (ADR 027), the ranking as race lanes with three players or more; after
+ * a game its final beside «Yenidən oyna»
  * and the five other games. Before and after a game it sends the host's
  * own requests for the choice and the start (`useRoomChoice()`,
  * `useRoomStart()`), which the server lets through for the host; it holds
@@ -94,6 +102,7 @@ export default function RoomsScreen({
     join,
     catalog,
     sounds,
+    rivalry,
 }: Props) {
     const { t } = useTranslation();
     // A closed room has no screen: its results are on the room's page.
@@ -111,7 +120,13 @@ export default function RoomsScreen({
     const playing = game !== null && game.phase === 'live' && round !== null;
 
     return (
-        <div className="flex min-h-dvh flex-col bg-background text-foreground">
+        <div
+            className={cn(
+                'flex flex-col bg-background text-foreground',
+                // A round fills the screen exactly: its parts fit it (`ScreenFit`).
+                playing ? 'h-dvh' : 'min-h-dvh',
+            )}
+        >
             <Head title={t('rooms.screen.title')} />
 
             <header className="flex items-center gap-[1.5vw] border-b px-[3vw] py-[1.4vh]">
@@ -148,7 +163,7 @@ export default function RoomsScreen({
                     </p>
                 </main>
             ) : playing ? (
-                <main className="flex flex-1 flex-col px-[4vw] py-[3vh]">
+                <main className="flex min-h-0 flex-1 flex-col px-[4vw] py-[3vh]">
                     <ScreenRound
                         state={state}
                         game={game}
@@ -156,6 +171,7 @@ export default function RoomsScreen({
                         clock={clock}
                         placeLabels={placeLabels}
                         motion={motion}
+                        icons={rivalry}
                     />
                 </main>
             ) : (
@@ -548,9 +564,11 @@ function ScreenOver({
 
 /**
  * The current round as every player sees it, without anyone's own answer:
- * the seconds and the bar of the estimated server clock (for show only),
- * the material only while the state carries it and the clock is before the
- * question, the question with the count of answers, then the reveal.
+ * the rivalry strip of the first two (ADR 027), the seconds and the bar of
+ * the estimated server clock (for show only), the material only while the
+ * state carries it and the clock is before the question, the question with
+ * the count of answers, then the reveal — the solution beside the plain
+ * ranking with two players, beside the race lanes with three or more.
  */
 function ScreenRound({
     state,
@@ -559,6 +577,7 @@ function ScreenRound({
     clock,
     placeLabels,
     motion,
+    icons,
 }: {
     state: RoomState;
     game: RoomGame;
@@ -566,18 +585,63 @@ function ScreenRound({
     clock: ServerClock;
     placeLabels: string[];
     motion: RoomMotion;
+    icons: RivalryIcons;
 }) {
     const { t } = useTranslation();
     const now = useServerNow(clock, true);
     const view = MECHANIC_VIEWS[game.mechanic];
     const previous = usePreviousReveal(game, round, state.ranking);
+    const rivalry = useRivalry(state, game, round, null);
+    const race = rivalry.pair?.mode === 'race';
+    // A round's study and question share one size (`ScreenFit`): the question's
+    // grid takes the place the study's had.
+    const shared = round.phase === 'study' || round.phase === 'answer';
+    const [fitted, setFitted] = useState<{ round: number; zoom: number }>({
+        round: -1,
+        zoom: 1,
+    });
+    const cap = shared && fitted.round === round.index ? fitted.zoom : 1;
+    const index = round.index;
+    const remember = useCallback(
+        (zoom: number) =>
+            setFitted((last) =>
+                last.round === index && last.zoom <= zoom
+                    ? last
+                    : { round: index, zoom },
+            ),
+        [index],
+    );
+    const fit = shared ? remember : undefined;
+    const ranking = {
+        delay: REVEAL_MS.ranking,
+        motion: motion.phase ? { previous, delay: REVEAL_MS.ranking } : null,
+    };
 
     return (
         <section
             data-phase={round.phase}
             data-round={round.index}
-            className="flex flex-1 flex-col gap-[3vh]"
+            className={cn(
+                'flex min-h-0 flex-1 flex-col',
+                rivalry.pair === null ? 'gap-[3vh]' : 'gap-[2vh]',
+            )}
         >
+            {rivalry.pair !== null && (
+                <RivalryStrip
+                    key={`strip:${round.index}:${round.phase === 'reveal' ? 'reveal' : 'open'}`}
+                    pair={rivalry.pair}
+                    previous={rivalry.previous}
+                    overtake={rivalry.overtake}
+                    ranking={state.ranking}
+                    results={round.reveal?.results ?? null}
+                    players={state.players}
+                    placeLabels={placeLabels}
+                    icons={icons}
+                    moves={motion.strip}
+                    big
+                />
+            )}
+
             <RoundHead
                 game={game}
                 round={round}
@@ -589,43 +653,54 @@ function ScreenRound({
             <div
                 key={`${round.index}:${round.phase}`}
                 data-motion={motion.phase ? 'on' : undefined}
-                className="flex flex-1 flex-col"
+                className="flex min-h-0 flex-1 flex-col"
             >
                 {round.phase === 'countdown' && (
-                    <Countdown game={game} round={round} now={now} big />
+                    <ScreenFit className="flex-1">
+                        <Countdown game={game} round={round} now={now} big />
+                    </ScreenFit>
                 )}
 
                 {round.phase === 'study' && (
-                    <div className="flex flex-1 flex-col items-center justify-center gap-[4vh] pb-[8vh]">
-                        <p className="text-[4vh] font-semibold room-motion:animate-room-enter">
-                            {t(`rooms.mechanics.${game.mechanic}.study`)}
-                        </p>
-                        {round.study !== null && (
-                            <view.Study
-                                study={round.study}
-                                covered={
-                                    now === null || now >= round.answer_from_ms
-                                }
-                                big
-                            />
-                        )}
-                    </div>
+                    <ScreenFit className="flex-1" cap={cap} onFit={fit}>
+                        <div className="flex flex-1 flex-col items-center justify-center gap-[4vh] pb-[8vh]">
+                            <p className="text-[4vh] font-semibold room-motion:animate-room-enter">
+                                {t(`rooms.mechanics.${game.mechanic}.study`)}
+                            </p>
+                            {round.study !== null && (
+                                <view.Study
+                                    study={round.study}
+                                    covered={
+                                        now === null ||
+                                        now >= round.answer_from_ms
+                                    }
+                                    big
+                                />
+                            )}
+                        </div>
+                    </ScreenFit>
                 )}
 
                 {round.phase === 'answer' && round.ask !== null && (
-                    <div className="grid flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-[4vw]">
-                        <div className="flex flex-col items-center gap-[4vh]">
-                            <p className="text-center text-[4vh] font-semibold room-motion:animate-room-enter">
-                                {t(`rooms.mechanics.${game.mechanic}.ask`)}
-                            </p>
-                            <view.Ask
-                                ask={round.ask}
-                                picked={[]}
-                                disabled
-                                onPick={() => {}}
-                                big
-                            />
-                        </div>
+                    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-[4vw]">
+                        <ScreenFit
+                            className="h-full justify-center"
+                            cap={cap}
+                            onFit={fit}
+                        >
+                            <div className="flex flex-1 flex-col items-center justify-center gap-[4vh]">
+                                <p className="text-center text-[4vh] font-semibold room-motion:animate-room-enter">
+                                    {t(`rooms.mechanics.${game.mechanic}.ask`)}
+                                </p>
+                                <view.Ask
+                                    ask={round.ask}
+                                    picked={[]}
+                                    disabled
+                                    onPick={() => {}}
+                                    big
+                                />
+                            </div>
+                        </ScreenFit>
                         <AnsweredCount
                             count={round.answered_count}
                             total={round.present_count}
@@ -636,47 +711,65 @@ function ScreenRound({
                 {round.phase === 'reveal' &&
                     round.ask !== null &&
                     round.reveal !== null && (
-                        <div className="grid flex-1 grid-cols-[minmax(0,5fr)_minmax(0,6fr)] items-start gap-[4vw]">
+                        <div
+                            className={cn(
+                                'grid min-h-0 flex-1 gap-[4vw]',
+                                race
+                                    ? 'grid-cols-[minmax(0,32fr)_minmax(0,68fr)]'
+                                    : 'grid-cols-[minmax(0,5fr)_minmax(0,6fr)]',
+                            )}
+                        >
                             <div
-                                className="room-motion:animate-room-enter"
+                                className="flex min-h-0 flex-col room-motion:animate-room-enter"
                                 style={{
                                     animationDelay: `${REVEAL_MS.solution}ms`,
                                 }}
                             >
-                                <view.Solution
-                                    ask={round.ask}
-                                    solution={round.reveal.solution}
-                                    mine={null}
-                                    word={round.reveal.word}
-                                    big
-                                />
+                                <ScreenFit className="flex-1">
+                                    <view.Solution
+                                        ask={round.ask}
+                                        solution={round.reveal.solution}
+                                        mine={null}
+                                        word={round.reveal.word}
+                                        big
+                                    />
+                                </ScreenFit>
                             </div>
-                            <section
-                                className="flex min-w-0 flex-col gap-[1.6vh] room-motion:animate-room-enter"
+                            <div
+                                className="flex min-h-0 min-w-0 flex-col room-motion:animate-room-enter"
                                 style={{
-                                    animationDelay: `${REVEAL_MS.ranking}ms`,
+                                    animationDelay: `${ranking.delay}ms`,
                                 }}
                             >
-                                <h2 className="text-[2.8vh] font-semibold">
-                                    {t('rooms.game.ranking')}
-                                </h2>
-                                <Standing
-                                    ranking={state.ranking}
-                                    players={state.players}
-                                    me={null}
-                                    placeLabels={placeLabels}
-                                    results={round.reveal.results}
-                                    motion={
-                                        motion.phase
-                                            ? {
-                                                  previous,
-                                                  delay: REVEAL_MS.ranking,
-                                              }
-                                            : null
-                                    }
-                                    big
-                                />
-                            </section>
+                                <ScreenFit className="flex-1">
+                                    {race ? (
+                                        <RaceLanes
+                                            ranking={state.ranking}
+                                            players={state.players}
+                                            placeLabels={placeLabels}
+                                            results={round.reveal.results}
+                                            pair={rivalry.pair}
+                                            icons={icons}
+                                            motion={ranking.motion}
+                                        />
+                                    ) : (
+                                        <section className="flex min-w-0 flex-col gap-[1.6vh]">
+                                            <h2 className="text-[2.8vh] font-semibold">
+                                                {t('rooms.game.ranking')}
+                                            </h2>
+                                            <Standing
+                                                ranking={state.ranking}
+                                                players={state.players}
+                                                me={null}
+                                                placeLabels={placeLabels}
+                                                results={round.reveal.results}
+                                                motion={ranking.motion}
+                                                big
+                                            />
+                                        </section>
+                                    )}
+                                </ScreenFit>
+                            </div>
                         </div>
                     )}
             </div>

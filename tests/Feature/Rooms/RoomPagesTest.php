@@ -446,6 +446,30 @@ it('sends the screen the room\'s sounds and a phone only its own, and a closed r
     $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('sounds', null));
 });
 
+it('sends the rivalry icons to the room page of an open room and to the screen, and none to a closed room', function (): void {
+    $room = Rooms::open($this->resad);
+    Rooms::join($room, $this->aygun);
+    $version = (new ContentRepository(base_path('content')))->roomRivalry()->version;
+    $icons = [
+        'clash' => asset('content/fluent/26A1.svg').'?v='.$version,
+        'leader' => asset('content/fluent/1F451.svg').'?v='.$version,
+        'overtake' => asset('content/fluent/1F525.svg').'?v='.$version,
+    ];
+
+    // The screen, and every phone that follows the open room: the same three Fluent files.
+    expect(pagesProps($this->actingAs($this->resad)->get(route('rooms.screen', $room)))['rivalry'])->toBe($icons);
+
+    foreach ([$this->resad, $this->aygun] as $account) {
+        expect(pagesProps($this->actingAs($account)->get(route('rooms.show', $room)))['rivalry'])->toBe($icons);
+    }
+
+    // A player who left follows nothing, and a closed room has no strip.
+    $this->actingAs($this->aygun)->post(route('rooms.leave', $room))->assertRedirect();
+    $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('rivalry', null));
+    $this->actingAs($this->resad)->post(route('rooms.close', $room))->assertRedirect();
+    $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('rivalry', null));
+});
+
 it('names the family of each game the setup offers and what each level holds', function (): void {
     $room = Rooms::open($this->resad);
     Rooms::join($room, $this->aygun);

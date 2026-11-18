@@ -64,7 +64,8 @@ use Inertia\Response;
  * ranking (`RoomResults`), named from the state's players. Whoever follows
  * an open room's state also gets `sounds`, the URLs of a phone's own quiet
  * cues (ADR 025 "Sound": its taps, its answer sent and its verdict; never
- * the room's moments, which are the screen's). No other account's id or
+ * the room's moments, which are the screen's) and `rivalry`, the URLs of
+ * the rivalry strip's three emoji (ADR 027). No other account's id or
  * address reaches a room page — the shared `auth.user` is the viewer's own
  * — and no name goes into a URL or a flash.
  */
@@ -118,6 +119,7 @@ final class RoomController extends Controller
             'join' => $open && $watches ? RoomJoinLink::of($room) : null,
             'games' => $open ? null : RoomResults::games($room, RoomClock::nowMs()),
             'sounds' => $open && $watches ? $content->roomSounds()->urls(RoomSpeaker::Phone) : null,
+            'rivalry' => $open && $watches ? $content->roomRivalry()->urls() : null,
             'can' => [
                 'host' => $gate->allows('host', $room),
                 'leave' => $gate->allows('play', $room),

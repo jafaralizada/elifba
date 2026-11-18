@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { reducedMotion } from '@/components/rooms/motion-dom';
-import { countUpValue, roomMoment, sawBegin } from '@/components/rooms/motion';
+import {
+    countUpValue,
+    roomMoment,
+    sawBegin,
+    stripMoves,
+} from '@/components/rooms/motion';
 import type {
     RoomGame,
     RoomRankedPlayer,
@@ -11,11 +16,12 @@ import type {
 /**
  * Whether the page animates what `state` shows (docs/frontend.md rule 15
  * "Motion", ADR 025): `phase` for the moment (a round's phase, a game's
- * end), `round` for the round itself. Both are false on the moment the
- * page first drew — opened, reloaded or joined late — and true for every
+ * end), `round` for the round itself, `strip` for the rivalry strip (a
+ * reveal, ADR 027). All are false on the moment the page first drew —
+ * opened, reloaded or joined late — and `phase` and `round` true for every
  * later one; a state fetched again is the same moment.
  */
-export type RoomMotion = { phase: boolean; round: boolean };
+export type RoomMotion = { phase: boolean; round: boolean; strip: boolean };
 
 export function useRoomMotion(state: RoomState | null): RoomMotion {
     const [first] = useState(() => roomMoment(state));
@@ -24,6 +30,7 @@ export function useRoomMotion(state: RoomState | null): RoomMotion {
     return {
         phase: sawBegin(first, now, 'phase'),
         round: sawBegin(first, now, 'round'),
+        strip: stripMoves(first, now),
     };
 }
 

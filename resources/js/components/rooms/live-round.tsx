@@ -11,6 +11,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { MECHANIC_VIEWS } from '@/components/rooms/mechanics/views';
 import { REVEAL_MS } from '@/components/rooms/motion';
+import { RivalryStrip, useRivalry } from '@/components/rooms/rivalry-strip';
+import type { RivalryIcons } from '@/components/rooms/rivalry-strip';
 import { seconds } from '@/components/rooms/seconds';
 import { Standing } from '@/components/rooms/standing';
 import { tap, untap } from '@/components/rooms/taps';
@@ -74,6 +76,11 @@ type Sent = {
  * A tap sounds the same for every item, and a tap taken back («Geri», a
  * cell tapped again) has its own sound (`sound`, the page's: rule 15
  * "Sound"); the answer sent and the verdict sound from the state.
+ *
+ * Above the round's head stands the rivalry strip (rule 15 "Rivals face
+ * to face", ADR 027): the viewer against the nearest rival, or the
+ * screen's pair for a host who does not play. It moves only in a reveal
+ * the page saw begin.
  */
 export function LiveRound({
     roomId,
@@ -87,6 +94,7 @@ export function LiveRound({
     aside = null,
     motion,
     sound = null,
+    icons = null,
 }: {
     roomId: string;
     state: RoomState;
@@ -102,11 +110,14 @@ export function LiveRound({
     motion: RoomMotion;
     /** The page's sound, for the viewer's own taps. */
     sound?: RoomSound | null;
+    /** The rivalry strip's emoji (the prop `rivalry`). */
+    icons?: RivalryIcons | null;
 }) {
     const { t } = useTranslation();
     const now = useServerNow(clock, true);
     const view = MECHANIC_VIEWS[game.mechanic];
     const previous = usePreviousReveal(game, round, state.ranking);
+    const rivalry = useRivalry(state, game, round, state.me.player_id);
     const [draft, setDraft] = useState<{ round: string; ids: string[] }>({
         round: '',
         ids: [],
@@ -206,6 +217,21 @@ export function LiveRound({
             data-round={round.index}
             className="flex flex-col gap-4"
         >
+            {rivalry.pair !== null && (
+                <RivalryStrip
+                    key={`strip:${round.index}:${round.phase === 'reveal' ? 'reveal' : 'open'}`}
+                    pair={rivalry.pair}
+                    previous={rivalry.previous}
+                    overtake={rivalry.overtake}
+                    ranking={state.ranking}
+                    results={round.reveal?.results ?? null}
+                    players={state.players}
+                    placeLabels={placeLabels}
+                    icons={icons}
+                    moves={motion.strip}
+                />
+            )}
+
             <RoundHead
                 game={game}
                 round={round}

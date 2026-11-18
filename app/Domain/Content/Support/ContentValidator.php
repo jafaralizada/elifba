@@ -7,6 +7,7 @@ use App\Domain\Content\Data\LevelData;
 use App\Domain\Content\Data\PackData;
 use App\Domain\Content\Data\PromptTemplateData;
 use App\Domain\Content\Data\RangeData;
+use App\Domain\Content\Data\RoomRivalryData;
 use App\Domain\Content\Data\SoundChoiceData;
 use App\Domain\Content\Data\VoiceData;
 use App\Domain\Content\Enums\Effect;
@@ -37,7 +38,8 @@ use SplFileInfo;
  * `avatars.json`, `sounds.json`, `levels.json`, `prompts.json`, `names.json`,
  * `voice.json` with `voice-clips.json`, `credits.json`, `packs/*.json`,
  * `rooms/levels.json`, `rooms/shapes.json`, `rooms/categories.json`,
- * `rooms/words.json` and `rooms/sounds.json` (§12 "Room content"),
+ * `rooms/words.json`, `rooms/sounds.json` and `rooms/rivalry.json` (§12
+ * "Room content"),
  * `tests/syllables.json` and every file under `assets/`, `voice-names/`
  * and `resources/fonts/` (credits; SVG files are also checked for anything
  * that could run or load). `validate()` lists every problem, one line each;
@@ -197,6 +199,12 @@ final class ContentValidator
     public const int MAX_ROOM_SOUND_BYTES = 48 * 1024;
 
     /**
+     * Where the rivalry strip's emoji are, under `assets/`: Fluent Emoji
+     * (Color) files of the app's own set (§12 "Room content", ADR 027).
+     */
+    public const string ROOM_RIVALRY_FOLDER = 'fluent/';
+
+    /**
      * A `next_in_sequence` row shows at most seven terms, and every number
      * of a round is 1–999 — three digits, short enough for seven terms and
      * the «?» to fit one row of a 375px phone (§12 "Room games", B5).
@@ -323,6 +331,7 @@ final class ContentValidator
         $this->roomCategories();
         $this->roomLevels($this->roomShapes(), $this->roomWords());
         $this->roomSounds();
+        $this->roomRivalry();
         $this->voice();
         $credits = $this->credits();
 
@@ -1453,6 +1462,63 @@ final class ContentValidator
             if (! isset($used[$path])) {
                 $this->problem($file, "assets/{$path} is no sound of the list");
             }
+        }
+    }
+
+    // ── rooms/rivalry.json ──────────────────────────────────────────────
+
+    /**
+     * The rivalry strip's emoji (§12 "Room content", ADR 027 decision 10):
+     * `version` and `icons`, an object with exactly `clash`, `leader` and
+     * `overtake`. Each is an SVG under `assets/fluent/` — a Fluent Emoji
+     * file of the app's own set — that exists and no other icon uses. Like
+     * every SVG under `assets/` it must be a plain drawing (`svgs()`), and
+     * like every asset it needs a credits entry.
+     */
+    private function roomRivalry(): void
+    {
+        $file = ContentRepository::ROOM_RIVALRY;
+        $data = $this->object($this->read($file), $file, '', ['version', 'icons']);
+
+        if ($data === null) {
+            return;
+        }
+
+        if (! is_int($data['version']) || $data['version'] < 1) {
+            $this->problem($file, 'version must be a whole number from 1');
+        }
+
+        $icons = $this->object($data['icons'], $file, 'icons', RoomRivalryData::ICONS);
+
+        if ($icons === null) {
+            return;
+        }
+
+        /** @var array<string, string> $used icon path → the entry that has it */
+        $used = [];
+
+        foreach ($icons as $name => $path) {
+            $where = "icons.{$name}";
+
+            if (is_string($path) && ! str_starts_with($path, self::ROOM_RIVALRY_FOLDER)) {
+                $this->problem($file, "{$where} \"{$path}\" must be under {$this->contentFolder()}/assets/".self::ROOM_RIVALRY_FOLDER);
+
+                continue;
+            }
+
+            $path = $this->asset($path, ['svg'], $file, $where);
+
+            if ($path === null || pathinfo($path, PATHINFO_EXTENSION) !== 'svg' || ! self::exists("{$this->root}/assets/{$path}")) {
+                continue;
+            }
+
+            if (isset($used[$path])) {
+                $this->problem($file, "{$where} \"{$path}\" is already the icon of {$used[$path]}");
+
+                continue;
+            }
+
+            $used[$path] = $where;
         }
     }
 
