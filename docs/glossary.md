@@ -200,6 +200,25 @@ Adults' games (architecture §12, ADRs 019–024): an area of its own, switched 
 | böyük ekran                             | screen                 | page `rooms/screen`, `GET /rooms/{room}/screen`                                       | Optional, the host's own session, read-only. Not a board and not a guest board.                                             |
 | böyüklər üçün söz siyahısı              | room word list         | `content/rooms/words.json`                                                            | Our own, MIT; not the theme packs' words and not a teacher's.                                                               |
 
+### Games first (G2, G3)
+
+The adults' area as the owner chose it on 2026-11-18 (ADR 026, architecture §12 "Games first"). The rows above stay true of the code; where one names an interface word, this table says what the interface says from G3.
+
+| Azərbaycanca                  | English                 | Code                                                                                     | Notes                                                                                                                              |
+| ----------------------------- | ----------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| oyunlar (bölmə)               | games, the player area  | the same route group and `routes/rooms.php`; `nav.rooms`                                 | G3: what «otaqlar (bölmə)» is called. Code names stay `Rooms`, `rooms.*`.                                                          |
+| otaq (arxa planda)            | room, in the background | `Rooms\Models\Room`                                                                      | G3: written only where the thing itself is named: «Otağın idarəsi», «Otağı bağla», «Otağın sıralaması», a closed room, `/privacy`. |
+| aparıcı                       | host                    | `rooms.user_id`, `RoomPolicy::host`                                                      | G3: the interface's word for «otaq sahibi» / «otağı açan». Not a role.                                                             |
+| oyun kodu                     | game code               | `Rooms\Support\RoomCode`, `/oyun`, `/oyun/{code}`                                        | G2, G3: what «otaq kodu» is called; the same code and code space. `/otaq` redirects.                                               |
+| oyun seçmək                   | choose a game           | `POST /rooms` `{mechanic}`, `OpenRoom`                                                   | G2: opens the room behind the choice, or gives the choice to the host's open room.                                                 |
+| seçim (oyun, çətinlik, raund) | the choice, setup       | `rooms.setup_*`, `Room::setup()`, `ChooseRoomGame`, `RoomSetupData`, the state's `setup` | G2: the host's not-yet-started choice; every device reads it from the state. `played`: it is the game just played.                 |
+| başlanğıc ekranı              | start screen            | page `rooms/show` and `rooms/screen` while no game is live and `setup.played` is false   | G3: what «gözləmə otağı» becomes: the QR, the code, the choice, who has joined, «Başla».                                           |
+| oyun ayarları                 | game settings           | `GameSettings`, `PUT /rooms/{room}/setup`                                                | G3: the game, the difficulty and the rounds, changed by the host from the phone or the screen.                                     |
+| yenidən oyna (otaqda)         | play again (in a room)  | `POST /rooms/{room}/games`, no body                                                      | G2: starts the room's choice again. Not the board's «Yenidən oyna» (`/games/{game}/replay`).                                       |
+| mən də oynayıram              | I play too              | `SetHostPlays`, `PUT /rooms/{room}/plays`                                                | G2: the host steps out of playing and back in; a tool of the start screen, no longer asked at opening.                             |
+| keçmiş oyunlar                | past games              | page `rooms/past`, `GET /rooms/past`                                                     | G2, G3: what «keçmiş otaqlar» is called, on a page of its own. One row per room.                                                   |
+| QR oxutmaq                    | scan                    | `RoomScanner`, `resources/js/rooms/scan.ts` (`scannedCode()`)                            | G3: the camera reads only this app's `/oyun/{code}`; the picture never leaves the device.                                          |
+
 ## Project
 
 | Azərbaycanca        | English               | Code                                             | Notes                                                                                                  |
