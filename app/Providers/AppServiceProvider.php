@@ -140,7 +140,9 @@ class AppServiceProvider extends ServiceProvider
             static fn (Request $request): ?string => $request->route('code') === null ? null : route('rooms.entrance'),
         ));
 
-        // A room page's state, asked at each moment of the timetable and every 3 s without a socket.
+        // A room page's state, asked at each moment of the timetable, every 1.5 s
+        // (3 s with a socket) in the lobby and while it waits for the others, and
+        // when the page is shown again (ADR 021 decision 9).
         RateLimiter::for('room-state', static fn (Request $request): Limit => Limit::perMinute(120)->by($account($request)));
 
         // A player's answers (B3).

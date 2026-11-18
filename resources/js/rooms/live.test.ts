@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vite-plus/test';
-import type { RoomChannel, SocketState, Timers } from './live';
-import { oneAtATime, POLL_MS, SOCKET_TIMEOUTS, watchRoom } from './live';
+import type { RoomChannel, ShownPage, SocketState, Timers } from './live';
+import {
+    oneAtATime,
+    onShown,
+    POLL_MS,
+    SOCKET_TIMEOUTS,
+    watchRoom,
+} from './live';
 
 /*
  * A room page's live link (docs/architecture.md §12 "The race"): it fetches
@@ -240,5 +246,46 @@ describe('the socket', () => {
         expect(SOCKET_TIMEOUTS.activityTimeout).toBeLessThan(30_000);
         // Closed, the page polls until it is subscribed again — within the 3 s countdown.
         expect(POLL_MS).toBeLessThan(3000);
+    });
+});
+
+describe('onShown', () => {
+    /** A page that is hidden and shown as the test says. */
+    function fakePage() {
+        const listeners = new Set<() => void>();
+        const page: ShownPage & { visibilityState: DocumentVisibilityState } = {
+            visibilityState: 'visible',
+            addEventListener: (_type, listener) => listeners.add(listener),
+            removeEventListener: (_type, listener) =>
+                listeners.delete(listener),
+        };
+        const turn = (next: DocumentVisibilityState) => {
+            page.visibilityState = next;
+            listeners.forEach((listener) => listener());
+        };
+
+        return { page, listeners, turn };
+    }
+
+    it('asks at once when the page is shown again, never when it is hidden', () => {
+        // A phone woken from its lock: its timers may have slept through a moment
+        // and its socket died unnoticed (ADR 021 decision 9).
+        const { page, listeners, turn } = fakePage();
+        const refresh = vi.fn();
+        const stop = onShown(page, refresh);
+
+        turn('hidden');
+        expect(refresh).not.toHaveBeenCalled();
+        turn('visible');
+        expect(refresh).toHaveBeenCalledTimes(1);
+        turn('hidden');
+        turn('visible');
+        expect(refresh).toHaveBeenCalledTimes(2);
+
+        stop();
+        expect(listeners.size).toBe(0);
+        turn('hidden');
+        turn('visible');
+        expect(refresh).toHaveBeenCalledTimes(2);
     });
 });

@@ -6,7 +6,7 @@ import type { RoomFollow, ServerClock } from '@/rooms/clock';
 import type { RoomState } from '@/rooms/contract';
 import { fetchState } from '@/rooms/http';
 import type { RoomWatch } from '@/rooms/live';
-import { oneAtATime, watchRoom } from '@/rooms/live';
+import { oneAtATime, onShown, watchRoom } from '@/rooms/live';
 import { connectRoomEcho, roomChannel } from '@/rooms/socket';
 
 /** Whether `next` may replace `shown`: a fetch that was overtaken never covers a newer state. */
@@ -23,8 +23,9 @@ function newer(next: RoomState, shown: RoomState | null): boolean {
  * big screen"): the room page and the screen start from the state of their
  * props and read it again when `room.changed` brings a higher revision, at
  * each moment of the timetable (`followRoom()`: the server's clock is
- * estimated from the states fetched), and by polling where there is no
- * socket. A page sends no client event, and a fetched state older than the
+ * estimated from the states fetched), by polling where only a signal would
+ * tell it of a change, and whenever it is shown again (`onShown()`). A
+ * page sends no client event, and a fetched state older than the
  * one shown is dropped. A room that refused the viewer reloads the page,
  * which says why; one that closed calls `onClosed` (by default the same
  * reload: the room page becomes its results).
@@ -143,6 +144,9 @@ export function useLiveRoom({
             onListening: follow.listening,
         });
 
+        // A phone woken from its lock, a tab brought back: read the room at once.
+        const unshown = onShown(document, refresh);
+
         watchRef.current = watch;
         followRef.current = follow;
         refreshRef.current = refresh;
@@ -159,6 +163,7 @@ export function useLiveRoom({
             watchRef.current = null;
             followRef.current = null;
             refreshRef.current = () => {};
+            unshown();
             follow.stop();
             watch.stop();
         };

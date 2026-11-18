@@ -11,11 +11,11 @@
  * phase with the server's own `server_ms`, which says how much of it was
  * left, and asks again once that has passed; told it again, it waits a
  * little longer each time, so a clock that is off never makes a hot loop
- * (`room-state` allows 120 requests a minute). A page that does not hear
- * the channel also asks every 1.5 s in the lobby and while it waits for
- * the others in an open round, where only a signal would tell it of a
- * change; one that hears it still asks every 3 s while it waits for the
- * others, since a socket can be open and deaf.
+ * (`room-state` allows 120 requests a minute). In the lobby and while it
+ * waits for the others in an open round, where only a signal would tell
+ * it of a change, a page also asks every 1.5 s while it does not hear the
+ * channel and every 3 s while it does, since a socket can be open and
+ * deaf.
  *
  * The local clock and the timers come from outside, so Vitest fakes them;
  * nothing here judges, scores or derives a phase.
@@ -116,17 +116,18 @@ export function phaseEnds(state: RoomState): number | null {
 }
 
 /**
- * Whether a page that does not hear the channel asks every `POLL_MS`: in
- * the lobby and after a game, where only a state tells it that a game
- * began, and in a round's question once it has answered — or when it
- * answers nothing: a host who does not play, and the big screen
- * (`answers` false), whose viewer answers on a phone, so its own
- * `answered` stays false while the room answers — where it waits for the
- * others: an early close is told only by a signal or a state. The
+ * Whether only a signal or a state tells the page of its next change: in
+ * the lobby and after a game, where nothing comes but a start, and in a
+ * round's question once it has answered — or when it answers nothing: a
+ * host who does not play, and the big screen (`answers` false), whose
+ * viewer answers on a phone, so its own `answered` stays false while the
+ * room answers — where it waits for the others' answers or the early
+ * close (`waitsForOthers()`). There the page asks every `POLL_MS` while it
+ * does not hear the channel, and every `WAIT_POLL_MS` while it does. The
  * countdown, the study and the reveal end at their moments, which the
  * page asks about anyway.
  */
-export function pollsWithoutChannel(state: RoomState, answers = true): boolean {
+export function waitsForSignal(state: RoomState, answers = true): boolean {
     return state.round === null || waitsForOthers(state, answers);
 }
 
@@ -148,14 +149,15 @@ export function waitsForOthers(state: RoomState, answers = true): boolean {
 }
 
 /**
- * How often a page that hears the channel still asks while it waits for
- * the others in a question. A socket can stay open and hear nothing — a
- * phone that changed networks — until its ping times out: the
- * rooms-flow check (2026-11-18) saw such a phone left on the question it
- * had answered while the room closed it and played two more rounds
- * without it, since a round waits only for the phones that read the
- * state. Asked within the 3 s reveal, the page reads in time to be waited
- * for in the next round.
+ * How often a page that hears the channel still asks where only a signal
+ * tells it of a change (`waitsForSignal()`). A socket can stay open and
+ * hear nothing — a phone that changed networks — until its ping times
+ * out: the rooms-flow check (2026-11-18) saw such a phone left on the
+ * question it had answered while the room closed it and played two more
+ * rounds without it, since a round waits only for the phones that read
+ * the state, and one in the lobby miss a game's first three rounds. Asked
+ * within the 3 s reveal, the page reads in time to be waited for in the
+ * next round; in the lobby it learns of a start within the 3 s countdown.
  */
 export const WAIT_POLL_MS = 3000;
 
@@ -199,16 +201,15 @@ export type RoomFollow = {
  * Plans one request at a time from the state the page shows: at the end
  * of its phase, sent half a round trip ahead (`ServerClock.trip()`, at
  * most `LEAD_MAX_MS`) so that it reaches the server `LATE_MS` after the
- * moment; sooner every `POLL_MS` where `pollsWithoutChannel()` says so and
- * the channel is not heard, and every `WAIT_POLL_MS` where
- * `waitsForOthers()` says so and it is. Told the same phase after its end, the page
- * asks again once the time the server said was left (the phase's end
- * minus the state's `server_ms`) has passed, then a little later each
- * time. A request that failed — one this plan made, or one a signal, a
- * subscription or an answer started — is made again shortly, a little
- * later each time, until a state is shown: a page in the lobby that hears
- * the channel would otherwise wait for the next signal, and miss the start
- * of a game.
+ * moment; sooner where `waitsForSignal()` says so: every `POLL_MS` while
+ * the channel is not heard, every `WAIT_POLL_MS` while it is. Told the
+ * same phase after its end, the page asks again once the time the server
+ * said was left (the phase's end minus the state's `server_ms`) has
+ * passed, then a little later each time. A request that failed — one this
+ * plan made, or one a signal, a subscription or an answer started — is
+ * made again shortly, a little later each time, until a state is shown: a
+ * page in the lobby that hears the channel would otherwise wait for the
+ * next signal or its next poll, and miss the start of a game.
  */
 export function followRoom(options: {
     clock: ServerClock;
@@ -266,10 +267,9 @@ export function followRoom(options: {
             }
         }
 
-        if (!heard && pollsWithoutChannel(shown, answers)) {
-            wait = Math.min(wait ?? POLL_MS, POLL_MS);
-        } else if (heard && waitsForOthers(shown, answers)) {
-            wait = Math.min(wait ?? WAIT_POLL_MS, WAIT_POLL_MS);
+        if (waitsForSignal(shown, answers)) {
+            const every = heard ? WAIT_POLL_MS : POLL_MS;
+            wait = Math.min(wait ?? every, every);
         }
 
         if (misses > 0) {

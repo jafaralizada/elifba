@@ -160,6 +160,35 @@ export function watchRoom(options: {
     };
 }
 
+/** The page as `onShown()` sees it: `document` in the browser, a fake in tests. */
+export type ShownPage = {
+    readonly visibilityState: DocumentVisibilityState;
+    addEventListener: (type: 'visibilitychange', listener: () => void) => void;
+    removeEventListener: (
+        type: 'visibilitychange',
+        listener: () => void,
+    ) => void;
+};
+
+/**
+ * Calls `refresh` whenever the page is shown again — a phone woken from
+ * its lock, a tab brought back (ADR 021 decision 9). Its timers may have
+ * slept through a moment, and its socket may have died with nothing yet
+ * the wiser; one read says where the room is. Never while it is hidden.
+ * Returns the function that stops listening.
+ */
+export function onShown(page: ShownPage, refresh: () => void): () => void {
+    const listener = () => {
+        if (page.visibilityState === 'visible') {
+            refresh();
+        }
+    };
+
+    page.addEventListener('visibilitychange', listener);
+
+    return () => page.removeEventListener('visibilitychange', listener);
+}
+
 /**
  * Runs `request` one at a time: a call made while one is in flight is
  * not sent at once but folded, with any others, into one more request

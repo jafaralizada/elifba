@@ -8,10 +8,10 @@ import {
     barStretch,
     followRoom,
     phaseEnds,
-    pollsWithoutChannel,
     serverClock,
     timeLeft,
     waitsForOthers,
+    waitsForSignal,
 } from './clock';
 import { RoomState } from './contract';
 import { POLL_MS } from './live';
@@ -22,8 +22,8 @@ import { POLL_MS } from './live';
  * `server_ms` against the request's send and receive times; the page asks
  * again when the shown phase ends, sent half a round trip ahead, again
  * once the server's own word says the phase is over when it was early,
- * and every 1.5 s without a channel only in the lobby and while it waits
- * for the others.
+ * and only in the lobby and while it waits for the others every 1.5 s
+ * without a channel, every 3 s with one.
  */
 const fixtures = import.meta.glob<unknown>(
     '../../../tests/Fixtures/rooms/state.*.json',
@@ -216,9 +216,10 @@ describe('followRoom', () => {
         time.advance(time.nextIn());
         expect(refresh).toHaveBeenCalledTimes(4);
 
-        // Over: nothing waits for a moment while the channel is heard.
+        // Over: no moment to wait for, only the lobby's poll for the next start.
         room.show(state('over'));
-        expect(time.pending.size).toBe(0);
+        expect(phaseEnds(state('over'))).toBeNull();
+        expect(time.nextIn()).toBe(WAIT_POLL_MS);
     });
 
     it('asks again when the server says how much of the phase was left, then a little later each time', () => {
@@ -310,7 +311,7 @@ describe('followRoom', () => {
         const time = fakeTime();
         const { follow: room, refresh } = follow(time);
 
-        // The lobby: every 1.5 s while the channel is not heard, never while it is.
+        // The lobby: every 1.5 s while the channel is not heard, every 3 s while it is.
         room.show(state('lobby'));
         expect(time.nextIn()).toBe(POLL_MS);
         time.advance(POLL_MS);
@@ -319,13 +320,13 @@ describe('followRoom', () => {
         expect(refresh).toHaveBeenCalledTimes(2);
 
         room.listening(true);
-        expect(time.pending.size).toBe(0);
+        expect(time.nextIn()).toBe(WAIT_POLL_MS);
         room.listening(false);
         expect(time.nextIn()).toBe(POLL_MS);
 
         // A question not yet answered: only at the bell.
         const unanswered = at('answer', { answered: false, answered_count: 0 });
-        expect(pollsWithoutChannel(unanswered)).toBe(false);
+        expect(waitsForSignal(unanswered)).toBe(false);
         room.show(unanswered);
         expect(time.nextIn()).toBe(T.bell - (OFFSET + 2 * POLL_MS) + LATE_MS);
 
@@ -336,27 +337,23 @@ describe('followRoom', () => {
 
         // The countdown, the study and the reveal: only at their moments,
         // whoever answered — the reveal ends when its `next_ms` comes.
-        expect(pollsWithoutChannel(at('countdown'))).toBe(false);
-        expect(pollsWithoutChannel(at('study'))).toBe(false);
-        expect(pollsWithoutChannel(at('reveal', { answered: false }))).toBe(
-            false,
-        );
-        expect(pollsWithoutChannel(at('reveal', { answered: true }))).toBe(
-            false,
-        );
+        expect(waitsForSignal(at('countdown'))).toBe(false);
+        expect(waitsForSignal(at('study'))).toBe(false);
+        expect(waitsForSignal(at('reveal', { answered: false }))).toBe(false);
+        expect(waitsForSignal(at('reveal', { answered: true }))).toBe(false);
         room.show(at('reveal', { answered: true }));
         expect(time.nextIn()).toBe(T.next - (OFFSET + 2 * POLL_MS) + LATE_MS);
 
         // A host who does not play waits as one who answered; after a game, as in the lobby.
         expect(
-            pollsWithoutChannel(
+            waitsForSignal(
                 RoomState.parse({
                     ...unanswered,
                     me: { player_id: null, host: true },
                 }),
             ),
         ).toBe(true);
-        expect(pollsWithoutChannel(state('over'))).toBe(true);
+        expect(waitsForSignal(state('over'))).toBe(true);
     });
 
     it('polls through every question on the screen, whose viewer answers on a phone', () => {
@@ -373,20 +370,20 @@ describe('followRoom', () => {
         });
         const unanswered = at('answer', { answered: false, answered_count: 0 });
 
-        expect(pollsWithoutChannel(unanswered, false)).toBe(true);
+        expect(waitsForSignal(unanswered, false)).toBe(true);
         screen.show(unanswered);
         expect(time.nextIn()).toBe(POLL_MS);
 
         // The study and the reveal end at their moments, on the screen too.
-        expect(pollsWithoutChannel(at('study'), false)).toBe(false);
-        expect(pollsWithoutChannel(at('reveal'), false)).toBe(false);
+        expect(waitsForSignal(at('study'), false)).toBe(false);
+        expect(waitsForSignal(at('reveal'), false)).toBe(false);
 
         // Hearing the channel, it still asks every 3 s: a socket can be open and deaf.
         screen.listening(true);
         expect(time.nextIn()).toBe(WAIT_POLL_MS);
     });
 
-    it('asks every 3 s while it waits for the others, even while it hears the channel', () => {
+    it('asks every 3 s in the lobby and while it waits for the others, even while it hears the channel', () => {
         // A socket open and deaf for 20 s left a phone on the question it had answered
         // while the room closed it and played rounds 3 and 4 without it (rooms-flow
         // check, 2026-11-18): only a state tells such a page of the early close.
@@ -403,25 +400,43 @@ describe('followRoom', () => {
         // Within the 3 s reveal: the page reads in time to be waited for in the next round.
         expect(WAIT_POLL_MS).toBeLessThanOrEqual(3000);
 
-        // Not yet answered, it asks at the bell; the lobby and the reveal wait for a signal or a moment.
+        // Not yet answered, it asks at the bell; the reveal waits for its moment.
         const unanswered = at('answer', { answered: false, answered_count: 0 });
         expect(waitsForOthers(unanswered)).toBe(false);
+        expect(waitsForSignal(unanswered)).toBe(false);
         room.show(unanswered);
         expect(time.nextIn()).toBe(T.bell - (OFFSET + WAIT_POLL_MS) + LATE_MS);
-        expect(waitsForOthers(at('reveal'))).toBe(false);
+        expect(waitsForSignal(at('reveal'))).toBe(false);
+
+        // The lobby and a game that is over: a socket deaf in the lobby left a
+        // phone there while a fast game played its first three rounds (rooms-flow
+        // check, 2026-11-18). Asked every 3 s, it learns of a start within the
+        // 3 s countdown.
         expect(waitsForOthers(state('lobby'))).toBe(false);
+        expect(waitsForSignal(state('lobby'))).toBe(true);
+        expect(waitsForSignal(state('over'))).toBe(true);
+        const before = refresh.mock.calls.length;
         room.show(state('lobby'));
-        expect(time.pending.size).toBe(0);
+
+        for (let i = 0; i < 4; i++) {
+            expect(time.nextIn()).toBe(WAIT_POLL_MS);
+            time.advance(WAIT_POLL_MS);
+            room.show(state('lobby'));
+        }
+
+        expect(refresh).toHaveBeenCalledTimes(before + 4);
+        room.show(state('over'));
+        expect(time.nextIn()).toBe(WAIT_POLL_MS);
     });
 
     it('asks again when a request fails, whoever made it, a little later each time', () => {
         const time = fakeTime();
         const { follow: room, refresh } = follow(time);
 
-        // The lobby with the channel heard: nothing is planned until a signal.
+        // The lobby with the channel heard: a signal, or a poll every 3 s.
         room.listening(true);
         room.show(state('lobby'));
-        expect(time.pending.size).toBe(0);
+        expect(time.nextIn()).toBe(WAIT_POLL_MS);
 
         // The fetch a signal started fails (the server, the limiter, the network):
         // the page asks again rather than wait for another signal.
@@ -442,10 +457,9 @@ describe('followRoom', () => {
         room.failed();
         expect(time.nextIn()).toBe(AGAIN_MS[0]);
 
-        // A request that only took long is not asked again.
+        // A state shown in the lobby ends it too: back to the lobby's 3 s poll.
         room.show(state('lobby'));
-        time.advance(60_000);
-        expect(refresh).toHaveBeenCalledTimes(6);
+        expect(time.nextIn()).toBe(WAIT_POLL_MS);
     });
 
     it('stops', () => {
