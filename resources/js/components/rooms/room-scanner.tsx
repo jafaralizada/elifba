@@ -31,27 +31,29 @@ function detectorClass(): DetectorClass | undefined {
 
 /**
  * Whether this browser can scan a code here (ADR 026 decision 15): a
- * camera it may open (`getUserMedia` in a secure context) and a decoder on
- * the device — the browser's own `BarcodeDetector`. Without one the camera
- * button is not shown and the code is typed.
+ * camera it may open — `getUserMedia` in a secure context. The decoder is
+ * always on the device: the browser's own `BarcodeDetector`, else the
+ * bundled one (`loadDecoder()`). Without a camera the button is not shown
+ * and the code is typed.
  */
 export function canScan(): boolean {
     return (
         window.isSecureContext &&
-        typeof navigator.mediaDevices?.getUserMedia === 'function' &&
-        detectorClass() !== undefined
+        typeof navigator.mediaDevices?.getUserMedia === 'function'
     );
 }
 
-/** The device's own decoder, or null when it reads no QR code. */
-async function loadDecoder(): Promise<Decode | null> {
+/** The browser's own decoder when it reads QR codes (Chrome, Edge, Android). */
+async function nativeDecoder(): Promise<Decode | null> {
     const Detector = detectorClass();
 
     if (Detector === undefined) {
         return null;
     }
 
-    const formats = await Detector.getSupportedFormats();
+    const formats = await Detector.getSupportedFormats().catch(
+        (): string[] => [],
+    );
 
     if (!formats.includes('qr_code')) {
         return null;
@@ -61,6 +63,56 @@ async function loadDecoder(): Promise<Decode | null> {
 
     return async (video) =>
         (await detector.detect(video)).map((code) => code.rawValue);
+}
+
+/** The longest side a frame is read at by the bundled decoder: enough for a QR in the frame, light on a phone. */
+const FRAME_PX = 640;
+
+/**
+ * The bundled decoder (`jsqr`, Apache-2.0) for a browser without one of
+ * its own (Safari): loaded as its own chunk from the app's host when the
+ * scanner first needs it. Each frame is drawn on a canvas that never
+ * leaves the page and read there.
+ */
+async function bundledDecoder(): Promise<Decode> {
+    const { default: jsQR } = await import('jsqr');
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+
+    return async (video) => {
+        if (context === null || video.videoWidth === 0) {
+            return [];
+        }
+
+        const scale = Math.min(
+            1,
+            FRAME_PX / Math.max(video.videoWidth, video.videoHeight),
+        );
+        const width = Math.round(video.videoWidth * scale);
+        const height = Math.round(video.videoHeight * scale);
+
+        if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+        }
+
+        context.drawImage(video, 0, 0, width, height);
+        const found = jsQR(
+            context.getImageData(0, 0, width, height).data,
+            width,
+            height,
+            { inversionAttempts: 'dontInvert' },
+        );
+
+        return found === null ? [] : [found.data];
+    };
+}
+
+/** The device's own decoder, else the bundled one; null when neither could be had. */
+async function loadDecoder(): Promise<Decode | null> {
+    return (
+        (await nativeDecoder()) ?? (await bundledDecoder().catch(() => null))
+    );
 }
 
 /** How often a frame is looked at, in ms. */

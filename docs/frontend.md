@@ -219,4 +219,4 @@ The player area (B2–B7, architecture §12, ADRs 019–025) is the same `AppLay
         - The tools button stands in the header of the start screen and of the final, never in a round. The host's own «Oyundan çıx» is not offered: «Mən də oynayıram» steps the host out. A player's header has no «Kilidli».
         - When the page turns between the final and the start screen it scrolls to the top (`useTopOnTurn()`), never on its first draw.
         - Rule 11's banner still shows on `rooms/index` alone, floating above its code field's bar rather than over it (`bannerAboveBar()` in `lib/install-banner.ts`).
-        - The camera button shows only where `BarcodeDetector` reads QR codes (Chrome, Edge, Android); the bundled decoder for the rest awaits the owner's OK for its dependency (architecture §12 "As built (G3)").
+        - The camera button shows wherever the browser can open a camera in a secure context; the frames are read by the browser's `BarcodeDetector`, else by the bundled `jsqr`, loaded as its own chunk when the scanner opens (architecture §12 "As built (G3)").
