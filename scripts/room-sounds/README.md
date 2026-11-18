@@ -23,6 +23,8 @@
 
 The screen's set holds 225.9 KB (at most 320 KB), a phone's 22.0 KB (at most 64 KB); no file above 64 KB (`ContentValidator`). No voice, no speech, no music bed and no loop: each file is one event, played once for its moment; the clock is the same for everyone, and `sent` says nothing of right or wrong.
 
+The fanfare's length is `FANFARE_MS` in `resources/js/components/rooms/sound-cues.ts`: the screen's cheer — the winner's first name, then «Əla oynadın!» — starts there, after the fanfare (ADR 030). A new fanfare of another length changes that number in the same change. The cheer is not a room sound: the name list's clip (`content/voice-names/`) and the board's phrase (`content/assets/voice/`), ADR 016, never made here.
+
 ## Regenerate
 
 You need Python 3 (standard library only), ffmpeg with `libmp3lame` (`brew install ffmpeg`) and, the first time, the network.
