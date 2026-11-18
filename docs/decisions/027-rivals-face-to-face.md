@@ -1,0 +1,123 @@
+# 027 — Rivals face to face: a PK strip at the top of a room game
+
+- **Status:** Accepted, 2026-11-18 (roadmap step P1: the owner's choice among three clickable prototypes — variant A, «Zolaq», in blue and orange — and the finished look the owner asked for the same day, with three Fluent emoji). To be built by P2.
+- **Sections:** architecture.md §12 "Rivals face to face (P2)"; docs/frontend.md rule 15 "Rivals face to face"; glossary.md "Rivals face to face (P2)"
+- **Amends:**
+    - [025](025-room-motion-sound-and-final.md) decision 5 ("Nothing ranks, adds up or judges on the device"): a page may take rows of the state's ranking in the server's order and show the difference of two of the server's totals, and their ratio as a bar; it still never orders, sums or judges (decision 3 below). Decision 6: under `prefers-reduced-motion` an overtake's words stand still where the page drew the pair before the reveal (decision 16). Decision 10 ("Only there"): the screen's reveal with three players or more draws the race lanes instead of the plain `Standing` (decision 13); the phone's reveal, the lobby and a closed room keep it.
+    - docs/frontend.md rule 15: "A round" (the grid's height), "The ranking" and "The screen" (the strip and the lanes), "Nothing more" (three emoji, of the state and never of a person).
+    - [021](021-room-race-protocol.md), [022](022-room-scoring-and-history.md) and [024](024-adults-privacy-in-rooms.md) are unchanged: the state and its version, the channel, the points, the ranking and what is kept are as they were.
+- **Why it is hard to reverse:** players learn to read a race from one place at a glance — which colour is theirs, where the lead is shown, what the crown means. Moving it teaches it again; and a strip that told anything before the reveal would break the race's fairness for every game played with it.
+
+## Context
+
+The owner asked on 2026-11-18 that the players of a room game be shown as rivals, like the "PK" of a TikTok live battle: the players stand face to face at the top, and who leads and by how many points is obvious at a glance. Until then a room showed its ranking only in a round's reveal, as the plain list `Standing`, and after a game as `FinalStanding` (ADR 025 decision 10, rule 15 "The ranking").
+
+The owner answered before any drawing: with exactly two players, a full PK bar; with three or more (a room holds up to `elifba.rooms.max_players`, 20), the phone shows the viewer against the nearest rival — the leader when the viewer is behind, the runner-up when the viewer leads — with the gap in points, and the big screen shows the first two face to face with the rest as a race; variants first, then the build.
+
+P1 drew three clickable prototypes (one HTML file each, not in the repository; the phone at 375 × 667 with the shell and the screen in `vh`, on one state; two and eight players; question → reveal with an overtake → next question; a 4 × 4 grid and an 8-letter anagram; light, dark and reduced motion; a rival who left and a host who does not play). They differed in substance:
+
+- **A, «Zolaq»:** a slim strip above the round's head all game long; the reveal slides it and keeps «Sıralama» as it is; the screen has a full-width strip and, in a reveal, race lanes beside the solution.
+- **B, «Üz-üzə»:** a one-line score under the head during a round; the reveal opens with a large face-off card right after the verdict, the solution after it and the list behind «Hamısı»; the screen's reveal becomes a stage, the rest as cards of a ladder.
+- **C, «Arena»:** the round's head becomes an arena — the two corners, and the clock as a ring between them in place of the time bar; the reveal replaces the list with race lanes; the screen keeps a race column beside the question all game long.
+
+The owner chose **A**, in **blue and orange**. Seeing it, the owner said it looked unprofessional and that emoji could be added; a second drawing — the strip in a card, a glossy bar, ⚡ where the sides meet, 👑 by the first place, a 🔥 ribbon and a shine on an overtake — was accepted as it stands.
+
+Two things constrain the design. The state's ranking counts only closed rounds (`RoomRanking::ofGame`), so anything drawn from it is the order before the open round and can change only when a round closes; and nothing may tell right from wrong before the reveal (ADR 025 decisions 3 and 14). And a round must still fit a 375 × 667 phone with its shell and 44px controls.
+
+## Decision
+
+### Where and when
+
+1. **One strip, all game long.** `RivalryStrip` stands above the round's head on the phone (`LiveRound`, `rooms/show`) and under the screen's top bar, above the round's line, on the screen (`rooms/screen`), in every phase of a live game: the countdown, the study, the question and the reveal. It is not drawn in the start screen, the final or a closed room. It reads the state's `ranking`, `players` and `me.player_id`, and in a reveal `round.reveal.results`, and nothing else.
+2. **It moves only in a reveal.** During the countdown, the study and the question it shows the order of the rounds already closed and stands still — no idle movement, the ⚡ does not pulse — so nothing on it can say anything about the open round. It moves once, at the ranking's moment of a reveal the page saw begin (decision 14).
+
+### Who stands face to face
+
+3. **The device picks, from the server's order; the state does not change.** `rivalPair(state, viewer)` (`components/rooms/rivalry.ts`, pure, Vitest) takes rows of `ranking` in the order the server gave them and never sorts, sums or judges:
+    - **Contenders** are the ranking's rows whose player holds a place or is present (`players[].present`): a player who left keeps the points and stays while they hold a place; a player who left without points, and a host who does not play (whose row is a left one), are not contenders.
+    - **Fewer than two contenders:** no strip.
+    - **Exactly two — a duel:** on a player's phone the viewer on the left and the other on the right; on the screen and the phone of a host who does not play, the two in the order of `players` (the order they joined), so the sides stay put and the meeting point moves both ways.
+    - **Three or more — a race:** on a player's phone the viewer on the left and, on the right, the first contender if it is not the viewer, else the second (the leader when the viewer is behind, the runner-up when the viewer leads); on the screen and the phone of a host who does not play, the first contender on the left and the second on the right. A side on the right — on the screen either side — is shown only while its row holds a place.
+    - **The gap** is `left.points − right.points`: its sign says who leads, its size is the number shown. **The split** is `left ÷ (left + right)`, held between 12 % and 88 % so neither side vanishes, and 50 % at 0 : 0. Both are for show.
+    - The mode follows the contenders: a third player joining during a game turns a duel into a race, and one leaving without points turns it back.
+
+    The state stays `v: 2`: `RoomStateData`, `resources/js/rooms/contract.ts` and `tests/Fixtures/rooms/state.*.json` do not change. Two rows of an order the server gave and the difference of two of its totals are what ADR 025 decision 5 already lets the count-up compute (`points − result.points`); decision 5 is amended to say so.
+
+4. **Shared places and ties.** A side shows the row the order gave; when other contenders share that row's place, the side says so — «+:count nəfər» on the phone, «və daha :count nəfər» on the screen — so nobody who shares a place is shown behind. Two sides in one place have a gap of 0: «Bərabərsiniz» on a player's phone, «Bərabər» elsewhere. 👑 stands by every side whose row holds place 1, both when they share it.
+5. **Before anybody scores.** A duel shows its two names at 0 : 0, the bar split in the middle in its colours, «Bərabərsiniz» / «Bərabər». A race before any row holds a place shows a grey bar without a split, no ⚡ and «Hələ xal yoxdur»: the phone «Siz 0» against an empty side, the screen an empty side on each end. No crown.
+6. **A rival who left** stays on the strip while they hold a place, marked «çıxıb», with «—» for a round they did not answer.
+7. **A host who does not play and the screen.** With no `me.player_id` the room page draws the screen's pair, at the phone's size, over the round and «Siz bu oyunda oynamırsınız» as before. The screen has no viewer: it never says «Siz», and its ribbon names whoever took the lead.
+
+### The look (the owner's second drawing)
+
+8. **Two sides, two colours that mean a side.** The left side is sky — fill `sky-600` with a `sky-400` highlight, text `sky-700` (`sky-300` dark), tint `sky-600` at 10 % (16 % dark) — and the right side orange — `orange-600` with `orange-400`, text `orange-700` (`orange-300` dark), the same tints — in both themes. Never emerald or red, which are right and wrong, and never the study's amber lamp. A colour belongs to a side, not to a person: on a phone «Siz» is always the left, blue side; on the screen the duel's sides follow the order the players joined and the race's left is the first place.
+9. **The strip.** A card (14px radius, `border`, the two tints fading in from its ends over `card`), 87px tall on the phone with its padding:
+    - **Names row** (13.5px; on the screen 3.3vh): on each end the side's place as a filled label in the side's colour with white text — the server's `place_labels`, not shown in a duel — then the name as the state gives it (`Oyunçu` for none; «Siz» for the viewer), truncated, semibold in the side's text colour, 👑 by a side holding place 1, «çıxıb», «+:count nəfər». The right end is mirrored.
+    - **The bar** (24px; 6.4vh): fully rounded, each side a top-to-bottom gradient from its highlight to its fill with a soft gloss over both, the points inside each end in white, bold, tabular figures. ⚡ sits on the meeting point — a 22px emoji (6vh) on a soft white glow — and moves with it.
+    - **The gap**, centred under the bar: a pill on `muted` with a small disc in the leading side's colour holding an arrow (on a player's phone ▲ when the viewer leads, ▼ when behind; elsewhere ▲) and the words; «=» on a grey disc when level; the words alone with no pair yet.
+10. **Three emoji, of the state and never of a person.** Fluent Emoji (Color) at the commit the app already uses (`1ffb34c`), unmodified: `26A1.svg` ⚡ (the meeting point), `1F451.svg` 👑 (the first place) and `1F525.svg` 🔥 (the overtake). They enter `content/assets/fluent/`, which `content/credits.json`'s Fluent entry (MIT, `LICENSE.txt`) already covers, and a room content file names them: `content/rooms/rivalry.json` (`version`, `icons`: `clash`, `leader`, `overtake`), checked by `ContentValidator`, read by `ContentRepository::roomRivalry()` into `Content\Data\RoomRivalryData`, whose `urls()` give `ContentAssets::url()` addresses. `rooms/show` gets them as the prop `rivalry` while it follows an open room, and `rooms/screen` always; null otherwise. No room file imports the children's catalog, and no page asks a third party for a picture (rule 9). They are drawn `alt=""` and `aria-hidden`: the place label, the gap and the ribbon say in words what they show. No avatar, photo, initial, nickname or colour of a person enters the strip.
+11. **The round still fits.** The 87px strip and its gap come out of the round: the question's grid gets about 4.5rem less (its limit from `100svh − 22rem` to about `100svh − 26.5rem`), and at 375 × 667 with the shell the 4 × 4 grid's cells stay at least 44px (56px in the prototype) and the 8-letter anagram, its places and its two rows of tiles fit with the row under them, without scrolling. A reveal may scroll, as it does today.
+
+### The reveal
+
+12. **The phone's reveal keeps its order:** the strip, the round's head, the verdict, the solution, then «Sıralama» — the plain `Standing` with each player's result — as rule 15 has it.
+13. **The screen's reveal.** With two players, the solution beside the plain `Standing`, as today. With three or more, the solution beside the **race lanes** (`RaceLanes`): one row per row of the ranking, in the server's order — the place as a filled label once per place (the strip's two sides in their colours, the others muted), the name with 👑 at place 1 and «çıxıb», a bar of the row's points against the first row's, the round's result (`Check` +points, `X` +0, «—»), the total. The strip's two rows are tinted in their side's colour. One column up to ten rows, two from eleven. Rows move from the order of the previous reveal the page showed (`rankShift()`), each bar grows and each total counts up from `points − result.points` — ADR 025's rules, unchanged.
+14. **Motion.** In a reveal the page saw begin, at the ranking's moment (ADR 025, `REVEAL_MS.ranking`, and 250 ms on, as the rows), the split slides to its new place in 700 ms while both totals count up from `points − result.points` to the server's; the gap's words change when it stops; an overtake adds one shine across the bar and the ribbon. When the pair's members or sides changed — the screen's first and second swapped, the phone's rival is another — the strip first moves with the sides it showed and their new totals, then the sides take their new places with a short drop. A page opened on a reveal draws it complete and still.
+15. **An overtake** is a change of the pair's leader — the side with more points — between the pair the page last drew (in the round's question, or in the reveal before) and the reveal's: `overtakeOf(previous, current)`, pure, Vitest. Becoming level is not one; leading from level is. The ribbon shows 🔥 and «Önə keçdiniz!» on the phone of the viewer who took the lead, else «:name önə keçdi!» — on the phone of the one overtaken, of anyone further down whose leader changed, on the screen — filled in the leading side's colour with white text and a white ring. On the phone it is a row of its own inside the card, under the gap; on the screen it stands over the middle of the bar. It stays until the next round opens.
+16. **The still form.** Under `prefers-reduced-motion` nothing moves: the split, the totals, the gap and the sides are drawn at their new values and there is no shine; the ribbon, which is words, stands still where the page drew the pair before the reveal. A page opened on the reveal shows no ribbon, with or without motion.
+17. **No new sound.** The screen's `ranking` cue already sounds at that moment; no `RoomSound` case, file or credit is added, and a phone plays nothing for an overtake beyond its own verdict.
+18. **The final is unchanged.** The strip stands through the last reveal and gives way to `FinalStanding` (ADR 025 decisions 8 and 9), which keeps its `Trophy`, `Medal` and confetti; no crown there.
+
+### Words
+
+19. Every string is in `lang/az.json` and `lang/en.json` under `rooms.rivalry.*`; names come from the state and are never cased on the device; no text promises a benefit, and `RoomsWordingTest` reads them:
+
+    | Key                           | az                                                             | en                                                                    |
+    | ----------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------- |
+    | `rooms.rivalry.label`         | Rəqabət                                                        | Head to head                                                          |
+    | `rooms.rivalry.you`           | Siz                                                            | You                                                                   |
+    | `rooms.rivalry.ahead`         | {one}:count xal öndəsiniz\|{other}:count xal öndəsiniz         | {one}You lead by :count point\|{other}You lead by :count points       |
+    | `rooms.rivalry.behind`        | {one}:count xal geridəsiniz\|{other}:count xal geridəsiniz     | {one}You trail by :count point\|{other}You trail by :count points     |
+    | `rooms.rivalry.level`         | Bərabərsiniz                                                   | You are level                                                         |
+    | `rooms.rivalry.leads`         | {one}:name :count xal öndədir\|{other}:name :count xal öndədir | {one}:name leads by :count point\|{other}:name leads by :count points |
+    | `rooms.rivalry.level_others`  | Bərabər                                                        | Level                                                                 |
+    | `rooms.rivalry.no_points`     | Hələ xal yoxdur                                                | No points yet                                                         |
+    | `rooms.rivalry.took_lead_you` | Önə keçdiniz!                                                  | You took the lead!                                                    |
+    | `rooms.rivalry.took_lead`     | :name önə keçdi!                                               | :name took the lead!                                                  |
+    | `rooms.rivalry.more_short`    | +:count nəfər                                                  | +:count more                                                          |
+    | `rooms.rivalry.more`          | və daha :count nəfər                                           | and :count more                                                       |
+    | `rooms.rivalry.away`          | çıxıb                                                          | left                                                                  |
+
+    `label` is the strip's `aria-label` (`role="group"`); the race lanes have no heading of their own.
+
+### What does not change
+
+20. Everything else of ADRs 019–026, and in particular: the state, its version and what it withholds by phase; the server alone judging, scoring and keeping the clock; points, dense places with no tie-breaker and what is kept; no total, rating, level or profile across rooms — the strip and the lanes draw one game's ranking in its room, as the list did (ADR 024 "Nothing computed"); no avatar, nickname or chosen colour; no team mode and no new game; a game's sounds and final; nothing of rooms on the children's side.
+
+## Consequences
+
+- Every moment of a game shows who leads and by how much, on every device, from the same rows; a player's own colour is the same on every round.
+- A round's question gets 87px less on a phone: the 4 × 4 grid's cells go from about 73px to about 56px. It still fits, and the anagram is untouched.
+- Nothing changes on the wire. P2 is the pages, the words, one content file with three Fluent files, and one prop; a page loaded before the deploy keeps working without the strip.
+- Two devices that saw the same reveal begin show the same movement; a page that joined in the middle shows the strip still, as ADR 025 has it for everything else.
+- A mid-table player in a big room sees the distance to the leader rather than to the player just above; the reveal's «Sıralama» still shows the neighbours.
+- The screen's reveal changes look for three players or more; the phone's does not.
+
+## Alternatives rejected
+
+- **Variant B** (a score line, then a face-off card at the reveal; a stage and a ladder on the screen): the lead is hidden while a round is played — exactly when players glance at it — and the list goes behind a tap.
+- **Variant C** (an arena head, the clock as a ring, a race column always on the screen): the most height taken from the round, rule 15's time bar replaced, and a ranking always beside the question on the screen.
+- **A field of its own in the state** (`rivals` with the pair and the gap, `v: 3`): a protocol change and a reload of every open page for what is two rows of an order the state already carries; the screen and every phone would need different fields, and the rule would live in PHP and be drawn in TypeScript all the same.
+- **The player just above the viewer as the rival:** the owner's answer was the leader, or the runner-up for a leader; the neighbours are in the reveal's list.
+- **The leader always on the left of a phone:** the viewer would change sides on an overtake and lose their colour.
+- **Blue and fuchsia** (the second pair the prototypes offered, closer to TikTok): blue and violet run together for many colour-blind eyes. **Emerald and red**: right and wrong. **A colour per player**: a person's colour is what ADR 024 leaves out.
+- **The first drawing without emoji:** the owner found it unprofessional. **Unicode emoji from the device's own font:** each phone draws them differently; the Fluent files are the app's own set, the same everywhere. **More emoji** (a rocket for a quick answer, …): a mark of an answer's speed or rightness belongs to the reveal's result, not to the strip.
+- **A pulsing ⚡ or any idle movement:** motion that no moment of the state started (ADR 025 decision 1), and a strip that moves during a question invites reading it.
+- **An overtake decided from `points − result.points` alone:** a page would celebrate a change it never showed; the ribbon needs the pair the page drew.
+- **A sound for an overtake:** one more cue for a moment the screen's `ranking` cue already marks; twenty phones would sound it at once.
+- **The strip in the final:** `FinalStanding` is the end of a game; two names face to face would contradict its places.
+- **An initial or an avatar on each side:** an initial made on the device loses «İ» and «ı», and an avatar is what ADR 024 leaves out.
+
+## What would make us revisit
+
+Rooms of ten and more where players ask for their neighbour rather than the leader; a phone too short for the round under the strip; a wish for an overtake's sound; a request to show a game's own winner after several games (ADR 025's open point, unchanged).

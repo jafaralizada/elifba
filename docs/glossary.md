@@ -222,6 +222,24 @@ The adults' area as the owner chose it on 2026-11-18 (ADR 026, architecture §12
 | oyunu bitir · otağı bağla     | end the game · close the room | `DELETE /rooms/{room}/game` · `POST /rooms/{room}/close`                                 | ADR 026 decision 2: the first ends the game that runs and the players stay; the second ends everything and kills the code. Never on one screen.         |
 | qoşuldunuz                    | you are in                    | `rooms.start.joined`                                                                     | A player's start screen: the choice read-only, «Dostunu çağır» and the waiting line.                                                                    |
 
+### Rivals face to face (P2)
+
+How a live room game shows its players as rivals (ADR 027, architecture §12 "Rivals face to face (P2)", docs/frontend.md rule 15), designed in P1 on 2026-11-18 and built by P2. Until P2 lands none of the code names exists.
+
+| Azərbaycanca     | English       | Code                                                            | Notes                                                                                                                                                        |
+| ---------------- | ------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| rəqabət zolağı   | rivalry strip | `RivalryStrip` (`components/rooms/rivalry-strip.tsx`)           | The PK strip above the round on the phone and under the screen's top bar, all game long; moves only in a reveal the page saw begin. `aria-label` «Rəqabət».  |
+| üz-üzə (cüt)     | pair          | `rivalPair()` (`components/rooms/rivalry.ts`)                   | The two sides a device shows, taken from the state's ranking in the server's order; the state has no field of its own for it.                                |
+| yarışan          | contender     | `rivalPair()`                                                   | A ranking row whose player holds a place or is present. A player who left without points and a host who does not play are not.                               |
+| ikilik · yarış   | duel · race   | `rivalPair()`                                                   | Two contenders: the full PK, sides fixed on the screen. Three or more: the viewer against the nearest rival on a phone, the first two on the screen.         |
+| rəqib            | rival         | `rivalPair()`                                                   | On a player's phone: the leader when the viewer is behind, the runner-up when the viewer leads. Not the player just above.                                   |
+| lider            | leader        | place 1 of the ranking; 👑 (`icons.leader`)                     | The server's first place; a shared first place has as many leaders. Not a title kept anywhere.                                                               |
+| fərq             | gap           | `left.points − right.points`                                    | Shown in words («11 xal öndəsiniz», «Kamran Əliyev 11 xal öndədir», «Bərabər»); never stored.                                                                |
+| önə keçmək       | overtake      | `overtakeOf()`                                                  | The pair's leader changed between the pair a page last drew and the reveal's; drawing level is not one. Its ribbon: 🔥 «Önə keçdiniz!» / «:name önə keçdi!». |
+| yarış cərgələri  | race lanes    | `RaceLanes` (`components/rooms/race-lanes.tsx`)                 | The screen's reveal with three players or more: a row per ranking row with a bar of its points against the leader's. Not on the phone.                       |
+| tərəfin rəngi    | side colour   | sky (left), orange (right)                                      | A side's, never a person's; never right's emerald, wrong's red or the study's amber. «Siz» is always the left side on a phone.                               |
+| rəqabət ikonları | rivalry icons | `content/rooms/rivalry.json`, `RoomRivalryData`, prop `rivalry` | ⚡ `clash`, 👑 `leader`, 🔥 `overtake`: Fluent Emoji files in `content/assets/fluent/`; they show the state, never a person.                                 |
+
 ## Project
 
 | Azərbaycanca        | English               | Code                                             | Notes                                                                                                  |
