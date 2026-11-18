@@ -41,6 +41,7 @@
         "jsqr": "1.4.0",
         "laravel-echo": "^2.6.3",
         "laravel-vite-plugin": "^3.0.0",
+        "livekit-client": "2.24.1",
         "lucide-react": "^0.475.0",
         "modern-screenshot": "4.7.0",
         "phaser": "4.2.1",

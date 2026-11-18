@@ -1,0 +1,611 @@
+/**
+ * The live voice's connection (docs/architecture.md §12 "Live voice", "The
+ * page (C4)"; ADR 031 decisions 1, 2, 5, 10, 11, 26 and 31) — the one file
+ * that imports `livekit-client`, and only when a player taps «Səsə qoşul»
+ * (`loadVoiceLibrary()`), so the library is a chunk of its own from the
+ * app's host and no other page loads it.
+ *
+ * A join asks the app for a ticket (`POST /rooms/{room}/voice/tickets`)
+ * and connects to the instance's own voice server with an empty list of
+ * ICE servers, always: neither a public STUN server nor the voice server's
+ * own list is ever used. The microphone is off at every join and is opened
+ * and closed only by its owner's tap (`setMic()`); a hidden page closes its
+ * own microphone at once and says so when shown; when the voice room is
+ * closed under the page (a new epoch: a removal, the sweep), the page asks
+ * for a new ticket and comes back by itself with its microphone as it was
+ * a moment before, and stops after the last try. The page never sends a
+ * data message, and what the connection says — who is there, whose
+ * microphone is open, who speaks — is reported as `VoiceConnection` for
+ * `voiceView()` to draw and is stored nowhere.
+ */
+import type * as LiveKit from 'livekit-client';
+import { z } from 'zod';
+import type { ShownPage } from './live';
+import type { VoiceConnection, VoiceLive } from './voice-view';
+
+/** The parts of `livekit-client` this file uses. */
+export type VoiceLibrary = Pick<
+    typeof LiveKit,
+    | 'Room'
+    | 'RoomEvent'
+    | 'DisconnectReason'
+    | 'ConnectionState'
+    | 'AudioPresets'
+    | 'Track'
+>;
+
+/** The library, as its own chunk: imported on the tap of «Səsə qoşul», never before. */
+export function loadVoiceLibrary(): Promise<VoiceLibrary> {
+    return import('livekit-client');
+}
+
+/** `{url, token}`: where the voice server is and the ticket that lets this row in for a minute. */
+export const VoiceTicket = z.strictObject({
+    url: z.string().min(1),
+    token: z.string().min(1),
+});
+
+export type VoiceTicket = z.infer<typeof VoiceTicket>;
+
+/** What a ticket request came back with (`RoomVoiceTicketController`). */
+export type VoiceTicketOutcome =
+    | { kind: 'ticket'; ticket: VoiceTicket }
+    /** 422: the account has not accepted the voice's sentence. */
+    | { kind: 'agreement' }
+    /** 401, 403, 404, 419: not admitted, not present, the voice off, the room closed, the session over. */
+    | { kind: 'refused' }
+    /** 503, a limit, a network failure: the voice server is not there now. */
+    | { kind: 'unavailable' };
+
+/** Why the browser did not give the microphone (`rooms.voice.errors.*`). */
+export type MicError = 'denied' | 'no_mic';
+
+/** Waits before each try for a new ticket when the voice room was closed under the page. */
+export const REJOIN_MS = [0, 1000, 3000] as const;
+
+/** Audio as ADR 031 decision 31 sets it: Opus speech, DTX and RED, the browser's own processing. */
+export function roomOptions(lib: VoiceLibrary): LiveKit.RoomOptions {
+    return {
+        adaptiveStream: false,
+        dynacast: false,
+        disconnectOnPageLeave: true,
+        audioCaptureDefaults: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+        },
+        publishDefaults: {
+            audioPreset: lib.AudioPresets.speech,
+            dtx: true,
+            red: true,
+            stopMicTrackOnMute: true,
+        },
+    };
+}
+
+/** Every connection: no ICE server at all, so the voice server's own list is never used (ADR 031 decision 2). */
+export function connectOptions(): LiveKit.RoomConnectOptions {
+    return { autoSubscribe: true, rtcConfig: { iceServers: [] } };
+}
+
+/** Where a heard voice's `<audio>` element goes: the page's body, hidden. */
+export type AudioHost = {
+    append: (element: HTMLMediaElement) => void;
+};
+
+export type VoiceOptions = {
+    load?: () => Promise<VoiceLibrary>;
+    /** Asks the app for a ticket; `agree` sends the account's agreement with it. */
+    ticket: (agree: boolean) => Promise<VoiceTicketOutcome>;
+    /** Told whenever what the page draws changes. */
+    onChange: (connection: VoiceConnection) => void;
+    /** A join refused for want of the agreement: the page shows the sentence again. */
+    onAgreement?: () => void;
+    /** The microphone could not be had (the bar's note). */
+    onMicError?: (error: MicError) => void;
+    /** The page was hidden while its microphone was open, and closed it (`rooms.voice.hidden_mic`). */
+    onHiddenMic?: () => void;
+    /** Whether the browser plays the voice yet; false until a tap unlocks it (`unlockAudio()`). */
+    onAudio?: (playing: boolean) => void;
+    page: ShownPage;
+    audio: AudioHost;
+    wait?: (ms: number) => Promise<void>;
+};
+
+type Room = InstanceType<VoiceLibrary['Room']>;
+
+/**
+ * One page's voice: `join()`, `setMic()`, `leave()`, `dispose()`. It holds
+ * at most one connection, and reports every change through `onChange`.
+ */
+export class VoiceLink {
+    private lib: VoiceLibrary | null = null;
+    private room: Room | null = null;
+    private connection: VoiceConnection = { kind: 'idle' };
+    /** The owner's microphone as the owner left it: only a tap, the hidden page or the host's mute changes it. */
+    private micOn = false;
+    private opening = false;
+    /** Whether the player is in the voice by their own choice: a leave or a refusal ends it. */
+    private wanted = false;
+    private rejoining = false;
+    private leaving = false;
+    private disposed = false;
+    private readonly options: VoiceOptions;
+    private readonly load: () => Promise<VoiceLibrary>;
+    private readonly wait: (ms: number) => Promise<void>;
+    private readonly stopWatching: () => void;
+
+    constructor(options: VoiceOptions) {
+        this.options = options;
+        this.load = options.load ?? loadVoiceLibrary;
+        this.wait =
+            options.wait ??
+            ((ms) =>
+                new Promise((resolve) => globalThis.setTimeout(resolve, ms)));
+        const onVisibility = () => this.visibilityChanged();
+        this.options.page.addEventListener('visibilitychange', onVisibility);
+        this.stopWatching = () =>
+            this.options.page.removeEventListener(
+                'visibilitychange',
+                onVisibility,
+            );
+    }
+
+    get current(): VoiceConnection {
+        return this.connection;
+    }
+
+    /** The player's tap on «Səsə qoşul» or «Razıyam, qoşul» (`agree`), «Yenidən cəhd et», «Yenidən qoşul», «Burada qoşul». */
+    async join(agree = false): Promise<void> {
+        if (
+            this.disposed ||
+            this.room !== null ||
+            this.connection.kind === 'joining'
+        ) {
+            return;
+        }
+
+        this.wanted = true;
+        this.micOn = false;
+        this.report({ kind: 'joining' });
+
+        let lib: VoiceLibrary;
+
+        try {
+            lib = this.lib ?? (await this.load());
+            this.lib = lib;
+        } catch {
+            this.fail('unreachable');
+
+            return;
+        }
+
+        const outcome = await this.askTicket(agree);
+
+        if (!this.wanted || this.disposed) {
+            return;
+        }
+
+        switch (outcome.kind) {
+            case 'agreement':
+                this.wanted = false;
+                this.report({ kind: 'idle' });
+                this.options.onAgreement?.();
+
+                return;
+            case 'refused':
+                this.wanted = false;
+                this.report({ kind: 'idle' });
+
+                return;
+            case 'unavailable':
+                this.fail('unreachable');
+
+                return;
+            case 'ticket':
+                if (
+                    !(await this.connect(lib, outcome.ticket)) &&
+                    this.wanted &&
+                    !this.disposed
+                ) {
+                    this.fail('unreachable');
+                }
+        }
+    }
+
+    /** The owner's tap on the microphone. The browser's own question comes with the first `true`, never earlier. */
+    async setMic(on: boolean): Promise<void> {
+        const room = this.room;
+
+        if (room === null || this.connection.kind !== 'in') {
+            return;
+        }
+
+        if (!on) {
+            this.micOn = false;
+            this.opening = false;
+            this.emit();
+            await room.localParticipant
+                .setMicrophoneEnabled(false)
+                .catch(() => undefined);
+
+            return;
+        }
+
+        if (this.micOn || this.opening) {
+            return;
+        }
+
+        this.opening = true;
+        this.emit();
+
+        try {
+            await room.localParticipant.setMicrophoneEnabled(true);
+            this.micOn = this.room === room && this.opening;
+        } catch (error) {
+            this.micOn = false;
+            this.options.onMicError?.(micError(error));
+        } finally {
+            this.opening = false;
+        }
+
+        // A hidden page closes what a late answer of the browser opened.
+        if (this.micOn && this.options.page.visibilityState === 'hidden') {
+            this.closeHiddenMic();
+        }
+
+        this.emit();
+    }
+
+    /** «Səsdən çıx», or the voice going off: one tap, and nothing of the game changes. */
+    async leave(): Promise<void> {
+        this.wanted = false;
+        this.micOn = false;
+        this.opening = false;
+        const room = this.room;
+        this.room = null;
+        this.report({ kind: 'idle' });
+
+        if (room !== null) {
+            this.leaving = true;
+
+            try {
+                await room.disconnect();
+            } catch {
+                // Gone already.
+            } finally {
+                this.leaving = false;
+            }
+        }
+    }
+
+    /** A tap anywhere once the browser held the voice back (iOS Safari, ADR 031 "Who hears where"). */
+    unlockAudio(): void {
+        void this.room?.startAudio().catch(() => undefined);
+    }
+
+    dispose(): void {
+        this.disposed = true;
+        this.stopWatching();
+        void this.leave();
+    }
+
+    private async askTicket(agree: boolean): Promise<VoiceTicketOutcome> {
+        try {
+            return await this.options.ticket(agree);
+        } catch {
+            return { kind: 'unavailable' };
+        }
+    }
+
+    /** Connects with no ICE server; true once in. The microphone stays as `micOn` says (off at a join). */
+    private async connect(
+        lib: VoiceLibrary,
+        ticket: VoiceTicket,
+    ): Promise<boolean> {
+        const room = new lib.Room(roomOptions(lib));
+        this.watch(lib, room);
+        this.room = room;
+
+        try {
+            await room.connect(ticket.url, ticket.token, connectOptions());
+        } catch {
+            if (this.room === room) {
+                this.room = null;
+            }
+
+            room.removeAllListeners();
+
+            return false;
+        }
+
+        if (this.room !== room || !this.wanted || this.disposed) {
+            // Left while it connected: out again at once.
+            room.removeAllListeners();
+            void room.disconnect().catch(() => undefined);
+
+            if (this.room === room) {
+                this.room = null;
+            }
+
+            return false;
+        }
+
+        this.report(this.inState(room));
+        void room.startAudio().catch(() => undefined);
+
+        return true;
+    }
+
+    private watch(lib: VoiceLibrary, room: Room): void {
+        const E = lib.RoomEvent;
+        const update = () => {
+            if (this.room === room && this.connection.kind === 'in') {
+                this.emit();
+            }
+        };
+
+        for (const event of [
+            E.ParticipantConnected,
+            E.ParticipantDisconnected,
+            E.TrackPublished,
+            E.TrackUnpublished,
+            E.TrackMuted,
+            E.TrackUnmuted,
+            E.LocalTrackPublished,
+            E.LocalTrackUnpublished,
+            E.ActiveSpeakersChanged,
+        ] as const) {
+            room.on(event, update);
+        }
+
+        room.on(E.TrackSubscribed, (track) => {
+            if (track.kind === lib.Track.Kind.Audio) {
+                const element = track.attach();
+                element.hidden = true;
+                this.options.audio.append(element);
+            }
+        });
+        room.on(E.TrackUnsubscribed, (track) => {
+            for (const element of track.detach()) {
+                element.remove();
+            }
+        });
+        // The host's mute takes the permission to publish: the microphone is closed and stays closed (decision 10).
+        room.on(E.ParticipantPermissionsChanged, (_before, participant) => {
+            if (
+                participant === room.localParticipant &&
+                participant.permissions?.canPublish === false
+            ) {
+                this.micOn = false;
+                this.opening = false;
+            }
+
+            update();
+        });
+        room.on(E.Reconnecting, update);
+        room.on(E.SignalReconnecting, update);
+        room.on(E.Reconnected, update);
+        room.on(E.AudioPlaybackStatusChanged, () => {
+            this.options.onAudio?.(room.canPlaybackAudio);
+        });
+        room.on(E.MediaDevicesError, (error) => {
+            this.options.onMicError?.(micError(error));
+        });
+        room.on(E.Disconnected, (reason) => {
+            void this.disconnected(lib, room, reason);
+        });
+    }
+
+    private async disconnected(
+        lib: VoiceLibrary,
+        room: Room,
+        reason: LiveKit.DisconnectReason | undefined,
+    ): Promise<void> {
+        room.removeAllListeners();
+
+        if (this.room !== room) {
+            return;
+        }
+
+        this.room = null;
+        const R = lib.DisconnectReason;
+
+        if (this.leaving || !this.wanted || this.disposed) {
+            return;
+        }
+
+        if (reason === R.DUPLICATE_IDENTITY) {
+            this.fail('elsewhere');
+
+            return;
+        }
+
+        if (
+            reason === R.ROOM_DELETED ||
+            reason === R.ROOM_CLOSED ||
+            reason === R.PARTICIPANT_REMOVED
+        ) {
+            await this.rejoin(lib, this.micOn);
+
+            return;
+        }
+
+        if (reason === R.CLIENT_INITIATED) {
+            // The library left with the page (`pagehide`, a frozen tab): back in when the page is shown.
+            this.micOn = false;
+            this.report({
+                kind: 'in',
+                live: emptyLive(),
+                mic: 'off',
+                reconnecting: true,
+            });
+
+            if (this.options.page.visibilityState === 'visible') {
+                await this.rejoin(lib, false);
+            }
+
+            return;
+        }
+
+        // The library's own tries ran out (about 45 s).
+        this.fail('dropped');
+    }
+
+    /** A new ticket for the voice room as it is now, the microphone as it was a moment before. */
+    private async rejoin(lib: VoiceLibrary, mic: boolean): Promise<void> {
+        if (this.rejoining) {
+            return;
+        }
+
+        this.rejoining = true;
+        this.micOn = false;
+        this.report({
+            kind: 'in',
+            live: emptyLive(),
+            mic: 'off',
+            reconnecting: true,
+        });
+
+        try {
+            for (const delay of REJOIN_MS) {
+                await this.wait(delay);
+
+                if (!this.wanted || this.disposed || this.room !== null) {
+                    return;
+                }
+
+                const outcome = await this.askTicket(false);
+
+                if (!this.wanted || this.disposed) {
+                    return;
+                }
+
+                if (
+                    outcome.kind === 'refused' ||
+                    outcome.kind === 'agreement'
+                ) {
+                    // Turned off, removed, gone: the state says which.
+                    this.wanted = false;
+                    this.report({ kind: 'idle' });
+
+                    return;
+                }
+
+                if (
+                    outcome.kind === 'ticket' &&
+                    (await this.connect(lib, outcome.ticket))
+                ) {
+                    if (mic) {
+                        await this.setMic(true);
+                    }
+
+                    return;
+                }
+            }
+
+            this.fail('unreachable');
+        } finally {
+            this.rejoining = false;
+        }
+    }
+
+    private visibilityChanged(): void {
+        if (this.options.page.visibilityState === 'hidden') {
+            if (this.micOn || this.opening) {
+                this.closeHiddenMic();
+                this.emit();
+            }
+
+            return;
+        }
+
+        // Shown again: back into a voice the page left while hidden.
+        if (
+            this.wanted &&
+            this.room === null &&
+            !this.rejoining &&
+            this.connection.kind === 'in' &&
+            this.lib !== null
+        ) {
+            void this.rejoin(this.lib, false);
+        }
+    }
+
+    /** No open microphone on a page nobody sees: closed at once, and said when the page is shown. */
+    private closeHiddenMic(): void {
+        this.micOn = false;
+        this.opening = false;
+        void this.room?.localParticipant
+            .setMicrophoneEnabled(false)
+            .catch(() => undefined);
+        this.options.onHiddenMic?.();
+    }
+
+    private fail(trouble: 'unreachable' | 'dropped' | 'elsewhere'): void {
+        this.wanted = false;
+        this.micOn = false;
+        this.report({ kind: 'failed', trouble });
+    }
+
+    private emit(): void {
+        if (this.room !== null && this.connection.kind === 'in') {
+            this.report(this.inState(this.room));
+        }
+    }
+
+    private inState(room: Room): VoiceConnection {
+        const me = room.localParticipant.identity;
+        const remote = [...room.remoteParticipants.values()];
+        const live: VoiceLive = {
+            here: [me, ...remote.map((participant) => participant.identity)],
+            open: [
+                ...(this.micOn ? [me] : []),
+                ...remote
+                    .filter((participant) => participant.isMicrophoneEnabled)
+                    .map((participant) => participant.identity),
+            ],
+            speaking: room.activeSpeakers.map(
+                (participant) => participant.identity,
+            ),
+        };
+
+        return {
+            kind: 'in',
+            live,
+            mic: this.opening ? 'opening' : this.micOn ? 'on' : 'off',
+            reconnecting:
+                this.lib !== null &&
+                room.state !== this.lib.ConnectionState.Connected,
+        };
+    }
+
+    private report(connection: VoiceConnection): void {
+        this.connection = connection;
+
+        if (!this.disposed) {
+            this.options.onChange(connection);
+        }
+    }
+}
+
+function emptyLive(): VoiceLive {
+    return { here: [], open: [], speaking: [] };
+}
+
+/** The browser's refusal said in words: no permission, or no microphone. */
+export function micError(error: unknown): MicError {
+    const name =
+        typeof error === 'object' && error !== null && 'name' in error
+            ? String(error.name)
+            : '';
+
+    return [
+        'NotFoundError',
+        'DevicesNotFoundError',
+        'OverconstrainedError',
+        'NotReadableError',
+    ].includes(name)
+        ? 'no_mic'
+        : 'denied';
+}

@@ -381,3 +381,110 @@ it('takes the taunts\' images from the room\'s own list, never from the children
 
     expect($wrong)->toBe([]);
 });
+
+/**
+ * Every module a TypeScript file names — static, type-only and dynamic
+ * imports and re-exports — resolved to a path under resources/js, or left
+ * as the package's name.
+ *
+ * @return list<string>
+ */
+function jsImportsOf(string $js, string $path): array
+{
+    preg_match_all("/(?:\\bfrom|\\bimport)\\s*\\(?\\s*'([^']+)'/", (string) file_get_contents("{$js}/{$path}"), $matches);
+    $resolved = [];
+
+    foreach ($matches[1] as $import) {
+        $base = match (true) {
+            str_starts_with($import, '@/') => substr($import, 2),
+            str_starts_with($import, '.') => dirname($path).'/'.$import,
+            default => null,
+        };
+
+        if ($base === null) {
+            $resolved[] = $import;
+
+            continue;
+        }
+
+        $parts = [];
+
+        foreach (explode('/', $base) as $part) {
+            match ($part) {
+                '', '.' => null,
+                '..' => array_pop($parts),
+                default => $parts[] = $part,
+            };
+        }
+
+        $base = implode('/', $parts);
+
+        foreach (['', '.ts', '.tsx', '/index.ts', '/index.tsx'] as $suffix) {
+            if (is_file("{$js}/{$base}{$suffix}")) {
+                $resolved[] = $base.$suffix;
+
+                break;
+            }
+        }
+    }
+
+    return array_values(array_unique($resolved));
+}
+
+it('keeps the voice library inside the room\'s voice module', function (): void {
+    $js = resource_path('js');
+    $files = array_values(array_filter(
+        array_map(static fn ($file): string => str_replace($js.'/', '', $file->getPathname()), File::allFiles($js)),
+        static fn (string $path): bool => preg_match('/\.tsx?$/', $path) === 1,
+    ));
+    $importers = [];
+    $ticketCallers = [];
+
+    foreach ($files as $path) {
+        $imports = jsImportsOf($js, $path);
+
+        if (in_array('livekit-client', $imports, true)) {
+            $importers[] = $path;
+        }
+
+        // Wayfinder's own files (`routes/`, `actions/`) name each other; a page's file names the route to call it.
+        $generated = preg_match('#^(routes|actions|wayfinder)/#', $path) === 1;
+        $ticketRoute = array_filter($imports, static fn (string $import): bool => str_contains($import, 'rooms/voice/tickets') || str_contains($import, 'RoomVoiceTicketController'));
+
+        if (! $generated && $ticketRoute !== []) {
+            $ticketCallers[] = $path;
+        }
+    }
+
+    // `livekit-client` is imported by one file, and there only on the tap of «Səsə qoşul» (or as a type).
+    expect($importers)->toBe(['rooms/voice.ts']);
+    $voice = (string) file_get_contents("{$js}/rooms/voice.ts");
+    expect(preg_match("/^\\s*import\\s+(?!type\\b)[^;]*?from\\s+'livekit-client'/m", $voice))->toBe(0)
+        ->and(preg_match("/^\\s*export\\s+[^;]*?from\\s+'livekit-client'/m", $voice))->toBe(0)
+        ->and(substr_count($voice, "import('livekit-client')"))->toBe(1);
+
+    // Only the page's voice asks for a ticket.
+    expect($ticketCallers)->toBe(['components/rooms/use-room-voice.ts']);
+
+    // The big screen reaches no voice module: no connection, no ticket, no library — only the state's facts.
+    $connection = ['livekit-client', 'rooms/voice.ts', 'components/rooms/use-room-voice.ts', 'components/rooms/voice-bar.tsx'];
+    $reached = [];
+    $queue = ['pages/rooms/screen.tsx'];
+
+    while ($queue !== []) {
+        $path = array_shift($queue);
+
+        if (isset($reached[$path])) {
+            continue;
+        }
+
+        $reached[$path] = true;
+
+        if (is_file("{$js}/{$path}")) {
+            array_push($queue, ...jsImportsOf($js, $path));
+        }
+    }
+
+    expect(array_values(array_intersect($connection, array_keys($reached))))->toBe([])
+        ->and($reached)->toHaveKey('rooms/voice-view.ts');
+});

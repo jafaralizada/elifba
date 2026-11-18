@@ -240,6 +240,8 @@ What this meets:
 
 **As built (C4, words; 2026-11-19).** Every text of "Words" and decisions 14–17 and 25 is in `lang/az.json` and `lang/en.json` as written here, 57 new keys a language and three changed values; `RoomsWordingTest` reads them from this record, so a sentence changes here first. No text departs from the record. Two things the record left open: `privacy.rooms.live_voice` holds its five paragraphs as five lines, drawn a paragraph a line in a part of its own after `where` and before the operator; and the cue toggle's new words (decision 25) show whatever the switch, since they are the screen's button's visible text — the one change an instance without voice sees. `/privacy` and the welcome page choose the voice forms only from `rooms.voice`. The room pages, the screen and the library are C4's second session (architecture §12 "Live voice", "As built (C4, words)").
 
+**As built (C4, pages; 2026-11-19).** The room page, the screen and the library are built as decision 34 and docs/frontend.md rule 15 "Live voice" draw them; architecture §12 "Live voice", "As built (C4, pages)" has the files and the measurements. Three things the record read differently: the screen's "no voice module" is the voice connection — the screen draws the state's facts through the pure `screenVoiceView()` and reaches neither `rooms/voice.ts`, the page's voice hook, the bar nor the library (`RoomsApartTest`); decision 34's 67px cells were 44px once measured with the rivals' strip and the taunts, so the round gives back 1rem while the bar shows; and no text is added beyond "Words" — the sheet says `rooms.voice.count` without «səs yazılmır», the waiting form is the one sentence `rooms.voice.waiting_you`, and a dropped connection says `rooms.voice.errors.unreachable` with «Yenidən qoşul». Decision 26's failures were each seen in a headless browser against `composer dev:voice` but on real networks and phones, which are C5's.
+
 ### Targets C5 measures
 
 31. Numbers, on two real phones and in a headless harness with twenty fake microphones:
@@ -274,7 +276,7 @@ What this meets:
     - **the host** turns the voice on with a switch in «Otağın idarəsi», and mutes, admits and turns it off in the sheet «Canlı səs» that the bar opens — one tap away in a round too. A waiting newcomer adds a line above the bar with «Səsə burax»;
     - **the screen** shows a chip «Canlı səs açıqdır» in its top bar, marks a waiting or muted player's chip, and says that the voice is on the phones.
 
-    A state is an icon with a word, never a colour alone; no avatar, photo or nickname; the voice has one colour of its own (indigo), which is neither right, wrong nor the study's lamp. The bar takes 56px of a round: a 4 × 4 grid keeps cells of 67px on a 375 × 667 screen.
+    A state is an icon with a word, never a colour alone; no avatar, photo or nickname; the voice has one colour of its own (indigo), which is neither right, wrong nor the study's lamp. The bar takes 56px of a round, and the round gives back 1rem of its own spacing while the bar shows: a 4 × 4 grid keeps cells of 44px — its floor — on a 375 × 667 screen, and the 8-letter anagram fits (C4, measured; C1's 67px was counted from the grid's limit before the rivals' strip and the taunts took their height).
 
 ## Words
 

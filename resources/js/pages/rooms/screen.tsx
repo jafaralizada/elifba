@@ -1,7 +1,10 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeft,
+    Headphones,
+    Hourglass,
     Maximize,
+    MicOff,
     Minimize,
     Pencil,
     Play,
@@ -63,6 +66,8 @@ import type {
     RoomState,
 } from '@/rooms/contract';
 import type { RoomFinishVoice, RoomSoundUrls } from '@/rooms/sound';
+import { screenVoiceView } from '@/rooms/voice-view';
+import type { ScreenVoiceView } from '@/rooms/voice-view';
 
 type Props = {
     room: { id: string; status: 'open' | 'closed' };
@@ -113,6 +118,12 @@ type Props = {
  * after the final's fanfare, cheers the first place as a home board ends a
  * game: the first name from the name list's clip, then «Əla oynadın!»
  * (ADR 030).
+ *
+ * It joins no live voice (docs/frontend.md rule 15 "Live voice", ADR 031
+ * decision 25): it asks for no ticket, plays and captures nothing, and
+ * imports no voice connection. From the state alone (`screenVoiceView()`)
+ * it shows «Canlı səs açıqdır» in its top bar, a waiting or muted player's
+ * mark on the poster's chips, and that the voice is on the phones.
  */
 export default function RoomsScreen({
     room,
@@ -156,6 +167,8 @@ export default function RoomsScreen({
     const game = state?.game ?? null;
     const round = state?.round ?? null;
     const playing = game !== null && game.phase === 'live' && round !== null;
+    // The live voice's facts from the state alone (the cheer's `voice` above is a route, another thing).
+    const liveVoice = state === null ? null : screenVoiceView(state);
 
     return (
         <div
@@ -179,6 +192,15 @@ export default function RoomsScreen({
                         {t('rooms.screen.code_short', {
                             code: spacedCode(state.room.code),
                         })}
+                    </span>
+                )}
+                {liveVoice !== null && (
+                    <span className="inline-flex items-center gap-[0.9vh] rounded-full bg-(--voice-tint) px-[1.6vh] py-[0.5vh] text-[max(0.875rem,2.2vh)] font-semibold text-(--voice-text)">
+                        <Headphones
+                            aria-hidden
+                            className="size-[max(1rem,2.4vh)]"
+                        />
+                        {t('rooms.voice.on')}
                     </span>
                 )}
                 <span className="flex-1" />
@@ -223,6 +245,7 @@ export default function RoomsScreen({
             ) : (
                 <ScreenHost
                     roomId={room.id}
+                    voice={liveVoice}
                     state={state}
                     setup={state.setup}
                     over={game !== null && state.setup.played ? game : null}
@@ -244,6 +267,7 @@ export default function RoomsScreen({
  */
 function ScreenHost({
     roomId,
+    voice,
     state,
     setup,
     over,
@@ -254,6 +278,8 @@ function ScreenHost({
     refresh,
 }: {
     roomId: string;
+    /** The state's voice facts (`screenVoiceView()`); null while nothing of voice is drawn. */
+    voice: ScreenVoiceView | null;
     state: RoomState;
     setup: RoomSetup;
     over: RoomGame | null;
@@ -290,6 +316,7 @@ function ScreenHost({
             ) : (
                 <ScreenStart
                     state={state}
+                    voice={voice}
                     join={join}
                     choice={choice}
                     start={start}
@@ -311,8 +338,18 @@ function ScreenHost({
 
 type Start = ReturnType<typeof useRoomStart>;
 
-/** The present players as chips; one who joins after the screen first drew pops in. */
-function PlayerChips({ players }: { players: RoomPlayer[] }) {
+/**
+ * The present players as chips; one who joins after the screen first drew
+ * pops in. While the live voice is on, a player who waits to be let in or
+ * whom the host muted says so on the chip, an icon with its word (C4).
+ */
+function PlayerChips({
+    players,
+    voice = null,
+}: {
+    players: RoomPlayer[];
+    voice?: ScreenVoiceView | null;
+}) {
     const { t } = useTranslation();
     const present = players.filter((player) => player.present);
     const [first] = useState(() => new Set(present.map((player) => player.id)));
@@ -341,9 +378,25 @@ function PlayerChips({ players }: { players: RoomPlayer[] }) {
                             {t('rooms.show.host')}
                         </span>
                     )}
+                    {voice?.marks[player.id] !== undefined && (
+                        <VoiceMark mark={voice.marks[player.id]} />
+                    )}
                 </li>
             ))}
         </ul>
+    );
+}
+
+/** «icazə gözləyir» with `Hourglass`, or «aparıcı susdurub» with `MicOff`, on a player's chip. */
+function VoiceMark({ mark }: { mark: 'waiting' | 'muted' }) {
+    const { t } = useTranslation();
+    const Icon = mark === 'waiting' ? Hourglass : MicOff;
+
+    return (
+        <span className="ml-[1vh] inline-flex items-center gap-[0.4vh] align-middle text-[0.75em] font-semibold text-muted-foreground">
+            <Icon aria-hidden className="size-[1em]" />
+            {t(`rooms.voice.state.${mark}`)}
+        </span>
     );
 }
 
@@ -356,6 +409,7 @@ function PlayerChips({ players }: { players: RoomPlayer[] }) {
  */
 function ScreenStart({
     state,
+    voice,
     join,
     choice,
     start,
@@ -363,6 +417,7 @@ function ScreenStart({
     onChange,
 }: {
     state: RoomState;
+    voice: ScreenVoiceView | null;
     join: JoinLink | null;
     choice: RoomChoice;
     start: Start;
@@ -413,7 +468,16 @@ function ScreenStart({
                     <h2 className="text-[max(1rem,2.6vh)] font-semibold">
                         {t('rooms.start.joined_count', { count: present })}
                     </h2>
-                    <PlayerChips players={state.players} />
+                    <PlayerChips players={state.players} voice={voice} />
+                    {voice !== null && (
+                        <p className="flex max-w-[44vw] items-center gap-[1vh] text-[max(0.875rem,2.1vh)] text-muted-foreground">
+                            <Headphones
+                                aria-hidden
+                                className="size-[1.1em] shrink-0"
+                            />
+                            {t('rooms.voice.screen')}
+                        </p>
+                    )}
                 </div>
             </div>
 

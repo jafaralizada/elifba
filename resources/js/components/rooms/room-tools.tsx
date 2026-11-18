@@ -31,7 +31,8 @@ export const SHEET =
 /**
  * «Otağın idarəsi» (docs/frontend.md rule 15 "Games first", ADR 026
  * decision 16): the host's tools behind one 44px `Ellipsis` button, a
- * sheet of 52px rows — «Mən də oynayıram», «Kilidlə» and, from T2,
+ * sheet of 52px rows — from C4 «Canlı səs» first while the instance's
+ * voice is on (`voice`, ADR 031 decision 34), «Mən də oynayıram», «Kilidlə» and, from T2,
  * «Atmacalar» (ADR 029 decision 12) as switches with their lines, «Böyük
  * ekran» (a link: the game is chosen and started from
  * there too) and «Otağı bağla», which asks first. Not offered while a
@@ -42,10 +43,13 @@ export function RoomTools({
     roomId,
     state,
     onChanged,
+    voice = null,
 }: {
     roomId: string;
     state: RoomState;
     onChanged: () => void;
+    /** «Canlı səs», the first row while the instance's voice is on (C4, ADR 031 decision 34). */
+    voice?: ReactNode;
 }) {
     const { t } = useTranslation();
     const [open, setOpen] = useState(false);
@@ -144,6 +148,7 @@ export function RoomTools({
                     </DialogClose>
                 </div>
                 <div className="flex flex-col divide-y px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+                    {voice}
                     <SwitchRow
                         label={t('rooms.tools.plays')}
                         line={t('rooms.tools.plays_line')}
@@ -241,7 +246,7 @@ function RowText({
     );
 }
 
-/** A 52px row that is one switch: its label, its line and the track (on the screen, `big`, in `vh`). */
+/** A 52px row that is one switch: its icon if it has one, its label, its line and the track (on the screen, `big`, in `vh`). */
 export function SwitchRow({
     label,
     line,
@@ -250,6 +255,7 @@ export function SwitchRow({
     disabled,
     onToggle,
     big = false,
+    icon = null,
 }: {
     label: string;
     line: string;
@@ -258,6 +264,7 @@ export function SwitchRow({
     disabled: boolean;
     onToggle: () => void;
     big?: boolean;
+    icon?: ReactNode;
 }) {
     return (
         <button
@@ -271,6 +278,7 @@ export function SwitchRow({
                 big ? 'min-h-[max(2.75rem,6vh)] py-[1vh]' : 'min-h-13 py-3',
             )}
         >
+            {icon}
             <RowText label={label} line={line} big={big} />
             {busy ? <Spinner /> : <Track on={on} />}
         </button>

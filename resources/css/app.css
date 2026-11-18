@@ -526,3 +526,39 @@
         }
     }
 }
+
+/*
+ * Live voice (docs/frontend.md rule 15 "Live voice", ADR 031 decision 34):
+ * indigo in both themes — a fill, the voice's text on the page, the text
+ * on the fill and a tint. Never emerald or red (right, wrong), never the
+ * lamp's amber, the strip's sky or orange or the taunt's violet; and never
+ * alone: every state of the voice is an icon with a word. The three bars of
+ * a speaker move only `motion-safe:` and stand still otherwise.
+ */
+:root {
+    --voice: var(--color-indigo-600);
+    --voice-text: var(--color-indigo-700);
+    --voice-on: var(--color-white);
+    --voice-tint: color-mix(in oklab, var(--color-indigo-600) 9%, transparent);
+}
+
+.dark {
+    --voice: var(--color-indigo-400);
+    --voice-text: var(--color-indigo-300);
+    --voice-on: var(--color-indigo-950);
+    --voice-tint: color-mix(in oklab, var(--color-indigo-400) 16%, transparent);
+}
+
+@theme {
+    --animate-room-voice-bar: room-voice-bar 900ms ease-in-out infinite;
+
+    @keyframes room-voice-bar {
+        0%,
+        100% {
+            transform: scaleY(0.45);
+        }
+        50% {
+            transform: scaleY(1);
+        }
+    }
+}

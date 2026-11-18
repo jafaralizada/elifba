@@ -110,6 +110,7 @@ export function LiveRound({
     sound = null,
     icons = null,
     taunts = null,
+    compact = false,
 }: {
     roomId: string;
     state: RoomState;
@@ -129,6 +130,8 @@ export function LiveRound({
     icons?: RivalryIcons | null;
     /** The taunts a player may throw (the prop `taunts`, T2). */
     taunts?: TauntList | null;
+    /** The live voice's bar stands under the round: its parts stand closer (C4, rule 15 "Live voice", "Fit"). */
+    compact?: boolean;
 }) {
     const { t } = useTranslation();
     const now = useServerNow(clock, true);
@@ -247,7 +250,7 @@ export function LiveRound({
             aria-labelledby="round-heading"
             data-phase={round.phase}
             data-round={round.index}
-            className="flex flex-col gap-4"
+            className={cn('flex flex-col', compact ? 'gap-3' : 'gap-4')}
         >
             {rivalry.pair !== null && (
                 <div className="relative flex items-center gap-2">
