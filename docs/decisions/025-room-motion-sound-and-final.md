@@ -2,6 +2,7 @@
 
 - **Status:** Accepted, 2026-11-18 (the owner's three decisions of that day; "Motion", "The final" and "Sound" built on the branch `feat/rooms-polish`, sound as "As built" below says); amended by [027](027-rivals-face-to-face.md) the same day — decision 5 (a page may show the difference of two of the server's totals and their ratio), decision 6 (an overtake's words stand still under reduced motion) and decision 10 (the screen's reveal with three players or more draws race lanes)
 - **Sections:** architecture.md §12 "Room games", "Guard tests"; docs/frontend.md rule 15
+- **Amended by:** [028](028-room-sound-set.md) — the sound set: its cues, long cues on the server's clock, its sources and limits
 - **Amends:** [023](023-room-games-and-content.md) decision 11 ("No Phaser, no sound and no voice in a room in the first stage"): Phaser and voice stay out; motion is designed and sound comes, as below. docs/frontend.md rule 15: the ranking's "No medal colours, podium or confetti" and the last bullet's "No sound, voice, Phaser, confetti or vibration" give way to the final and to the two parts below. [021](021-room-race-protocol.md) and [022](022-room-scoring-and-history.md) are unchanged: the device still never judges, scores or keeps the time.
 - **Why it is hard to reverse:** a room is played by several people in one room at once. What moves, what sounds and on which device are habits the players learn, and a sound or a movement that told one phone's owner something before the others would break the race's fairness, which no later fix can take back from a game already played.
 
@@ -62,6 +63,8 @@ Two things constrain all three. The state is all a page knows (§12 "The state")
 A wish to celebrate each game's own winner after several games (the state's ranking at `over`), a room played without a screen often enough that phones should carry the room's sounds, or a player who asks for less motion than the system setting gives.
 
 ## As built (sound, 2026-11-18)
+
+> **The second set:** [028](028-room-sound-set.md) (2026-11-18) replaced the cues of item 1 — a three-second countdown and a five-second clock placed on the server's clock, and `go`, `place` and `join` added — made item 2's player stop every cue when its moment ends, and changed item 7's files (recordings under CC0 beside our synthesis) and their limits. What follows is the first set as it was built.
 
 Built on `feat/rooms-polish` after the motion, from the owner's split of 2026-11-18 — the screen: the countdown, the question opening, the last seconds, the round closing, the reveal, the final; the phone: its own taps and undo, "answer accepted", its own result at the reveal, quietly. Where the decisions above leave a choice, it was made so:
 
