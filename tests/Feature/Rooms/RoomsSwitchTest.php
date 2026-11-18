@@ -119,12 +119,33 @@ it('runs the switch before anything else of a room route', function (): void {
 });
 
 it('reads the switch from the environment as a yes or a no', function (string $value, bool $enabled): void {
+    // env() reads $_SERVER and $_ENV before getenv(), and a .env that sets
+    // ELIFBA_ROOMS (CI's copy of .env.example does) fills both: set all
+    // three, and put back what was there.
+    $server = $_SERVER['ELIFBA_ROOMS'] ?? null;
+    $env = $_ENV['ELIFBA_ROOMS'] ?? null;
+    $process = getenv('ELIFBA_ROOMS');
+
     putenv("ELIFBA_ROOMS={$value}");
+    $_SERVER['ELIFBA_ROOMS'] = $value;
+    $_ENV['ELIFBA_ROOMS'] = $value;
 
     try {
         $config = require config_path('elifba.php');
     } finally {
-        putenv('ELIFBA_ROOMS');
+        putenv($process === false ? 'ELIFBA_ROOMS' : "ELIFBA_ROOMS={$process}");
+
+        if ($server === null) {
+            unset($_SERVER['ELIFBA_ROOMS']);
+        } else {
+            $_SERVER['ELIFBA_ROOMS'] = $server;
+        }
+
+        if ($env === null) {
+            unset($_ENV['ELIFBA_ROOMS']);
+        } else {
+            $_ENV['ELIFBA_ROOMS'] = $env;
+        }
     }
 
     expect($config['rooms']['enabled'])->toBe($enabled);
