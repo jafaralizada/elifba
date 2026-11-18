@@ -3,6 +3,8 @@
 use App\Domain\Rooms\Data\RoomAnswerData;
 use App\Domain\Rooms\Data\RoomAnswerReceiptData;
 use App\Domain\Rooms\Data\RoomStateData;
+use App\Domain\Rooms\Data\RoomTauntData;
+use App\Domain\Rooms\Data\RoomTauntReceiptData;
 
 /*
  * The room's contract on the PHP side (docs/architecture.md §12 "Room
@@ -46,6 +48,8 @@ it('round-trips every fixture', function (string $name): void {
         'state' => RoomStateData::fromArray($fixture)->toArray(),
         'answer' => RoomAnswerData::fromArray($fixture)->toArray(),
         'receipt' => RoomAnswerReceiptData::fromArray($fixture)->toArray(),
+        'taunt' => RoomTauntData::fromArray($fixture)->toArray(),
+        'taunt-receipt' => RoomTauntReceiptData::fromArray($fixture)->toArray(),
     };
 
     expect($again)->toBe($fixture);
@@ -63,6 +67,8 @@ it('has every phase\'s fixture, the answer and the receipt', function (): void {
         'state.answer.spelling', 'answer.spelling', 'state.reveal.spelling',
         // G2: a game over and another chosen.
         'state.chosen',
+        // T2: a target's phone and the screen with taunts, a taunt and its receipt.
+        'state.taunted', 'state.screen-taunted', 'taunt', 'taunt-receipt',
     ]);
 });
 
@@ -153,4 +159,47 @@ it('says the choice of the next game in every open room\'s state, and nothing el
         ->and(fn () => RoomStateData::fromArray($closed))->toThrow(InvalidArgumentException::class, 'choice')
         ->and(RoomStateData::fromArray([...$closed, 'setup' => null])->setup)->toBeNull()
         ->and(fn () => RoomStateData::fromArray([...$lobby, 'v' => 1]))->toThrow(InvalidArgumentException::class, 'version');
+});
+
+it('carries a live game\'s taunts, and nothing of them anywhere else', function (): void {
+    foreach (array_filter(array_keys(roomPayloads()), static fn (string $name): bool => str_starts_with($name, 'state.')) as $name) {
+        $state = roomFixture($name);
+        $live = $state['game'] !== null && $state['game']['phase'] === 'live';
+
+        expect(array_keys($state['room']))->toBe(['id', 'status', 'locked', 'code', 'taunts'], $name)
+            ->and($state['taunts'] === null)->toBe(! $live, $name);
+
+        if ($live) {
+            expect(array_keys($state['taunts']))->toBe(['open', 'balance', 'ready_ms', 'received', 'shown'], $name);
+
+            // The target's own list never names a target; only the screen's does.
+            foreach ($state['taunts']['received'] as $taunt) {
+                expect(array_keys($taunt))->toBe(['id', 'from', 'taunt', 'sent_ms'], $name);
+            }
+
+            foreach ($state['taunts']['shown'] ?? [] as $taunt) {
+                expect(array_keys($taunt))->toBe(['id', 'from', 'to', 'taunt', 'sent_ms'], $name);
+            }
+        }
+
+        // The cost of a close only in its reveal.
+        if ($state['round'] !== null && $state['round']['reveal'] !== null) {
+            expect(array_keys($state['round']['reveal']))->toBe(['solution', 'word', 'mine', 'results', 'spent'], $name);
+        }
+    }
+
+    expect(roomFixture('state.taunted')['taunts']['received'])->toHaveCount(1)
+        ->and(roomFixture('state.screen-taunted')['taunts']['shown'])->toHaveCount(2)
+        ->and(roomFixture('state.reveal')['round']['reveal']['spent'])->toBe([['player_id' => '01kaqrx2ab3c4d5e6f7g8h9jkm', 'count' => 1]]);
+
+    // A live game has its taunts and nothing else has; a received taunt never names its target, a shown one always does.
+    $answer = roomFixture('state.answer');
+    $taunted = roomFixture('state.taunted');
+    $screen = roomFixture('state.screen-taunted');
+
+    expect(fn () => RoomStateData::fromArray([...$answer, 'taunts' => null]))->toThrow(InvalidArgumentException::class, 'taunts')
+        ->and(fn () => RoomStateData::fromArray([...roomFixture('state.over'), 'taunts' => $answer['taunts']]))->toThrow(InvalidArgumentException::class, 'taunts')
+        ->and(fn () => RoomStateData::fromArray([...$answer, 'taunts' => [...$taunted['taunts'], 'received' => $screen['taunts']['shown']]]))->toThrow(InvalidArgumentException::class, 'target')
+        ->and(fn () => RoomStateData::fromArray([...$answer, 'taunts' => [...$screen['taunts'], 'shown' => $taunted['taunts']['received']]]))->toThrow(InvalidArgumentException::class, 'target')
+        ->and(fn () => RoomStateData::fromArray([...$answer, 'taunts' => [...$answer['taunts'], 'balance' => -1]]))->toThrow(InvalidArgumentException::class, 'below 0');
 });

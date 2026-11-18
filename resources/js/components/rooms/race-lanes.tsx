@@ -4,6 +4,7 @@ import { reducedMotion, slideSlots } from '@/components/rooms/motion-dom';
 import type { RivalPair } from '@/components/rooms/rivalry';
 import type { RivalryIcons } from '@/components/rooms/rivalry-strip';
 import { RoundResult } from '@/components/rooms/standing';
+import { SpentMark } from '@/components/rooms/taunt-parts';
 import { useCountUp } from '@/components/rooms/use-motion';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
@@ -11,6 +12,7 @@ import type {
     RoomPlayer,
     RoomRankedPlayer,
     RoomResult,
+    RoomSpent,
 } from '@/rooms/contract';
 
 /** In a reveal: the rows start moving this long after they come in, for this long (as `Standing`'s). */
@@ -33,13 +35,16 @@ const ONE_COLUMN = 10;
  * In a reveal the page saw begin (`motion`, ADR 025) the lanes stand where
  * the previous reveal had them, then move to their places while each bar
  * grows and each total counts up from its number before the round
- * (`points − result.points`) to the server's.
+ * (`points − result.points + spent`: from T2 the taunts counted at this
+ * close are added back, and shown beside the round's result as «−:count»,
+ * ADR 029 decision 6) to the server's.
  */
 export function RaceLanes({
     ranking,
     players,
     placeLabels,
     results,
+    spent = [],
     pair,
     icons,
     motion,
@@ -48,6 +53,8 @@ export function RaceLanes({
     players: RoomPlayer[];
     placeLabels: string[];
     results: RoomResult[];
+    /** The taunts counted at this close (T2). */
+    spent?: RoomSpent[];
     /** The strip's pair: its two rows are tinted. */
     pair: RivalPair | null;
     icons: RivalryIcons | null;
@@ -57,6 +64,7 @@ export function RaceLanes({
     const { t } = useTranslation();
     const names = new Map(players.map((player) => [player.id, player]));
     const round = new Map(results.map((result) => [result.player_id, result]));
+    const paid = new Map(spent.map((cost) => [cost.player_id, cost.count]));
     const root = useRef<HTMLDivElement>(null);
     const moved = useRef(false);
     const moves =
@@ -116,6 +124,8 @@ export function RaceLanes({
                     {rows.map((row) => {
                         const tint = side(row);
                         const result = round.get(row.player_id) ?? null;
+                        const cost = paid.get(row.player_id) ?? 0;
+                        const from = row.points - (result?.points ?? 0) + cost;
                         const label =
                             row.place === null
                                 ? null
@@ -126,7 +136,7 @@ export function RaceLanes({
                                 key={row.player_id}
                                 data-player={row.player_id}
                                 className={cn(
-                                    'relative grid min-h-[5.4vh] grid-cols-[7vh_minmax(0,1.3fr)_minmax(0,1fr)_10vh_6vh] items-center gap-[1.4vh] border-b bg-card px-[1.8vh] py-[0.3vh] text-[2.5vh] last:border-b-0',
+                                    'relative grid min-h-[5.4vh] grid-cols-[7vh_minmax(0,1.3fr)_minmax(0,1fr)_14vh_6vh] items-center gap-[1.4vh] border-b bg-card px-[1.8vh] py-[0.3vh] text-[2.5vh] last:border-b-0',
                                     tint === 'left' &&
                                         'bg-[linear-gradient(90deg,var(--rival-left-tint),var(--card)_60%)]',
                                     tint === 'right' &&
@@ -182,23 +192,31 @@ export function RaceLanes({
                                 </span>
                                 <LaneBar
                                     points={row.points}
-                                    from={row.points - (result?.points ?? 0)}
+                                    from={from}
                                     most={most}
                                     tint={tint}
                                     moves={moves}
                                 />
-                                <RoundResult
-                                    result={result}
-                                    big
-                                    delay={
-                                        motion === null
-                                            ? null
-                                            : motion.delay + 120
-                                    }
-                                />
+                                <span className="flex items-center justify-end gap-[0.6vh]">
+                                    <RoundResult
+                                        result={result}
+                                        big
+                                        delay={
+                                            motion === null
+                                                ? null
+                                                : motion.delay + 120
+                                        }
+                                    />
+                                    {cost > 0 && (
+                                        <SpentMark
+                                            count={cost}
+                                            className="text-[2.2vh]"
+                                        />
+                                    )}
+                                </span>
                                 <LaneTotal
                                     points={row.points}
-                                    from={row.points - (result?.points ?? 0)}
+                                    from={from}
                                     moves={moves}
                                 />
                             </li>

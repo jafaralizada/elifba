@@ -13,6 +13,7 @@ use App\Http\Controllers\Rooms\RoomPlaysController;
 use App\Http\Controllers\Rooms\RoomScreenController;
 use App\Http\Controllers\Rooms\RoomSetupController;
 use App\Http\Controllers\Rooms\RoomStateController;
+use App\Http\Controllers\Rooms\RoomTauntController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -86,6 +87,13 @@ Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::mid
         ->can('play', 'room')
         ->name('rooms.answers.store');
 
+    // A present player's own taunt at another, for a point of their own (T2, ADR 029).
+    Route::post('rooms/{room}/taunts', [RoomTauntController::class, 'store'])
+        ->whereUlid('room')
+        ->middleware('throttle:room-taunts')
+        ->can('play', 'room')
+        ->name('rooms.taunts.store');
+
     // The host's tools.
     Route::patch('rooms/{room}', [RoomController::class, 'update'])
         ->whereUlid('room')
@@ -110,6 +118,12 @@ Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::mid
         ->whereUlid('room')
         ->can('start', 'room')
         ->name('rooms.plays.update');
+
+    // The host's switch «Atmacalar», from the phone or the screen, at any time in an open room (T2).
+    Route::put('rooms/{room}/taunts', [RoomTauntController::class, 'update'])
+        ->whereUlid('room')
+        ->can('host', 'room')
+        ->name('rooms.taunts.update');
 
     // A game: the room's choice started in an open room with none running, ended while it runs (B3, G2).
     Route::post('rooms/{room}/games', [RoomGameController::class, 'store'])

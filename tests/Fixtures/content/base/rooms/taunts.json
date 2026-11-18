@@ -1,0 +1,13 @@
+{
+    "version": 1,
+    "taunts": [
+        { "key": "turtle", "image": "fluent/1F422.svg" },
+        { "key": "tick_tock", "image": "fluent/23F0.svg" },
+        { "key": "frozen", "image": "fluent/1F976.svg" },
+        { "key": "sleepy", "image": "fluent/1F634.svg" },
+        { "key": "lucky", "image": "fluent/1F340.svg" },
+        { "key": "dice", "image": "fluent/1F3B2.svg" },
+        { "key": "mine", "image": "fluent/1F60E.svg" },
+        { "key": "catch_me", "image": "fluent/1F680.svg" }
+    ]
+}

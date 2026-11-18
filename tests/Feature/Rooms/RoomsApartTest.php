@@ -2,6 +2,7 @@
 
 use App\Domain\Classroom\Models\SchoolClass;
 use App\Domain\Classroom\Models\Student;
+use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Family\Models\Child;
 use App\Domain\Rooms\Enums\RoomPhase;
 use App\Domain\Rooms\Models\RoomAnswer;
@@ -265,6 +266,43 @@ it('keeps the room pages apart from the children\'s on the page side', function 
                 $wrong[$path][] = $import;
             }
         }
+    }
+
+    expect($wrong)->toBe([]);
+});
+
+it('takes the taunts\' images from the room\'s own list, never from the children\'s catalog', function (): void {
+    $wrong = [];
+    // What the children's games are drawn from: packs, their words and pictures, levels, prompts, avatars.
+    $catalog = ['Content\\Data\\PackData', 'Content\\Data\\WordData', 'Content\\Data\\LevelData', 'Content\\Data\\PromptTemplateData', 'Content\\Support\\Avatars', 'Content\\Support\\TeacherPacks', 'Content\\Enums\\Mechanic'];
+
+    foreach ([...phpFilesUnder(app_path('Domain/Rooms')), ...phpFilesUnder(app_path('Http/Controllers/Rooms'))] as $path) {
+        $file = str_replace(base_path().'/', '', $path);
+        $source = (string) file_get_contents($path);
+
+        foreach (appNamesIn($path) as $name) {
+            if (array_any($catalog, static fn (string $part): bool => str_ends_with($name, $part))) {
+                $wrong[$file][] = $name;
+            }
+        }
+
+        if (preg_match('/->(packs?|levels?|prompts?)\(/', $source) === 1) {
+            $wrong[$file][] = 'a pack, a level or a prompt of the children\'s content';
+        }
+    }
+
+    // A room page gets every emoji by the URL of its prop, never by a path of its own.
+    foreach (['rooms', 'pages/rooms', 'components/rooms'] as $folder) {
+        foreach (File::allFiles(resource_path("js/{$folder}")) as $file) {
+            if (str_contains($file->getContents(), 'fluent/')) {
+                $wrong[str_replace(base_path().'/', '', $file->getPathname())][] = 'fluent/';
+            }
+        }
+    }
+
+    // And the list names only the Fluent set.
+    foreach (app(ContentRepository::class)->roomTaunts() as $taunt) {
+        expect($taunt->image)->toStartWith('fluent/');
     }
 
     expect($wrong)->toBe([]);

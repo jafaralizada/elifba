@@ -184,6 +184,13 @@ function isolationCases(): array
             'round_id' => $w['roomGameA']->rounds[0]->id,
             'picked' => $w['roomGameA']->rounds[0]->askData()->ids(),
         ]],
+        // A taunt at a player of A's room, and the host's switch for them (T2).
+        'POST rooms/{room}/taunts' => ['rooms.taunts.store', $roomA, static fn (array $w): array => [
+            'event_id' => '01kaqs2s1r0q9p8n7m6k5j4h3g',
+            'target_id' => $w['memberA']->id,
+            'taunt' => 'turtle',
+        ]],
+        'PUT rooms/{room}/taunts' => ['rooms.taunts.update', $roomA, static fn (array $w): array => ['on' => false]],
         // A closed room: the host deletes it, a player takes their name out.
         'DELETE rooms/{room}' => ['rooms.destroy', $closedRoomA, $none],
         'DELETE rooms/{room}/name' => ['rooms.name.destroy', $closedRoomA, $none],
@@ -239,6 +246,7 @@ function isolationSnapshot(): array
         'room_games' => $rows('room_games'),
         'room_rounds' => $rows('room_rounds'),
         'room_answers' => $rows('room_answers'),
+        'room_taunts' => $rows('room_taunts'),
     ];
 }
 

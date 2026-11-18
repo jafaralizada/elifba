@@ -1,12 +1,13 @@
 {
-    "v": 2,
+    "v": 3,
     "revision": 5,
     "server_ms": 1795534220000,
     "room": {
         "id": "01kaqrx1zd7w4n5v6b8c9defgh",
         "status": "open",
         "locked": false,
-        "code": "482913"
+        "code": "482913",
+        "taunts": true
     },
     "me": {
         "player_id": "01kaqrx3mn4p5q6r7s8t9vwxyz",
@@ -118,5 +119,12 @@
         "difficulty": 1,
         "rounds": 5,
         "played": false
+    },
+    "taunts": {
+        "open": true,
+        "balance": 17,
+        "ready_ms": null,
+        "received": [],
+        "shown": null
     }
 }

@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef } from 'react';
 import { rankShift } from '@/components/rooms/motion';
 import { slideRows } from '@/components/rooms/motion-dom';
 import { standingGroups } from '@/components/rooms/standing-groups';
+import { SpentMark } from '@/components/rooms/taunt-parts';
 import { useCountUp } from '@/components/rooms/use-motion';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
@@ -10,6 +11,7 @@ import type {
     RoomPlayer,
     RoomRankedPlayer,
     RoomResult,
+    RoomSpent,
 } from '@/rooms/contract';
 
 /** In a reveal: the rows start moving this long after they come in, for this long. */
@@ -28,9 +30,11 @@ const MOVE_MS = 700;
  *
  * In a reveal the page saw begin (`motion`, ADR 025) the rows stand where
  * the previous reveal had them, then move to their places while each total
- * counts up from its number before the round (`points − result.points`)
- * to the server's, and the round's results pop in. It is a plain list:
- * the final of a game is `FinalStanding`.
+ * counts up from its number before the round (`points − result.points`,
+ * from T2 `+ spent`: the taunts counted at this close, shown beside the
+ * result as «−:count», ADR 029 decision 6) to the server's, and the
+ * round's results pop in. It is a plain list: the final of a game is
+ * `FinalStanding`.
  */
 export function Standing({
     ranking,
@@ -38,6 +42,7 @@ export function Standing({
     me,
     placeLabels,
     results = null,
+    spent = [],
     big = false,
     motion = null,
 }: {
@@ -47,6 +52,8 @@ export function Standing({
     placeLabels: string[];
     /** The round's results, in a reveal: a player without one did not answer. */
     results?: RoomResult[] | null;
+    /** The taunts counted at this close, in a reveal (T2). */
+    spent?: RoomSpent[];
     /** The screen's size. */
     big?: boolean;
     /** A reveal the page saw begin: the previous reveal's order, and when the rows start. */
@@ -57,6 +64,7 @@ export function Standing({
     const round = new Map(
         (results ?? []).map((result) => [result.player_id, result]),
     );
+    const paid = new Map(spent.map((cost) => [cost.player_id, cost.count]));
     const list = useRef<HTMLOListElement>(null);
     const moved = useRef(false);
     const moves =
@@ -105,6 +113,7 @@ export function Standing({
                         {group.rows.map((row) => {
                             const mine = row.player_id === me;
                             const result = round.get(row.player_id);
+                            const cost = paid.get(row.player_id) ?? 0;
 
                             return (
                                 <li
@@ -137,10 +146,22 @@ export function Standing({
                                             }
                                         />
                                     )}
+                                    {cost > 0 && (
+                                        <SpentMark
+                                            count={cost}
+                                            className={
+                                                big
+                                                    ? 'text-[2.2vh]'
+                                                    : 'text-[0.78125rem]'
+                                            }
+                                        />
+                                    )}
                                     <Total
                                         points={row.points}
                                         from={
-                                            row.points - (result?.points ?? 0)
+                                            row.points -
+                                            (result?.points ?? 0) +
+                                            cost
                                         }
                                         moves={moves}
                                         big={big}

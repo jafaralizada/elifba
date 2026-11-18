@@ -6,6 +6,7 @@ use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomAnswer;
 use App\Domain\Rooms\Models\RoomGame;
 use App\Domain\Rooms\Models\RoomPlayer;
+use App\Domain\Rooms\Models\RoomTaunt;
 use App\Domain\Rooms\Support\RoomClock;
 use App\Domain\Rooms\Support\RoomRanking;
 use App\Models\User;
@@ -190,4 +191,35 @@ it('keeps a nameless player\'s points', function (): void {
         ->assertInertia(fn (Assert $page) => $page
             ->where('state.ranking.1', ['player_id' => $rows[1]->id, 'points' => 15, 'place' => 1])
             ->where('state.players.1.name', null));
+});
+
+it('ranks the net points of a game, and a player brought to 0 by taunts has no place', function (): void {
+    ['room' => $room, 'game' => $game, 'rows' => $rows] = roomRankingRoom(['Rəşad', 'Aygün', 'Tural', 'Nigar'], rounds: 3);
+    roomRankingAnswers($game, 0, $rows, [12, 14, 2, 10]);
+    $timetable = $game->timetable();
+    // Thrown in round 1's question, they count at its close (§12 "Taunts (T2)").
+    $in = static fn (RoomPlayer $by, int $count) => RoomTaunt::factory()->count($count)->for($game, 'game')->by($by)->at($rows[0])
+        ->create(['sent_ms' => $timetable->answerFrom(1)]);
+    $in($rows[1], 2);
+    $in($rows[2], 2);
+    $in($rows[3], 1);
+
+    $this->travelTo(RoomClock::at($timetable->closes(1) - 1));
+    expect(roomRankingRows(RoomRanking::ofGame($game, RoomClock::nowMs()), $rows))->toBe([
+        [1, 14, 1], [0, 12, 2], [3, 10, 3], [2, 2, 4],
+    ]);
+
+    // 12, 14 − 2, 2 − 2, 10 − 1: dense places over the net, Tural at 0 without one.
+    $this->travelTo(RoomClock::at($timetable->closes(1)));
+    expect(roomRankingRows(RoomRanking::ofGame($game, RoomClock::nowMs()), $rows))->toBe([
+        [1, 12, 1], [0, 12, 1], [3, 9, 2], [2, 0, null],
+    ]);
+
+    // The room's standing adds each game's net: a later game's points never pay an earlier game's taunts.
+    $next = RoomGame::factory()->for($room)->withRounds(2)->create(['started_ms' => $timetable->overMs() + 1_000]);
+    roomRankingAnswers($next, 0, $rows, [0, 0, 20, 0]);
+    $this->travelTo(RoomClock::at($next->timetable()->overMs()));
+    expect(roomRankingRows(RoomRanking::ofRoom($room->refresh(), RoomClock::nowMs()), $rows))->toBe([
+        [2, 20, 1], [1, 12, 2], [0, 12, 2], [3, 9, 3],
+    ]);
 });

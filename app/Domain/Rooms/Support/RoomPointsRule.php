@@ -12,12 +12,21 @@ use InvalidArgumentException;
  * nothing is negative. The time is held to the round's answer time, so a
  * moment before the question counts as at once and one after the bell as
  * at the bell. Not `Play\Support\PointsRule`, which children's games keep.
+ *
+ * From T2 a taunt costs its thrower `TAUNT_COST` (§12 "Taunts (T2)", ADR
+ * 029 decision 1), a constant here and never config, so a change never
+ * re-prices a game already played. An answer's points never change for
+ * it: `RoomRanking` subtracts the cost of the taunts counted at a close,
+ * and `RoomTauntBalance` what a player may still spend.
  */
 final class RoomPointsRule
 {
     public const int RIGHT = 10;
 
     public const int SPEED = 10;
+
+    /** What one taunt costs the player who throws it; the target pays nothing. */
+    public const int TAUNT_COST = 1;
 
     /**
      * @param  int  $elapsedMs  the server's receipt − the moment the question opened

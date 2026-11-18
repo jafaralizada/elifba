@@ -20,6 +20,7 @@ import type {
     RoomRankedPlayer,
     RoomResult,
     RoomRound,
+    RoomSpent,
     RoomState,
 } from '@/rooms/contract';
 
@@ -118,7 +119,9 @@ export function useRivalry(
  * pair's sides changed, the sides it showed move first and then drop into
  * their new places. An overtake adds one light across the bar and a
  * ribbon until the next round. Under reduced motion all of it stands at
- * its new values, the ribbon included.
+ * its new values, the ribbon included. From T2 the count starts from
+ * before the taunts counted at this close (`spent`, ADR 029 decision 6);
+ * a taunt shown now lies over the strip, which never moves under it.
  */
 export function RivalryStrip({
     pair,
@@ -126,6 +129,7 @@ export function RivalryStrip({
     overtake,
     ranking,
     results,
+    spent = [],
     players,
     placeLabels,
     icons,
@@ -139,6 +143,8 @@ export function RivalryStrip({
     ranking: RoomRankedPlayer[];
     /** The round's results, in a reveal. */
     results: RoomResult[] | null;
+    /** The taunts counted at this close, in a reveal (T2): the count starts before their cost. */
+    spent?: RoomSpent[];
     players: RoomPlayer[];
     placeLabels: string[];
     icons: RivalryIcons | null;
@@ -167,7 +173,7 @@ export function RivalryStrip({
     const staged = animate ? interimPair(previous, pair, ranking) : null;
     const swapped = staged !== null && step >= 3;
     const drawn = staged !== null && !swapped ? staged : pair;
-    const before = pairBefore(drawn, results);
+    const before = pairBefore(drawn, results, spent);
     const sliding = animate && !swapped;
     const split = sliding && step === 0 ? before.split : drawn.split;
     const words = animate && step < 2 && previous !== null ? previous : drawn;

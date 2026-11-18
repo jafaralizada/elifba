@@ -27,10 +27,17 @@ import { REVEAL_MS } from '@/components/rooms/motion';
 import { RaceLanes } from '@/components/rooms/race-lanes';
 import { RivalryStrip, useRivalry } from '@/components/rooms/rivalry-strip';
 import type { RivalryIcons } from '@/components/rooms/rivalry-strip';
+import {
+    ScreenTauntCover,
+    ScreenTauntsToggle,
+    useTauntsHidden,
+} from '@/components/rooms/taunt-parts';
+import type { TauntList } from '@/components/rooms/taunt-parts';
 import { RoomQr, spacedCode, typedAddress } from '@/components/rooms/room-code';
 import { ScreenFit } from '@/components/rooms/screen-fit';
 import type { JoinLink } from '@/components/rooms/room-code';
 import { SoundToggle } from '@/components/rooms/sound-toggle';
+import { useTauntsSwitch } from '@/components/rooms/taunts-switch';
 import { Standing } from '@/components/rooms/standing';
 import { StandingCard, useChoiceLine } from '@/components/rooms/start-parts';
 import { useLiveRoom } from '@/components/rooms/use-live-room';
@@ -69,6 +76,8 @@ type Props = {
     sounds: RoomSoundUrls;
     /** The rivalry strip's emoji (ADR 027). */
     rivalry: RivalryIcons;
+    /** The taunts' list, each key with its emoji (T2, ADR 029). */
+    taunts: TauntList;
 };
 
 /**
@@ -81,8 +90,10 @@ type Props = {
  * of the round — the countdown, the material while it is studied, the
  * question with the count of answers — then the reveal with the ranking
  * and each player's result, under the rivalry strip of the first two
- * (ADR 027), the ranking as race lanes with three players or more; after
- * a game its final beside «Yenidən oyna»
+ * (ADR 027), the ranking as race lanes with three players or more; a
+ * taunt thrown now over that strip for 4 s, «:from → :to» and the phrase,
+ * which its top bar's «Atmacalar» hides on this screen (T2, ADR 029
+ * decision 21); after a game its final beside «Yenidən oyna»
  * and the five other games. Before and after a game it sends the host's
  * own requests for the choice and the start (`useRoomChoice()`,
  * `useRoomStart()`), which the server lets through for the host; it holds
@@ -103,6 +114,7 @@ export default function RoomsScreen({
     catalog,
     sounds,
     rivalry,
+    taunts,
 }: Props) {
     const { t } = useTranslation();
     // A closed room has no screen: its results are on the room's page.
@@ -114,6 +126,7 @@ export default function RoomsScreen({
         answers: false,
     });
     const motion = useRoomMotion(state);
+    const [tauntsHidden, setTauntsHidden] = useTauntsHidden('screen');
     const sound = useRoomSound({ speaker: 'screen', sounds, state, clock });
     const game = state?.game ?? null;
     const round = state?.round ?? null;
@@ -144,6 +157,12 @@ export default function RoomsScreen({
                     </span>
                 )}
                 <span className="flex-1" />
+                {state?.room.status === 'open' && state.room.taunts && (
+                    <ScreenTauntsToggle
+                        hidden={tauntsHidden}
+                        onChange={setTauntsHidden}
+                    />
+                )}
                 <SoundToggle sound={sound} big />
                 <FullscreenToggle />
                 <Button asChild variant="ghost" className="h-11">
@@ -172,6 +191,8 @@ export default function RoomsScreen({
                         placeLabels={placeLabels}
                         motion={motion}
                         icons={rivalry}
+                        taunts={taunts}
+                        tauntsHidden={tauntsHidden}
                     />
                 </main>
             ) : (
@@ -218,6 +239,11 @@ function ScreenHost({
     refresh: () => void;
 }) {
     const choice = useRoomChoice({ roomId, choice: setup, onChanged: refresh });
+    const tauntsSwitch = useTauntsSwitch({
+        roomId,
+        on: state.room.taunts,
+        onChanged: refresh,
+    });
     const start = useRoomStart({ roomId, onChanged: refresh });
     const [settings, setSettings] = useState(false);
 
@@ -252,6 +278,7 @@ function ScreenHost({
                 open={settings}
                 onOpenChange={setSettings}
                 big
+                taunts={tauntsSwitch}
             />
         </>
     );
@@ -578,6 +605,8 @@ function ScreenRound({
     placeLabels,
     motion,
     icons,
+    taunts,
+    tauntsHidden,
 }: {
     state: RoomState;
     game: RoomGame;
@@ -586,6 +615,9 @@ function ScreenRound({
     placeLabels: string[];
     motion: RoomMotion;
     icons: RivalryIcons;
+    taunts: TauntList;
+    /** This screen hides taunts (its «Atmacalar»). */
+    tauntsHidden: boolean;
 }) {
     const { t } = useTranslation();
     const now = useServerNow(clock, true);
@@ -627,19 +659,29 @@ function ScreenRound({
             )}
         >
             {rivalry.pair !== null && (
-                <RivalryStrip
-                    key={`strip:${round.index}:${round.phase === 'reveal' ? 'reveal' : 'open'}`}
-                    pair={rivalry.pair}
-                    previous={rivalry.previous}
-                    overtake={rivalry.overtake}
-                    ranking={state.ranking}
-                    results={round.reveal?.results ?? null}
-                    players={state.players}
-                    placeLabels={placeLabels}
-                    icons={icons}
-                    moves={motion.strip}
-                    big
-                />
+                <div className="relative">
+                    <RivalryStrip
+                        key={`strip:${round.index}:${round.phase === 'reveal' ? 'reveal' : 'open'}`}
+                        pair={rivalry.pair}
+                        previous={rivalry.previous}
+                        overtake={rivalry.overtake}
+                        ranking={state.ranking}
+                        results={round.reveal?.results ?? null}
+                        spent={round.reveal?.spent ?? []}
+                        players={state.players}
+                        placeLabels={placeLabels}
+                        icons={icons}
+                        moves={motion.strip}
+                        big
+                    />
+                    <ScreenTauntCover
+                        shown={state.taunts?.shown}
+                        players={state.players}
+                        taunts={taunts}
+                        now={now}
+                        hidden={tauntsHidden}
+                    />
+                </div>
             )}
 
             <RoundHead
@@ -748,6 +790,7 @@ function ScreenRound({
                                             players={state.players}
                                             placeLabels={placeLabels}
                                             results={round.reveal.results}
+                                            spent={round.reveal.spent}
                                             pair={rivalry.pair}
                                             icons={icons}
                                             motion={ranking.motion}
@@ -763,6 +806,7 @@ function ScreenRound({
                                                 me={null}
                                                 placeLabels={placeLabels}
                                                 results={round.reveal.results}
+                                                spent={round.reveal.spent}
                                                 motion={ranking.motion}
                                                 big
                                             />

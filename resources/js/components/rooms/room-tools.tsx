@@ -4,6 +4,10 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import InputError from '@/components/input-error';
 import { RoomConfirm } from '@/components/rooms/room-confirm';
+import {
+    TauntsSwitchRow,
+    useTauntsSwitch,
+} from '@/components/rooms/taunts-switch';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -27,8 +31,9 @@ export const SHEET =
 /**
  * «Otağın idarəsi» (docs/frontend.md rule 15 "Games first", ADR 026
  * decision 16): the host's tools behind one 44px `Ellipsis` button, a
- * sheet of 52px rows — «Mən də oynayıram» and «Kilidlə» as switches with
- * their lines, «Böyük ekran» (a link: the game is chosen and started from
+ * sheet of 52px rows — «Mən də oynayıram», «Kilidlə» and, from T2,
+ * «Atmacalar» (ADR 029 decision 12) as switches with their lines, «Böyük
+ * ekran» (a link: the game is chosen and started from
  * there too) and «Otağı bağla», which asks first. Not offered while a
  * game runs: the round has «Oyunu bitir» instead, and the two never stand
  * on one screen.
@@ -51,6 +56,11 @@ export function RoomTools({
     );
     const plays = mine?.present ?? false;
     const locked = state.room.locked;
+    const taunts = useTauntsSwitch({
+        roomId,
+        on: state.room.taunts,
+        onChanged,
+    });
 
     const togglePlays = () => {
         setBusy('plays');
@@ -154,6 +164,7 @@ export function RoomTools({
                         disabled={busy !== null}
                         onToggle={toggleLock}
                     />
+                    <TauntsSwitchRow taunts={taunts} disabled={busy !== null} />
                     <Link
                         href={screen(roomId)}
                         className="flex min-h-13 items-center gap-3 py-3 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
@@ -187,9 +198,13 @@ export function RoomTools({
                         destructive
                         form={close.form(roomId)}
                     />
-                    {error !== null && (
+                    {(error !== null || taunts.failed) && (
                         <div className="py-2">
-                            <InputError message={error} />
+                            <InputError
+                                message={
+                                    error ?? t('rooms.setup.change_failed')
+                                }
+                            />
                         </div>
                     )}
                 </div>
@@ -198,25 +213,43 @@ export function RoomTools({
     );
 }
 
-function RowText({ label, line }: { label: string; line: string }) {
+function RowText({
+    label,
+    line,
+    big = false,
+}: {
+    label: string;
+    line: string;
+    big?: boolean;
+}) {
     return (
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="font-medium">{label}</span>
-            <span className="text-[0.8125rem] leading-snug text-muted-foreground">
+            <span
+                className={cn('font-medium', big && 'text-[max(1rem,2.2vh)]')}
+            >
+                {label}
+            </span>
+            <span
+                className={cn(
+                    'leading-snug text-muted-foreground',
+                    big ? 'text-[max(0.875rem,1.9vh)]' : 'text-[0.8125rem]',
+                )}
+            >
                 {line}
             </span>
         </span>
     );
 }
 
-/** A 52px row that is one switch: its label, its line and the track. */
-function SwitchRow({
+/** A 52px row that is one switch: its label, its line and the track (on the screen, `big`, in `vh`). */
+export function SwitchRow({
     label,
     line,
     on,
     busy,
     disabled,
     onToggle,
+    big = false,
 }: {
     label: string;
     line: string;
@@ -224,6 +257,7 @@ function SwitchRow({
     busy: boolean;
     disabled: boolean;
     onToggle: () => void;
+    big?: boolean;
 }) {
     return (
         <button
@@ -232,9 +266,12 @@ function SwitchRow({
             aria-checked={on}
             disabled={disabled}
             onClick={onToggle}
-            className="flex min-h-13 items-center gap-3 py-3 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-wait"
+            className={cn(
+                'flex items-center gap-3 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-wait',
+                big ? 'min-h-[max(2.75rem,6vh)] py-[1vh]' : 'min-h-13 py-3',
+            )}
         >
-            <RowText label={label} line={line} />
+            <RowText label={label} line={line} big={big} />
             {busy ? <Spinner /> : <Track on={on} />}
         </button>
     );

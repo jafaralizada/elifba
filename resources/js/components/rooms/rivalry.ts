@@ -2,6 +2,7 @@ import type {
     RoomPlayer,
     RoomRankedPlayer,
     RoomResult,
+    RoomSpent,
     RoomState,
 } from '@/rooms/contract';
 
@@ -263,12 +264,14 @@ export function interimPair(
 
 /**
  * The same pair at the totals before the round — each side's points less
- * its result of the round (`points − result.points`, ADR 025's count) —
- * where a reveal's movement starts from.
+ * its result of the round, with the taunts counted at this close added
+ * back (`points − result.points + spent`, ADR 025's count as ADR 029
+ * amends it) — where a reveal's movement starts from.
  */
 export function pairBefore(
     pair: RivalPair,
     results: RoomResult[] | null,
+    spent: RoomSpent[] = [],
 ): RivalPair {
     if (results === null) {
         return pair;
@@ -277,12 +280,16 @@ export function pairBefore(
     const won = new Map(
         results.map((result) => [result.player_id, result.points]),
     );
+    const paid = new Map(spent.map((cost) => [cost.player_id, cost.count]));
     const before = (side: RoomRankedPlayer | null) =>
         side === null
             ? null
             : {
                   ...side,
-                  points: side.points - (won.get(side.player_id) ?? 0),
+                  points:
+                      side.points -
+                      (won.get(side.player_id) ?? 0) +
+                      (paid.get(side.player_id) ?? 0),
               };
 
     return withNumbers({

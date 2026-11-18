@@ -33,8 +33,10 @@ import { CodeChip, CodeDialog, InviteCard } from '@/components/rooms/room-code';
 import type { JoinLink } from '@/components/rooms/room-code';
 import { RoomConfirm } from '@/components/rooms/room-confirm';
 import type { RivalryIcons } from '@/components/rooms/rivalry-strip';
+import type { TauntList } from '@/components/rooms/taunt-parts';
 import { RoomTools } from '@/components/rooms/room-tools';
 import { SoundToggle } from '@/components/rooms/sound-toggle';
+import { useTauntsSwitch } from '@/components/rooms/taunts-switch';
 import { Standing } from '@/components/rooms/standing';
 import {
     ChoiceRow,
@@ -91,6 +93,8 @@ type Props = {
     sounds: RoomSoundUrls | null;
     /** The rivalry strip's emoji (ADR 027); null when it follows no open room. */
     rivalry: RivalryIcons | null;
+    /** The taunts a player may throw, each key with its emoji (T2, ADR 029); null when it follows no open room. */
+    taunts: TauntList | null;
     can: Can;
 };
 
@@ -122,6 +126,7 @@ export default function RoomsShow({
     games,
     sounds,
     rivalry,
+    taunts,
     can,
 }: Props) {
     const { t } = useTranslation();
@@ -181,6 +186,7 @@ export default function RoomsShow({
                         motion={motion}
                         sound={sound}
                         icons={rivalry}
+                        taunts={taunts}
                         aside={
                             <>
                                 {sounds !== null && (
@@ -317,6 +323,11 @@ function HostRoom({
 }) {
     const { t } = useTranslation();
     const choice = useRoomChoice({ roomId, choice: setup, onChanged: refresh });
+    const tauntsSwitch = useTauntsSwitch({
+        roomId,
+        on: state.room.taunts,
+        onChanged: refresh,
+    });
     const { starting, failed, start } = useRoomStart({
         roomId,
         onChanged: refresh,
@@ -463,6 +474,7 @@ function HostRoom({
                 choice={choice}
                 open={settings}
                 onOpenChange={setSettings}
+                taunts={tauntsSwitch}
             />
         </div>
     );

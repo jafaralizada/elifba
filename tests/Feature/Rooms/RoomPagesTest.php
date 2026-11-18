@@ -283,8 +283,9 @@ it('sends no account id, address or solution to any room page', function (): voi
                         ->and($wire)->not->toContain('"id":'.$someone->id.'}', "{$moment} {$name}");
                 }
 
+                // Keys, not values: a taunt's key is a word too (`mine`, ADR 029 decision 27).
                 if ($round !== null) {
-                    expect($wire)->not->toMatch('/"(solution|accept|correct|mine|results|picked|elapsed_ms)"/', "{$moment} {$name}")
+                    expect($wire)->not->toMatch('/"(solution|accept|correct|mine|results|picked|elapsed_ms|spent)":/', "{$moment} {$name}")
                         ->and($wire)->not->toContain(json_encode(Rooms::right($round)), "{$moment} {$name}");
                 }
             }
@@ -387,7 +388,7 @@ it('gives the screen only to the host', function (): void {
 
     expect(array_keys($props))->toContain('room', 'state', 'place_labels', 'join')
         ->and($props['room'])->toBe(['id' => $room->id, 'status' => 'open'])
-        ->and($props['state'])->toBe($this->getJson(route('rooms.state', $room), ['Referer' => route('rooms.screen', $room)])->json())
+        ->and($props['state'])->toBe($this->getJson(route('rooms.state', [$room, 'for' => 'screen']), ['Referer' => route('rooms.screen', $room)])->json())
         ->and($props['join']['url'])->toBe(rtrim((string) config('app.url'), '/').'/oyun/'.$room->code);
     $this->get(route('rooms.screen', $room))->assertInertia(fn (Assert $page) => $page->component('rooms/screen'));
 
@@ -398,7 +399,7 @@ it('gives the screen only to the host', function (): void {
     $props = pagesProps($this->actingAs($this->resad)->get(route('rooms.screen', $room)));
 
     expect($props['state']['round']['phase'])->toBe('study')
-        ->and($props['state'])->toBe($this->getJson(route('rooms.state', $room), ['Referer' => route('rooms.screen', $room)])->json())
+        ->and($props['state'])->toBe($this->getJson(route('rooms.state', [$room, 'for' => 'screen']), ['Referer' => route('rooms.screen', $room)])->json())
         ->and([DB::table('rooms')->get()->all(), DB::table('room_players')->get()->all(), DB::table('room_answers')->count(), RoomRound::query()->whereNotNull('closed_ms')->count()])->toEqual($before);
 
     // A player of the room, a host who does not play too: only the host.
@@ -468,6 +469,29 @@ it('sends the rivalry icons to the room page of an open room and to the screen, 
     $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('rivalry', null));
     $this->actingAs($this->resad)->post(route('rooms.close', $room))->assertRedirect();
     $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('rivalry', null));
+});
+
+it('sends the room page and the screen the taunts\' images, and a closed room none', function (): void {
+    $room = Rooms::open($this->resad);
+    Rooms::join($room, $this->aygun);
+    $keys = ['turtle', 'tick_tock', 'frozen', 'sleepy', 'lucky', 'dice', 'mine', 'catch_me', 'too_easy', 'so_close'];
+    $folder = asset('content/fluent').'/';
+
+    // The screen and every phone that follows the room: each key with its emoji, never a phrase.
+    foreach ([[$this->resad, route('rooms.screen', $room)], [$this->resad, route('rooms.show', $room)], [$this->aygun, route('rooms.show', $room)]] as [$account, $url]) {
+        $taunts = pagesProps($this->actingAs($account)->get($url))['taunts'];
+
+        expect(array_column($taunts, 'key'))->toBe($keys)
+            ->and(array_map(array_keys(...), $taunts))->each->toBe(['key', 'url'])
+            ->and(array_column($taunts, 'url'))->each->toStartWith($folder)
+            ->and(array_column($taunts, 'url')[0])->toBe($folder.'1F422.svg?v=1');
+    }
+
+    // A player who left follows nothing, and a closed room throws nothing.
+    $this->actingAs($this->aygun)->post(route('rooms.leave', $room))->assertRedirect();
+    $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('taunts', null));
+    $this->actingAs($this->resad)->post(route('rooms.close', $room))->assertRedirect();
+    $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('taunts', null));
 });
 
 it('names the family of each game the setup offers and what each level holds', function (): void {

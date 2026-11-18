@@ -243,7 +243,7 @@ How a live room game shows its players as rivals (ADR 027, architecture §12 "Ri
 
 ### Taunts (T2)
 
-A ready-made jibe a player throws a rival during a room game, for a point of their own (ADR 029, architecture §12 "Taunts (T2)", docs/frontend.md rule 15 "Taunts"), designed in T1 on 2026-11-18 and built by T2. Until T2 lands none of the code names exists.
+A ready-made jibe a player throws a rival during a room game, for a point of their own (ADR 029, architecture §12 "Taunts (T2)", docs/frontend.md rule 15 "Taunts"), designed in T1 on 2026-11-18 and built by T2 the same day (what the build added: architecture §12 "Taunts (T2)", "As built (T2)").
 
 | Azərbaycanca       | English           | Code                                                                                    | Notes                                                                                                                                                           |
 | ------------------ | ----------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |

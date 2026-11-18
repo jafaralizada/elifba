@@ -39,7 +39,11 @@ export function useLiveRoom({
     room: { id: string; status: 'open' | 'closed' };
     initial: RoomState | null;
     onClosed?: () => void;
-    /** Whether the page answers for its viewer: false for the big screen (`followRoom()`). */
+    /**
+     * Whether the page answers for its viewer: false for the big screen
+     * (`followRoom()`), which asks for the state as the screen
+     * (`?for=screen`: every taunt shown now with its target, T2).
+     */
     answers?: boolean;
 }): {
     state: RoomState | null;
@@ -98,7 +102,13 @@ export function useLiveRoom({
         const refresh = oneAtATime(() =>
             (stopped
                 ? Promise.resolve(null)
-                : fetchState(stateRoute.url(room.id))
+                : fetchState(
+                      answers
+                          ? stateRoute.url(room.id)
+                          : stateRoute.url(room.id, {
+                                query: { for: 'screen' },
+                            }),
+                  )
             ).then((result) => {
                 if (stopped || result === null) {
                     return;

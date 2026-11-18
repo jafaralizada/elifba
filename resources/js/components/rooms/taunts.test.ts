@@ -1,0 +1,254 @@
+import { describe, expect, it } from 'vite-plus/test';
+import type { RoomState } from '@/rooms/contract';
+import {
+    readTauntsHidden,
+    shownTaunts,
+    TAUNT_SHOW_MS,
+    tauntMoment,
+    tauntsEnd,
+    TAUNTS_HIDDEN_KEYS,
+    TAUNTS_UNSEEN,
+    trayView,
+    writeTauntsHidden,
+} from './taunts';
+
+/*
+ * Taunts on a page (docs/frontend.md rule 15 "Taunts", ADR 029 decisions
+ * 17–24): what a page shows of the state's taunts, when a card pops in,
+ * what the tray says, and the device's own choice to hide them. The
+ * numbers are the server's; these only read them.
+ */
+
+const fixtures = import.meta.glob<unknown>(
+    '../../../../tests/Fixtures/rooms/state.*.json',
+    { eager: true, import: 'default' },
+);
+
+function state(name: string): RoomState {
+    return fixtures[
+        `../../../../tests/Fixtures/rooms/state.${name}.json`
+    ] as RoomState;
+}
+
+const taunt = (id: string, sentMs: number) => ({
+    id,
+    from: '01kaqrx2ab3c4d5e6f7g8h9jkm',
+    taunt: 'turtle',
+    sent_ms: sentMs,
+});
+
+/** A live state with its taunts changed. */
+function withTaunts(
+    live: RoomState,
+    patch: Partial<NonNullable<RoomState['taunts']>>,
+): RoomState {
+    return { ...live, taunts: { ...live.taunts!, ...patch } } as RoomState;
+}
+
+function memory(): Storage & { data: Map<string, string> } {
+    const data = new Map<string, string>();
+
+    return {
+        data,
+        length: 0,
+        clear: () => data.clear(),
+        key: () => null,
+        getItem: (key) => data.get(key) ?? null,
+        setItem: (key, value) => void data.set(key, value),
+        removeItem: (key) => void data.delete(key),
+    };
+}
+
+describe('tauntMoment', () => {
+    it('shows a taunt the page heard arrive once, however often the state comes again', () => {
+        let seen = tauntMoment(TAUNTS_UNSEEN, []).seen;
+        let moment = tauntMoment(seen, ['a']);
+
+        expect(moment.arrived).toEqual(['a']);
+        seen = moment.seen;
+
+        // The same state again, or with the taunt beside a new one.
+        moment = tauntMoment(seen, ['a']);
+        expect(moment.arrived).toEqual([]);
+        moment = tauntMoment(moment.seen, ['b', 'a']);
+        expect(moment.arrived).toEqual(['b']);
+        expect(tauntMoment(moment.seen, ['b', 'a']).arrived).toEqual([]);
+    });
+
+    it('draws a taunt the page opened on still', () => {
+        const opened = tauntMoment(TAUNTS_UNSEEN, ['a', 'b']);
+
+        expect(opened.arrived).toEqual([]);
+        expect(tauntMoment(opened.seen, ['a', 'b']).arrived).toEqual([]);
+        expect(tauntMoment(opened.seen, ['c', 'a']).arrived).toEqual(['c']);
+    });
+});
+
+describe('shownTaunts', () => {
+    it("drops a taunt at sent_ms + show_ms by the server's clock", () => {
+        const list = [taunt('a', 10_000)];
+
+        expect(TAUNT_SHOW_MS).toBe(4_000);
+        expect(shownTaunts(list, 10_000, false)).toEqual(list);
+        expect(shownTaunts(list, 13_999, false)).toEqual(list);
+        expect(shownTaunts(list, 14_000, false)).toEqual([]);
+        // An estimate a little behind the server still shows what the state holds.
+        expect(shownTaunts(list, 9_900, false)).toEqual(list);
+        // Before the page knows the server's clock, nothing.
+        expect(shownTaunts(list, null, false)).toEqual([]);
+        expect(tauntsEnd(list)).toBe(14_000);
+        expect(tauntsEnd([])).toBeNull();
+    });
+
+    it('shows the two that came first, and a third once a place is free', () => {
+        // Newest first, as the state lists them.
+        const list = [
+            taunt('c', 12_000),
+            taunt('b', 11_000),
+            taunt('a', 10_000),
+        ];
+
+        expect(shownTaunts(list, 12_000, false).map((t) => t.id)).toEqual([
+            'a',
+            'b',
+        ]);
+        expect(shownTaunts(list, 14_000, false).map((t) => t.id)).toEqual([
+            'b',
+            'c',
+        ]);
+    });
+
+    it('shows nothing while this device hides taunts', () => {
+        const storage = memory();
+        const list = [taunt('a', 10_000)];
+
+        expect(readTauntsHidden(storage, 'phone')).toBe(false);
+        writeTauntsHidden(storage, 'phone', true);
+        expect(storage.data.get(TAUNTS_HIDDEN_KEYS.phone)).toBe('1');
+        expect(readTauntsHidden(storage, 'phone')).toBe(true);
+        // The screen's choice is its own.
+        expect(readTauntsHidden(storage, 'screen')).toBe(false);
+        expect(
+            shownTaunts(list, 10_000, readTauntsHidden(storage, 'phone')),
+        ).toEqual([]);
+        writeTauntsHidden(storage, 'phone', false);
+        expect(storage.data.has(TAUNTS_HIDDEN_KEYS.phone)).toBe(false);
+
+        // A storage that refuses: not hidden, and nothing throws.
+        const refusing = {
+            getItem: () => {
+                throw new Error('denied');
+            },
+            setItem: () => {
+                throw new Error('denied');
+            },
+            removeItem: () => {
+                throw new Error('denied');
+            },
+        };
+
+        expect(readTauntsHidden(refusing, 'phone')).toBe(false);
+        expect(() => writeTauntsHidden(refusing, 'phone', true)).not.toThrow();
+        expect(readTauntsHidden(null, 'screen')).toBe(false);
+    });
+});
+
+describe('trayView', () => {
+    const rival = '01kaqrx2ab3c4d5e6f7g8h9jkm';
+
+    it('says the balance, or why a throw would not be taken now', () => {
+        const answer = state('answer');
+        const now = answer.server_ms;
+
+        expect(trayView(answer, rival, now)).toEqual({
+            kind: 'tray',
+            balance: 17,
+            reason: null,
+            cooling: null,
+        });
+
+        const cooling = withTaunts(answer, { ready_ms: now + 7_200 });
+
+        expect(trayView(cooling, rival, now)).toEqual({
+            kind: 'tray',
+            balance: 17,
+            reason: 'cooling',
+            cooling: 8,
+        });
+        expect(trayView(cooling, rival, now + 7_200)).toMatchObject({
+            reason: null,
+            cooling: null,
+        });
+
+        const broke = withTaunts(answer, { balance: 0 });
+
+        expect(trayView(broke, rival, now)).toMatchObject({
+            reason: 'no_points',
+        });
+        // Before the first close nobody has a point: it says so.
+        expect(trayView(state('countdown'), rival, now)).toMatchObject({
+            reason: 'first_round',
+            balance: 0,
+        });
+    });
+
+    it('has no tray without a rival, a viewer who plays or an open throw', () => {
+        const answer = state('answer');
+
+        expect(trayView(answer, null, answer.server_ms)).toEqual({
+            kind: 'none',
+        });
+        expect(
+            trayView(
+                withTaunts(answer, { balance: null }),
+                rival,
+                answer.server_ms,
+            ),
+        ).toEqual({ kind: 'none' });
+        expect(
+            trayView(
+                withTaunts(answer, { open: false }),
+                rival,
+                answer.server_ms,
+            ),
+        ).toEqual({ kind: 'none' });
+        expect(trayView(state('over'), rival, 0)).toEqual({ kind: 'none' });
+        expect(trayView(state('lobby'), rival, 0)).toEqual({ kind: 'none' });
+    });
+
+    it("never reads a verdict, a solution or anyone's result before the reveal", () => {
+        const answer = state('answer');
+        const now = answer.server_ms;
+        const shown = trayView(answer, rival, now);
+
+        // Whatever the round's count of answers, the viewer's own answer or the ranking say, the tray says the same.
+        for (const other of [
+            {
+                ...answer,
+                round: {
+                    ...answer.round!,
+                    answered: !answer.round!.answered,
+                    answered_count: 0,
+                },
+            } as RoomState,
+            { ...answer, ranking: [...answer.ranking].reverse() },
+            { ...answer, ranking: [] },
+        ]) {
+            expect(trayView(other, rival, now)).toEqual(shown);
+        }
+
+        // And the cards are the state's own list, whatever else the state holds.
+        const taunted = state('taunted');
+
+        expect(
+            shownTaunts(taunted.taunts!.received, taunted.server_ms, false),
+        ).toEqual(taunted.taunts!.received);
+        expect(
+            shownTaunts(
+                { ...taunted, ranking: [] }.taunts!.received,
+                taunted.server_ms,
+                false,
+            ),
+        ).toEqual(taunted.taunts!.received);
+    });
+});

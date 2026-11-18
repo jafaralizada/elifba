@@ -156,6 +156,33 @@ it('has the section for rooms in both languages when the switch is on', function
     'en' => ['en', 'Games for adults', 'the section “Games for adults” below', 'when its agreement was given', 'seen only by the hosts and the players', "asks no one's age", 'write to each other', 'Settings → Profile'],
 ]);
 
+it('says what a taunt is, what it costs, who sees it and how it is hidden', function (?string $locale, array $contact, string $stored): void {
+    Rooms::on();
+    $request = $locale === null ? $this : $this->withSession(['locale' => $locale]);
+
+    $request->get(route('privacy'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('privacy')
+            ->where('translations', function ($translations) use ($contact, $stored): bool {
+                foreach ($contact as $words) {
+                    if (! str_contains($translations['privacy.rooms.contact'], $words)) {
+                        return false;
+                    }
+                }
+
+                // Kept: who threw what at whom and when; the target forgotten after a day, the cost kept.
+                return str_contains($translations['privacy.rooms.stored'], $stored)
+                    && substr_count($translations['privacy.rooms.stored'], "\n") === 3
+                    // The player role's sentence does not change for it (ADR 029 decision 30).
+                    && ! str_contains(mb_strtolower($translations['roles.agreement.player']), 'atmaca')
+                    && ! str_contains(mb_strtolower($translations['roles.agreement.player']), 'taunt');
+            }));
+})->with([
+    'az' => [null, ['mesaj, çat və ya dəvət göndərilmir', 'yalnız hazır siyahıdan atmaca', 'hər atmaca atana 1 xal başa gəlir', '4 saniyə yalnız hədəf olan oyunçu və aparıcının böyük ekranı görür', 'öz cihazında gizlədə', 'otaqda bağlaya bilər'], 'kimə atıldığı bir gündən sonra silinir'],
+    'en' => ['en', ['no message, chat or invitation is sent', 'only a taunt from a ready-made list', 'each costs the thrower 1 point', "only the player it is aimed at and the host's big screen see it, for 4 seconds", 'hide taunts on their own device', 'switch them off for the room'], 'whom it was aimed at is erased after a day'],
+]);
+
 it('says what the camera does with the picture', function (?string $locale, string $optional, string $asks, string $nowhere): void {
     Rooms::on();
     $request = $locale === null ? $this : $this->withSession(['locale' => $locale]);

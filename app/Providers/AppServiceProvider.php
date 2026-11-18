@@ -147,5 +147,8 @@ class AppServiceProvider extends ServiceProvider
 
         // A player's answers (B3).
         RateLimiter::for('room-answers', static fn (Request $request): Limit => Limit::perMinute(30)->by($account($request)));
+
+        // A player's taunts (T2, ADR 029 decision 11): the server's cooldown is the brake, this the bound.
+        RateLimiter::for('room-taunts', static fn (Request $request): Limit => Limit::perMinute(20)->by($account($request)));
     }
 }

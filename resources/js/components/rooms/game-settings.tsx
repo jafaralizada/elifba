@@ -16,6 +16,8 @@ import type {
 } from '@/components/rooms/catalog';
 import { GameDrawing } from '@/components/rooms/game-drawing';
 import { seconds } from '@/components/rooms/seconds';
+import { TauntsSwitchRow } from '@/components/rooms/taunts-switch';
+import type { TauntsSwitch } from '@/components/rooms/taunts-switch';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -408,7 +410,8 @@ export function LevelLine({
  * room's choice, each tap sent as the whole choice (`useRoomChoice()`), and
  * «Hazırdır», which closes. On a phone a sheet from the bottom below `sm`
  * and a dialog from there; on the screen (`big`) a centred dialog with the
- * games three by two and «Çətinlik» beside «Raund sayı». Starting is not
+ * games three by two and «Çətinlik» beside «Raund sayı»; from T2 the
+ * host's «Atmacalar» under them (ADR 029 decision 12). Starting is not
  * here: it is the bar's.
  */
 export function GameSettings({
@@ -417,12 +420,15 @@ export function GameSettings({
     open,
     onOpenChange,
     big = false,
+    taunts,
 }: {
     options: GameSetupOptions;
     choice: RoomChoice;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     big?: boolean;
+    /** The host's switch «Atmacalar» (T2), under the choice. */
+    taunts?: TauntsSwitch;
 }) {
     const { t } = useTranslation();
     const game = gameOf(options, choice.shown.mechanic);
@@ -533,6 +539,12 @@ export function GameSettings({
                             />
                         </fieldset>
                     </div>
+
+                    {taunts !== undefined && (
+                        <div className="border-t">
+                            <TauntsSwitchRow taunts={taunts} big={big} />
+                        </div>
+                    )}
                 </div>
 
                 <div
@@ -543,7 +555,7 @@ export function GameSettings({
                             : 'px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]',
                     )}
                 >
-                    {choice.failed && (
+                    {(choice.failed || (taunts?.failed ?? false)) && (
                         <InputError message={t('rooms.setup.change_failed')} />
                     )}
                     <DialogClose asChild>

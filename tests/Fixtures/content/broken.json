@@ -1803,5 +1803,94 @@
             "assets/fluent/26A1.svg": "<svg width=\"32\" height=\"32\" viewBox=\"0 0 32 32\" xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script><circle cx=\"16\" cy=\"16\" r=\"12\"/></svg>\n"
         },
         "problem": "assets/fluent/26A1.svg: has a <script> element; asset SVGs must be plain drawings"
+    },
+    "rooms taunts: no list of taunts": {
+        "file": "rooms/taunts.json",
+        "delete": ["rooms/taunts.json"],
+        "problem": "rooms/taunts.json: is missing"
+    },
+    "rooms taunts: no version": {
+        "file": "rooms/taunts.json",
+        "unset": ["version"],
+        "problem": "rooms/taunts.json: the file needs `version`"
+    },
+    "rooms taunts: a version below 1": {
+        "file": "rooms/taunts.json",
+        "set": { "version": 0 },
+        "problem": "rooms/taunts.json: version must be a whole number from 1"
+    },
+    "rooms taunts: taunts that are no list": {
+        "file": "rooms/taunts.json",
+        "set": { "taunts": { "turtle": "fluent/1F422.svg" } },
+        "problem": "rooms/taunts.json: `taunts` must be a list"
+    },
+    "rooms taunts: fewer than eight": {
+        "file": "rooms/taunts.json",
+        "keep": { "taunts": 7 },
+        "problem": "rooms/taunts.json: taunts must hold 8–12 taunts, not 7"
+    },
+    "rooms taunts: more than twelve": {
+        "file": "rooms/taunts.json",
+        "set": {
+            "taunts.8": { "key": "too_easy", "image": "fluent/1F971.svg" },
+            "taunts.9": { "key": "so_close", "image": "fluent/1F605.svg" },
+            "taunts.10": { "key": "taunt_k", "image": "fluent/1F6A0.svg" },
+            "taunts.11": { "key": "taunt_l", "image": "fluent/1F6A1.svg" },
+            "taunts.12": { "key": "taunt_m", "image": "fluent/1F6A2.svg" }
+        },
+        "write": {
+            "assets/fluent/1F971.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\"><circle cx=\"16\" cy=\"16\" r=\"12\"/></svg>",
+            "assets/fluent/1F605.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\"><circle cx=\"16\" cy=\"16\" r=\"12\"/></svg>",
+            "assets/fluent/1F6A0.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\"><circle cx=\"16\" cy=\"16\" r=\"12\"/></svg>",
+            "assets/fluent/1F6A1.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\"><circle cx=\"16\" cy=\"16\" r=\"12\"/></svg>",
+            "assets/fluent/1F6A2.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\"><circle cx=\"16\" cy=\"16\" r=\"12\"/></svg>"
+        },
+        "problem": "rooms/taunts.json: taunts must hold 8–12 taunts, not 13"
+    },
+    "rooms taunts: a taunt with its phrase": {
+        "file": "rooms/taunts.json",
+        "set": { "taunts.0.text": "Bir az tez ol!" },
+        "problem": "rooms/taunts.json: taunts[0] has an unknown key `text`"
+    },
+    "rooms taunts: a taunt without an emoji": {
+        "file": "rooms/taunts.json",
+        "unset": ["taunts.0.image"],
+        "problem": "rooms/taunts.json: taunts[0] needs `image`"
+    },
+    "rooms taunts: a key in capitals": {
+        "file": "rooms/taunts.json",
+        "set": { "taunts.1.key": "Tick" },
+        "problem": "rooms/taunts.json: taunts[1] \"Tick\" needs a unique key matching /^[a-z_]{2,32}$/"
+    },
+    "rooms taunts: a key used twice": {
+        "file": "rooms/taunts.json",
+        "set": { "taunts.2.key": "turtle" },
+        "problem": "rooms/taunts.json: taunts[2] \"turtle\" needs a unique key matching /^[a-z_]{2,32}$/"
+    },
+    "rooms taunts: an emoji outside the Fluent set": {
+        "file": "rooms/taunts.json",
+        "set": { "taunts.0.image": "avatars/panda.svg" },
+        "problem": "rooms/taunts.json: taunts[0] \"turtle\".image \"avatars/panda.svg\" must be under content/assets/fluent/"
+    },
+    "rooms taunts: an emoji that is not there": {
+        "file": "rooms/taunts.json",
+        "set": { "taunts.0.image": "fluent/1F600.svg" },
+        "problem": "rooms/taunts.json: taunts[0] \"turtle\".image: content/assets/fluent/1F600.svg does not exist"
+    },
+    "rooms taunts: an emoji that is no SVG": {
+        "file": "rooms/taunts.json",
+        "set": { "taunts.0.image": "fluent/1F600.png" },
+        "write": { "assets/fluent/1F600.png": "PNG" },
+        "problem": "rooms/taunts.json: taunts[0] \"turtle\".image \"fluent/1F600.png\" must end in .svg"
+    },
+    "rooms taunts: one emoji for two taunts": {
+        "file": "rooms/taunts.json",
+        "set": { "taunts.1.image": "fluent/1F422.svg" },
+        "problem": "rooms/taunts.json: taunts[1] \"tick_tock\".image \"fluent/1F422.svg\" is already the emoji of taunts[0] \"turtle\""
+    },
+    "rooms taunts: an emoji of the rivalry strip": {
+        "file": "rooms/taunts.json",
+        "set": { "taunts.3.image": "fluent/1F451.svg" },
+        "problem": "rooms/taunts.json: taunts[3] \"sleepy\".image \"fluent/1F451.svg\" is the rivalry strip's icons.leader"
     }
 }

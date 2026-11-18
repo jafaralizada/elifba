@@ -94,6 +94,18 @@ return [
             'difficulty' => 2,
             'rounds' => 10,
         ],
+
+        // Taunts (§12 "Taunts (T2)", ADR 029): one thrower throws at most one
+        // per `cooldown_ms`, by the server's clock; a taunt is in its target's
+        // and the screen's state for `show_ms` after the throw; and whom it
+        // was aimed at is emptied `forget_target_hours` after it
+        // (`PruneOldRooms`). The price is `RoomPointsRule::TAUNT_COST`, never
+        // config.
+        'taunts' => [
+            'cooldown_ms' => 10_000,
+            'show_ms' => 4_000,
+            'forget_target_hours' => 24,
+        ],
     ],
 
     // Who runs this instance; shown on /privacy (§7).

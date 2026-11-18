@@ -7,6 +7,8 @@ import {
     RoomChangedEvent,
     RoomItem,
     RoomState,
+    RoomTaunt,
+    RoomTauntReceipt,
 } from './contract';
 
 /*
@@ -26,6 +28,8 @@ const schemas: Record<string, z.ZodType> = {
     state: RoomState,
     answer: RoomAnswer,
     receipt: RoomAnswerReceipt,
+    taunt: RoomTaunt,
+    'taunt-receipt': RoomTauntReceipt,
 };
 
 function schemaOf(path: string): z.ZodType | undefined {
@@ -79,6 +83,10 @@ describe('room fixtures', () => {
             'state.reveal.spelling',
             'answer.spelling',
             'state.chosen',
+            'state.taunted',
+            'state.screen-taunted',
+            'taunt',
+            'taunt-receipt',
         ]) {
             expect(fixture(name), name).toBeDefined();
         }
@@ -440,6 +448,106 @@ describe('an answer and its receipt', () => {
         ).toBe(false);
         expect(
             RoomAnswerReceipt.safeParse({ status: 'wrong', revision: 5 })
+                .success,
+        ).toBe(false);
+    });
+});
+
+describe('taunts', () => {
+    const answer = fixture('state.answer') as State;
+    const taunted = fixture('state.taunted') as State;
+    const screen = fixture('state.screen-taunted') as State;
+    const over = fixture('state.over') as State;
+
+    it("carries a live game's taunts and nothing else any", () => {
+        expect(taunted.taunts?.received).toHaveLength(1);
+        expect(screen.taunts?.shown).toHaveLength(2);
+        expect(answer.taunts?.shown).toBeNull();
+
+        for (const state of [lobby, over]) {
+            expect(
+                RoomState.safeParse({ ...state, taunts: answer.taunts })
+                    .success,
+            ).toBe(false);
+        }
+
+        expect(RoomState.safeParse({ ...answer, taunts: null }).success).toBe(
+            false,
+        );
+    });
+
+    it("never names a received taunt's target, never sends a phrase, a name or a verdict", () => {
+        const received = taunted.taunts!.received[0];
+        const shown = screen.taunts!.shown![0];
+
+        for (const taunts of [
+            {
+                ...taunted.taunts,
+                received: [{ ...received, to: shown.to }],
+            },
+            {
+                ...taunted.taunts,
+                received: [{ ...received, text: 'Bir az tez ol!' }],
+            },
+            { ...taunted.taunts, received: [{ ...received, name: 'Aygün' }] },
+            {
+                ...taunted.taunts,
+                received: [{ ...received, taunt: 'Bir az tez ol!' }],
+            },
+            { ...screen.taunts, shown: [{ ...shown, correct: true }] },
+            { ...answer.taunts, balance: -1 },
+            { ...answer.taunts, points: 20 },
+            {
+                ...taunted.taunts,
+                received: [received, received, received, received],
+            },
+        ]) {
+            expect(RoomState.safeParse({ ...answer, taunts }).success).toBe(
+                false,
+            );
+        }
+    });
+
+    it('lists the cost of a close only in its reveal', () => {
+        const reveal = fixture('state.reveal') as State;
+        const revealed = (reveal.round as Extract<Round, { phase: 'reveal' }>)
+            .reveal;
+        const asked = answer.round as Extract<Round, { phase: 'answer' }>;
+
+        expect(revealed.spent).toEqual([
+            { player_id: '01kaqrx2ab3c4d5e6f7g8h9jkm', count: 1 },
+        ]);
+        expect(
+            RoomState.safeParse({
+                ...answer,
+                round: { ...asked, spent: revealed.spent },
+            }).success,
+        ).toBe(false);
+        expect(
+            RoomState.safeParse({
+                ...reveal,
+                round: {
+                    ...reveal.round,
+                    reveal: {
+                        ...revealed,
+                        spent: [{ ...revealed.spent[0], count: 0 }],
+                    },
+                },
+            }).success,
+        ).toBe(false);
+    });
+
+    it('posts a key of the list and nothing of a person', () => {
+        const taunt = fixture('taunt') as z.infer<typeof RoomTaunt>;
+
+        expect(
+            RoomTaunt.safeParse({ ...taunt, text: 'Bir az tez ol!' }).success,
+        ).toBe(false);
+        expect(
+            RoomTaunt.safeParse({ ...taunt, from: taunt.target_id }).success,
+        ).toBe(false);
+        expect(
+            RoomTauntReceipt.safeParse({ status: 'refused', revision: 5 })
                 .success,
         ).toBe(false);
     });

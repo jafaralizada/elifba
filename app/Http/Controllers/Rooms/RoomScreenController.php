@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Rooms;
 
+use App\Domain\Content\Data\RoomTauntData;
 use App\Domain\Content\Enums\RoomSpeaker;
 use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Rooms\Data\RoomGameSetupData;
@@ -26,8 +27,12 @@ use Inertia\Response;
  * (`RoomJoinLink`), built on the server; `catalog`, the games the room's
  * choice may be, as the host's phone gets it (`RoomGameSetupData::
  * options()`); `sounds`, the URLs of the room's moments it plays as the
- * room's speaker (ADR 025 "Sound"), never a phone's own cues; and
- * `rivalry`, the URLs of the rivalry strip's three emoji (ADR 027).
+ * room's speaker (ADR 025 "Sound"), never a phone's own cues;
+ * `rivalry`, the URLs of the rivalry strip's three emoji (ADR 027); and
+ * `taunts`, the list's keys with their emoji's URLs, for the taunts its
+ * state shows (T2, ADR 029 decisions 21 and 28). Its state is the
+ * screen's (`RoomState::for(…, screen: true)`): the taunts shown now with
+ * their targets.
  *
  * Opening it writes nothing — not even a read (`RecordRoomRead`): the
  * screen is not the host's phone, and a round never waits for the host
@@ -45,12 +50,13 @@ final class RoomScreenController extends Controller
     {
         return Inertia::render('rooms/screen', [
             'room' => ['id' => $room->id, 'status' => $room->status()->value],
-            'state' => RoomState::for($room, $account)->toArray(),
+            'state' => RoomState::for($room, $account, screen: true)->toArray(),
             'place_labels' => RoomPlaces::labels($room, app()->getLocale()),
             'join' => RoomJoinLink::of($room),
             'catalog' => RoomGameSetupData::options(),
             'sounds' => $content->roomSounds()->urls(RoomSpeaker::Screen),
             'rivalry' => $content->roomRivalry()->urls(),
+            'taunts' => RoomTauntData::props($content->roomTaunts()),
         ]);
     }
 }

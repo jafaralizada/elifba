@@ -13,6 +13,13 @@ import { MECHANIC_VIEWS } from '@/components/rooms/mechanics/views';
 import { REVEAL_MS } from '@/components/rooms/motion';
 import { RivalryStrip, useRivalry } from '@/components/rooms/rivalry-strip';
 import type { RivalryIcons } from '@/components/rooms/rivalry-strip';
+import {
+    SpentLine,
+    TauntCover,
+    TauntTray,
+    useTauntsHidden,
+} from '@/components/rooms/taunt-parts';
+import type { TauntList } from '@/components/rooms/taunt-parts';
 import { seconds } from '@/components/rooms/seconds';
 import { Standing } from '@/components/rooms/standing';
 import { tap, untap } from '@/components/rooms/taps';
@@ -81,6 +88,13 @@ type Sent = {
  * to face", ADR 027): the viewer against the nearest rival, or the
  * screen's pair for a host who does not play. It moves only in a reveal
  * the page saw begin.
+ *
+ * Beside the strip stands the tray (rule 15 "Taunts", ADR 029): a player
+ * throws the strip's rival a taunt from the list (`taunts`), for a point of
+ * their own, and a taunt aimed at the viewer lies over the strip for 4 s
+ * without covering the round. The reveal says the cost counted at its
+ * close: «Atmaca: −:count xal» under the thrower's verdict and «−:count»
+ * in «Sıralama».
  */
 export function LiveRound({
     roomId,
@@ -95,6 +109,7 @@ export function LiveRound({
     motion,
     sound = null,
     icons = null,
+    taunts = null,
 }: {
     roomId: string;
     state: RoomState;
@@ -112,12 +127,29 @@ export function LiveRound({
     sound?: RoomSound | null;
     /** The rivalry strip's emoji (the prop `rivalry`). */
     icons?: RivalryIcons | null;
+    /** The taunts a player may throw (the prop `taunts`, T2). */
+    taunts?: TauntList | null;
 }) {
     const { t } = useTranslation();
     const now = useServerNow(clock, true);
     const view = MECHANIC_VIEWS[game.mechanic];
     const previous = usePreviousReveal(game, round, state.ranking);
     const rivalry = useRivalry(state, game, round, state.me.player_id);
+    const [tauntsHidden, setTauntsHidden] = useTauntsHidden('phone');
+    const spent = round.reveal?.spent ?? [];
+    const rival =
+        rivalry.pair !== null &&
+        rivalry.pair.mine &&
+        rivalry.pair.right !== null
+            ? {
+                  id: rivalry.pair.right.player_id,
+                  name:
+                      state.players.find(
+                          (player) =>
+                              player.id === rivalry.pair?.right?.player_id,
+                      )?.name ?? null,
+              }
+            : null;
     const [draft, setDraft] = useState<{ round: string; ids: string[] }>({
         round: '',
         ids: [],
@@ -218,18 +250,41 @@ export function LiveRound({
             className="flex flex-col gap-4"
         >
             {rivalry.pair !== null && (
-                <RivalryStrip
-                    key={`strip:${round.index}:${round.phase === 'reveal' ? 'reveal' : 'open'}`}
-                    pair={rivalry.pair}
-                    previous={rivalry.previous}
-                    overtake={rivalry.overtake}
-                    ranking={state.ranking}
-                    results={round.reveal?.results ?? null}
-                    players={state.players}
-                    placeLabels={placeLabels}
-                    icons={icons}
-                    moves={motion.strip}
-                />
+                <div className="relative flex items-center gap-2">
+                    <div className="relative min-w-0 flex-1">
+                        <RivalryStrip
+                            key={`strip:${round.index}:${round.phase === 'reveal' ? 'reveal' : 'open'}`}
+                            pair={rivalry.pair}
+                            previous={rivalry.previous}
+                            overtake={rivalry.overtake}
+                            ranking={state.ranking}
+                            results={round.reveal?.results ?? null}
+                            spent={spent}
+                            players={state.players}
+                            placeLabels={placeLabels}
+                            icons={icons}
+                            moves={motion.strip}
+                        />
+                        <TauntCover
+                            received={state.taunts?.received}
+                            players={state.players}
+                            list={taunts}
+                            now={now}
+                            hidden={tauntsHidden}
+                        />
+                    </div>
+                    <TauntTray
+                        roomId={roomId}
+                        state={state}
+                        rival={rival}
+                        list={taunts}
+                        clock={clock}
+                        now={now}
+                        hidden={tauntsHidden}
+                        onHiddenChange={setTauntsHidden}
+                        onThrown={refresh}
+                    />
+                </div>
             )}
 
             <RoundHead
@@ -368,6 +423,13 @@ export function LiveRound({
                                 mine={round.reveal.mine}
                                 plays={plays}
                                 motion={motion.phase}
+                                spent={
+                                    spent.find(
+                                        (cost) =>
+                                            cost.player_id ===
+                                            state.me.player_id,
+                                    )?.count ?? 0
+                                }
                             />
                             <div
                                 className="room-motion:animate-room-enter"
@@ -397,6 +459,7 @@ export function LiveRound({
                                     me={state.me.player_id}
                                     placeLabels={placeLabels}
                                     results={round.reveal.results}
+                                    spent={spent}
                                     motion={
                                         motion.phase
                                             ? {
@@ -716,16 +779,20 @@ function AnswerNote({
  * The viewer's own result of the round, from the reveal only: right with
  * its points and time, wrong, or no answer. A host who does not play has
  * none. In a reveal the page saw begin it comes in first, the same way
- * whatever the server judged, and its points count up from 0.
+ * whatever the server judged, and its points count up from 0. Under it,
+ * the viewer's taunts counted at this close (T2): «Atmaca: −:count xal».
  */
 function Verdict({
     mine,
     plays,
     motion,
+    spent = 0,
 }: {
     mine: RoomMine | null;
     plays: boolean;
     motion: boolean;
+    /** The viewer's taunts counted at this close. */
+    spent?: number;
 }) {
     const { t } = useTranslation();
     const points = useCountUp(mine?.points ?? 0, {
@@ -747,8 +814,11 @@ function Verdict({
                 >
                     <Minus aria-hidden className="size-6" />
                 </span>
-                <span className="font-semibold">
-                    {t('rooms.game.no_answer')}
+                <span className="flex min-w-0 flex-col">
+                    <span className="font-semibold">
+                        {t('rooms.game.no_answer')}
+                    </span>
+                    {spent > 0 && <SpentLine count={spent} />}
                 </span>
             </div>
         );
@@ -794,6 +864,11 @@ function Verdict({
                 <span className="text-sm text-muted-foreground tabular-nums">
                     {t('rooms.game.elapsed', { seconds: time })}
                 </span>
+                {spent > 0 && (
+                    <span className="text-sm">
+                        <SpentLine count={spent} />
+                    </span>
+                )}
             </span>
             <span className="shrink-0 text-xl font-bold tabular-nums">
                 {t('rooms.game.points_won', { count: points })}

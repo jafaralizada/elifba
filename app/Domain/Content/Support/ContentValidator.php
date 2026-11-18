@@ -8,6 +8,7 @@ use App\Domain\Content\Data\PackData;
 use App\Domain\Content\Data\PromptTemplateData;
 use App\Domain\Content\Data\RangeData;
 use App\Domain\Content\Data\RoomRivalryData;
+use App\Domain\Content\Data\RoomTauntData;
 use App\Domain\Content\Data\SoundChoiceData;
 use App\Domain\Content\Data\VoiceData;
 use App\Domain\Content\Enums\Effect;
@@ -39,8 +40,8 @@ use SplFileInfo;
  * `avatars.json`, `sounds.json`, `levels.json`, `prompts.json`, `names.json`,
  * `voice.json` with `voice-clips.json`, `credits.json`, `packs/*.json`,
  * `rooms/levels.json`, `rooms/shapes.json`, `rooms/categories.json`,
- * `rooms/words.json`, `rooms/sounds.json` and `rooms/rivalry.json` (§12
- * "Room content"),
+ * `rooms/words.json`, `rooms/sounds.json`, `rooms/rivalry.json` and
+ * `rooms/taunts.json` (§12 "Room content"),
  * `tests/syllables.json` and every file under `assets/`, `voice-names/`
  * and `resources/fonts/` (credits; SVG files are also checked for anything
  * that could run or load). `validate()` lists every problem, one line each;
@@ -216,6 +217,17 @@ final class ContentValidator
     public const string ROOM_RIVALRY_FOLDER = 'fluent/';
 
     /**
+     * Where the taunts' emoji are, under `assets/`: Fluent Emoji (Color)
+     * files of the app's own set (§12 "Room content", ADR 029 decision 28).
+     */
+    public const string ROOM_TAUNTS_FOLDER = 'fluent/';
+
+    /** How many taunts the list holds (ADR 029 decision 28). */
+    public const int MIN_ROOM_TAUNTS = 8;
+
+    public const int MAX_ROOM_TAUNTS = 12;
+
+    /**
      * A `next_in_sequence` row shows at most seven terms, and every number
      * of a round is 1–999 — three digits, short enough for seven terms and
      * the «?» to fit one row of a 375px phone (§12 "Room games", B5).
@@ -316,6 +328,14 @@ final class ContentValidator
     private ?array $names = null;
 
     /**
+     * The rivalry strip's icons by path (`fluent/26A1.svg` → `icons.clash`),
+     * as `rooms/rivalry.json` names them: no taunt may be one of them.
+     *
+     * @var array<string, string>
+     */
+    private array $rivalryIcons = [];
+
+    /**
      * @param  bool  $voiceClipsRequired  false for `content:voice`, which makes what this would require (the praise and retry clips, a deleted clip), lists what is made and prunes the clips of another voice or of a name that left the list
      * @param  bool  $namePhraseClipsRequired  whether the greeting and the end phrases need a clip (`NAME_PHRASE_CLIPS_REQUIRED`)
      */
@@ -343,6 +363,7 @@ final class ContentValidator
         $this->roomLevels($this->roomShapes(), $this->roomWords());
         $this->roomSounds();
         $this->roomRivalry();
+        $this->roomTaunts();
         $this->voice();
         $credits = $this->credits();
 
@@ -1503,6 +1524,7 @@ final class ContentValidator
      */
     private function roomRivalry(): void
     {
+        $this->rivalryIcons = [];
         $file = ContentRepository::ROOM_RIVALRY;
         $data = $this->object($this->read($file), $file, '', ['version', 'icons']);
 
@@ -1545,6 +1567,95 @@ final class ContentValidator
             }
 
             $used[$path] = $where;
+        }
+
+        $this->rivalryIcons = $used;
+    }
+
+    // ── rooms/taunts.json ───────────────────────────────────────────────
+
+    /**
+     * The taunts a player may throw (§12 "Room content", "Taunts (T2)", ADR
+     * 029 decision 28): `version` and `taunts`, a list of
+     * `MIN_ROOM_TAUNTS`–`MAX_ROOM_TAUNTS` entries `{key, image}`. Each key is
+     * unique and matches `RoomTauntData::KEY_PATTERN`; each image is an SVG
+     * under `assets/fluent/` — a Fluent Emoji file of the app's own set —
+     * that exists, no other taunt uses and is none of the rivalry strip's
+     * three (`rooms/rivalry.json`). Like every SVG under `assets/` it must
+     * be a plain drawing (`svgs()`), and like every asset it needs a credits
+     * entry. The phrases are the translations' (`rooms.taunts.say.{key}`),
+     * checked by `RoomTauntsTest`.
+     */
+    private function roomTaunts(): void
+    {
+        $file = ContentRepository::ROOM_TAUNTS;
+        $data = $this->object($this->read($file), $file, '', ['version', 'taunts']);
+
+        if ($data === null) {
+            return;
+        }
+
+        if (! is_int($data['version']) || $data['version'] < 1) {
+            $this->problem($file, 'version must be a whole number from 1');
+        }
+
+        $taunts = $this->list($data['taunts'], $file, 'taunts');
+
+        if ($taunts === null) {
+            return;
+        }
+
+        if (count($taunts) < self::MIN_ROOM_TAUNTS || count($taunts) > self::MAX_ROOM_TAUNTS) {
+            $this->problem($file, 'taunts must hold '.self::MIN_ROOM_TAUNTS.'–'.self::MAX_ROOM_TAUNTS.' taunts, not '.count($taunts));
+        }
+
+        $keys = [];
+
+        /** @var array<string, string> $used image path → the entry that has it */
+        $used = [];
+
+        foreach ($taunts as $index => $taunt) {
+            $where = "taunts[{$index}]";
+            $taunt = $this->object($taunt, $file, $where, ['key', 'image']);
+            $key = $taunt === null ? null : $this->string($taunt['key'], $file, "{$where}.key");
+
+            if ($taunt === null || $key === null) {
+                continue;
+            }
+
+            if (preg_match(RoomTauntData::KEY_PATTERN, $key) !== 1 || in_array($key, $keys, true)) {
+                $this->problem($file, "{$where} \"{$key}\" needs a unique key matching ".RoomTauntData::KEY_PATTERN);
+            }
+
+            $keys[] = $key;
+            $where = "{$where} \"{$key}\".image";
+            $path = $taunt['image'];
+
+            if (is_string($path) && ! str_starts_with($path, self::ROOM_TAUNTS_FOLDER)) {
+                $this->problem($file, "{$where} \"{$path}\" must be under {$this->contentFolder()}/assets/".self::ROOM_TAUNTS_FOLDER);
+
+                continue;
+            }
+
+            $path = $this->asset($path, ['svg'], $file, $where);
+
+            if ($path === null || pathinfo($path, PATHINFO_EXTENSION) !== 'svg' || ! self::exists("{$this->root}/assets/{$path}")) {
+                continue;
+            }
+
+            if (isset($this->rivalryIcons[$path])) {
+                $this->problem($file, "{$where} \"{$path}\" is the rivalry strip's {$this->rivalryIcons[$path]}");
+
+                continue;
+            }
+
+            if (isset($used[$path])) {
+                $this->problem($file, "{$where} \"{$path}\" is already the emoji of {$used[$path]}");
+
+                continue;
+            }
+
+            $used[$path] = "taunts[{$index}] \"{$key}\"";
         }
     }
 

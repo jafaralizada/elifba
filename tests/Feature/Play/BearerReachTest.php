@@ -129,6 +129,7 @@ function bearerSnapshot(): array
         'room_games' => $rows('room_games'),
         'room_rounds' => $rows('room_rounds'),
         'room_answers' => $rows('room_answers'),
+        'room_taunts' => $rows('room_taunts'),
     ];
 }
 

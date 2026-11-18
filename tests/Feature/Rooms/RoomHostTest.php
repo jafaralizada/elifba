@@ -145,7 +145,7 @@ it('closes the room and clears its code', function (): void {
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('room.status', 'closed')
-                ->where('state.room', ['id' => $this->room->id, 'status' => 'closed', 'locked' => false, 'code' => null])
+                ->where('state.room', ['id' => $this->room->id, 'status' => 'closed', 'locked' => false, 'code' => null, 'taunts' => true])
                 ->where('state.players.0.name', 'Rəşad Quliyev')
                 ->where('state.players.1.name', 'Aygün Məmmədova')
                 ->where('can.leave', false)

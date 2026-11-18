@@ -103,7 +103,8 @@ function raceWithholds(string $wire, RoomRound $round): void
 {
     $right = Rooms::right($round);
 
-    expect($wire)->not->toMatch('/"(solution|accept|correct|mine|results|seed|picked|elapsed_ms)"/')
+    // Keys, not values: a taunt's key is a word too (`mine`, ADR 029 decision 27).
+    expect($wire)->not->toMatch('/"(solution|accept|correct|mine|results|seed|picked|elapsed_ms|spent)":/')
         ->and($wire)->not->toContain('"word":')
         ->and($wire)->not->toContain(json_encode($right));
 
@@ -255,6 +256,7 @@ it('never serves the solution or a result before the round closes', function ():
                 ['player_id' => $this->hostRow->id, 'correct' => false, 'points' => 0],
                 ['player_id' => $this->aygunRow->id, 'correct' => true, 'points' => $points],
             ],
+            'spent' => [],
         ])
         ->and($state['ranking'][0])->toBe(['player_id' => $this->aygunRow->id, 'points' => $points, 'place' => 1]);
 

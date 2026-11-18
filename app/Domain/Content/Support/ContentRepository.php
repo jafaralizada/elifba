@@ -12,6 +12,7 @@ use App\Domain\Content\Data\RoomLevelData;
 use App\Domain\Content\Data\RoomRivalryData;
 use App\Domain\Content\Data\RoomShapeData;
 use App\Domain\Content\Data\RoomSoundsData;
+use App\Domain\Content\Data\RoomTauntData;
 use App\Domain\Content\Data\RoomWordData;
 use App\Domain\Content\Data\VoiceData;
 use App\Domain\Content\Enums\Mechanic;
@@ -31,8 +32,9 @@ use RuntimeException;
  * levels (`rooms/levels.json`), from B4 the shapes (`rooms/shapes.json`),
  * from B5 the groups of words (`rooms/categories.json`), from B6 the
  * adults' word list (`rooms/words.json`), the sounds of a room game
- * (`rooms/sounds.json`, ADR 025) and the rivalry strip's emoji
- * (`rooms/rivalry.json`, ADR 027).
+ * (`rooms/sounds.json`, ADR 025), the rivalry strip's emoji
+ * (`rooms/rivalry.json`, ADR 027) and, from T2, the taunts' list
+ * (`rooms/taunts.json`, ADR 029).
  *
  * With a compiled file (`php artisan content:cache` writes
  * `bootstrap/cache/content.php`, which OPcache keeps in memory) it reads
@@ -47,6 +49,7 @@ use RuntimeException;
  * @phpstan-import-type VoiceArray from VoiceData
  * @phpstan-import-type RoomLevelArray from RoomLevelData
  * @phpstan-import-type RoomWordArray from RoomWordData
+ * @phpstan-import-type RoomTauntArray from RoomTauntData
  */
 final class ContentRepository
 {
@@ -91,7 +94,12 @@ final class ContentRepository
     public const string ROOM_RIVALRY = 'rooms/rivalry.json';
 
     /**
-     * @var array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed, words: mixed, sounds: mixed, rivalry: mixed}}|null
+     * The taunts a player may throw (§12 "Room content", ADR 029).
+     */
+    public const string ROOM_TAUNTS = 'rooms/taunts.json';
+
+    /**
+     * @var array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed, words: mixed, sounds: mixed, rivalry: mixed, taunts: mixed}}|null
      */
     private ?array $data = null;
 
@@ -131,6 +139,13 @@ final class ContentRepository
     private ?RoomSoundsData $roomSounds = null;
 
     private ?RoomRivalryData $roomRivalry = null;
+
+    /**
+     * By key, in file order.
+     *
+     * @var array<string, RoomTauntData>|null
+     */
+    private ?array $roomTaunts = null;
 
     /**
      * @var list<RoomCategoryData>|null
@@ -381,6 +396,26 @@ final class ContentRepository
     }
 
     /**
+     * The taunts' list, by key in the tray's order (ADR 029 decision 27).
+     *
+     * @return array<string, RoomTauntData>
+     */
+    public function roomTaunts(): array
+    {
+        if ($this->roomTaunts === null) {
+            /** @var array{version: int, taunts: list<RoomTauntArray>} $data checked by `ContentValidator` */
+            $data = $this->data()['rooms']['taunts'];
+            $this->roomTaunts = [];
+
+            foreach ($data['taunts'] as $taunt) {
+                $this->roomTaunts[$taunt['key']] = RoomTauntData::fromArray($taunt, $data['version']);
+            }
+        }
+
+        return $this->roomTaunts;
+    }
+
+    /**
      * @return array<string, RoomLevelData>
      */
     private function roomLevelsByKey(): array
@@ -403,7 +438,7 @@ final class ContentRepository
      * The content as the JSON files hold it now, ignoring any compiled file:
      * what `content:cache` compiles.
      *
-     * @return array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed, words: mixed, sounds: mixed, rivalry: mixed}}
+     * @return array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed, words: mixed, sounds: mixed, rivalry: mixed, taunts: mixed}}
      *
      * @throws RuntimeException when a file is missing or not valid JSON
      */
@@ -429,6 +464,7 @@ final class ContentRepository
                 'words' => self::decode($this->root.'/'.self::ROOM_WORDS),
                 'sounds' => self::decode($this->root.'/'.self::ROOM_SOUNDS),
                 'rivalry' => self::decode($this->root.'/'.self::ROOM_RIVALRY),
+                'taunts' => self::decode($this->root.'/'.self::ROOM_TAUNTS),
             ],
         ];
     }
@@ -470,12 +506,12 @@ final class ContentRepository
     }
 
     /**
-     * @return array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed, words: mixed, sounds: mixed, rivalry: mixed}}
+     * @return array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed, words: mixed, sounds: mixed, rivalry: mixed, taunts: mixed}}
      */
     private function data(): array
     {
         if ($this->data === null) {
-            /** @var array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed, words: mixed, sounds: mixed, rivalry: mixed}} $compiled */
+            /** @var array{levels: list<mixed>, prompts: list<mixed>, credits: list<mixed>, packs: array<string, mixed>, voice: array<string, mixed>, names: mixed, rooms: array{levels: mixed, shapes: mixed, categories: mixed, words: mixed, sounds: mixed, rivalry: mixed, taunts: mixed}} $compiled */
             $compiled = $this->readsCompiled() ? require $this->compiled : $this->sources();
             $this->data = $compiled;
         }

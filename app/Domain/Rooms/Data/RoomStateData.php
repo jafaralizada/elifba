@@ -20,7 +20,8 @@ use InvalidArgumentException;
  * round, the room's standing). What a round serves in each phase is
  * `RoomRoundData`'s rule. An open room also has `setup`, the host's
  * choice of the next game (G2, ADR 026 decision 11; version 2); a closed
- * one has none.
+ * one has none. A live game also has its taunts (`taunts`, T2, ADR 029
+ * decision 15; version 3) as the viewer may see them; nothing else has.
  *
  * @phpstan-import-type RoomSummaryArray from RoomSummaryData
  * @phpstan-import-type RoomViewerArray from RoomViewerData
@@ -29,12 +30,13 @@ use InvalidArgumentException;
  * @phpstan-import-type RoomRoundArray from RoomRoundData
  * @phpstan-import-type RoomRankedPlayerArray from RoomRankedPlayerData
  * @phpstan-import-type RoomSetupArray from RoomSetupData
+ * @phpstan-import-type RoomTauntsArray from RoomTauntsData
  *
- * @phpstan-type RoomStateArray array{v: int, revision: int, server_ms: int, room: RoomSummaryArray, me: RoomViewerArray, players: list<RoomPlayerArray>, game: RoomGameArray|null, round: RoomRoundArray|null, ranking: list<RoomRankedPlayerArray>, setup: RoomSetupArray|null}
+ * @phpstan-type RoomStateArray array{v: int, revision: int, server_ms: int, room: RoomSummaryArray, me: RoomViewerArray, players: list<RoomPlayerArray>, game: RoomGameArray|null, round: RoomRoundArray|null, ranking: list<RoomRankedPlayerArray>, setup: RoomSetupArray|null, taunts: RoomTauntsArray|null}
  */
 final readonly class RoomStateData
 {
-    public const int VERSION = 2;
+    public const int VERSION = 3;
 
     /**
      * @param  list<RoomPlayerData>  $players
@@ -50,6 +52,7 @@ final readonly class RoomStateData
         public ?RoomRoundData $round = null,
         public array $ranking = [],
         public ?RoomSetupData $setup = null,
+        public ?RoomTauntsData $taunts = null,
     ) {
         $live = $game?->phase === RoomGamePhase::Live;
 
@@ -59,6 +62,10 @@ final readonly class RoomStateData
 
         if ($live !== ($round !== null)) {
             throw new InvalidArgumentException('A live game has its current round, and nothing else has one.');
+        }
+
+        if ($live !== ($taunts !== null)) {
+            throw new InvalidArgumentException('A live game has its taunts, and nothing else has any.');
         }
 
         if ($round !== null && $round->total !== $game?->rounds) {
@@ -86,6 +93,7 @@ final readonly class RoomStateData
             round: $data['round'] === null ? null : RoomRoundData::fromArray($data['round']),
             ranking: array_map(RoomRankedPlayerData::fromArray(...), $data['ranking']),
             setup: $data['setup'] === null ? null : RoomSetupData::fromArray($data['setup']),
+            taunts: $data['taunts'] === null ? null : RoomTauntsData::fromArray($data['taunts']),
         );
     }
 
@@ -105,6 +113,7 @@ final readonly class RoomStateData
             'round' => $this->round?->toArray(),
             'ranking' => array_map(static fn (RoomRankedPlayerData $row): array => $row->toArray(), $this->ranking),
             'setup' => $this->setup?->toArray(),
+            'taunts' => $this->taunts?->toArray(),
         ];
     }
 }

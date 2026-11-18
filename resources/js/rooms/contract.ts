@@ -1,10 +1,10 @@
 /**
  * A room's contract (docs/architecture.md §12 "The state", "The race",
- * "Room games", "Games first", ADR 021 decision 6, ADR 023 decision 5,
- * ADR 026 decision 11): what
+ * "Room games", "Games first", "Taunts (T2)", ADR 021 decision 6, ADR 023
+ * decision 5, ADR 026 decision 11, ADR 029 decision 15): what
  * `GET /rooms/{room}/state` answers (and the `state` of the room page's
- * props), what a device posts as its answer and the receipt it gets, and
- * what `room.changed` carries. The schemas are the source; every
+ * props), what a device posts as its answer or its taunt and the receipt
+ * it gets, and what `room.changed` carries. The schemas are the source; every
  * TypeScript type is inferred from them, never written by hand. The PHP
  * side is `app/Domain/Rooms/Data/*`; both are pinned to
  * `tests/Fixtures/rooms/*.json` (Pest round-trips them, Vitest parses them
@@ -15,7 +15,8 @@
  * them: an account id, an address, the material to study after its phase,
  * the question before its phase, a solution or a result before the
  * reveal. A player is known by `room_players.id` alone. There is no judge,
- * clock or points rule here: the server alone judges, times and scores.
+ * clock or points rule here: the server alone judges, times and scores —
+ * a taunt's cost and a balance too.
  *
  * The board's contract (`resources/js/game/contract.ts`) is another one and
  * shares nothing with this.
@@ -44,6 +45,8 @@ export const RoomSummary = z.strictObject({
         .string()
         .regex(/^\d{6}$/)
         .nullable(),
+    /** The host's switch for taunts (T2). */
+    taunts: z.boolean(),
 });
 
 export const RoomViewer = z.strictObject({
@@ -125,6 +128,12 @@ export const RoomResult = z.strictObject({
     points: z.number().int().min(0).max(20),
 });
 
+/** A player's taunts counted at this close (T2): each costs the thrower 1 point. */
+export const RoomSpent = z.strictObject({
+    player_id: id,
+    count: z.number().int().positive(),
+});
+
 /** Only in the phase `reveal`, once the round is closed. */
 export const RoomReveal = z.strictObject({
     /** The canonical ids: for a sequence, the question's ids in the order to tap. */
@@ -136,6 +145,8 @@ export const RoomReveal = z.strictObject({
     word: z.string().min(1).nullable(),
     mine: RoomMine.nullable(),
     results: z.array(RoomResult),
+    /** The taunts counted at this close, for the players with a cost (T2). */
+    spent: z.array(RoomSpent),
 });
 
 const roundBase = {
@@ -248,8 +259,44 @@ export const RoomSetup = z.strictObject({
     played: z.boolean(),
 });
 
+/** A taunt's key: one of `content/rooms/taunts.json`; the phrase is the page's own translation. */
+const tauntKey = z.string().regex(/^[a-z_]{2,32}$/);
+
+/** A taunt aimed at the viewer (T2): the thrower's row, the key, the server's moment. Never its target. */
+export const RoomTauntReceived = z.strictObject({
+    id,
+    from: id,
+    taunt: tauntKey,
+    sent_ms: moment,
+});
+
+/** A taunt on the big screen (T2): with its target. */
+export const RoomTauntShown = z.strictObject({
+    id,
+    from: id,
+    to: id,
+    taunt: tauntKey,
+    sent_ms: moment,
+});
+
+/**
+ * A live game's taunts as the viewer may see them (T2, ADR 029 decision 15):
+ * whether a throw would be accepted now but for the balance and the
+ * cooldown; the viewer's balance (null for a viewer who does not play) and
+ * the end of the cooldown; the taunts aimed at the viewer within `show_ms`,
+ * newest first; and the same window's taunts with their targets for the
+ * screen's request only. The server derives every number.
+ */
+export const RoomTaunts = z.strictObject({
+    open: z.boolean(),
+    balance: count.nullable(),
+    ready_ms: moment.nullable(),
+    received: z.array(RoomTauntReceived).max(3),
+    shown: z.array(RoomTauntShown).max(3).nullable(),
+});
+
 /** The state's version: a page that meets another reloads itself (`fetchState`). */
-export const ROOM_STATE_VERSION = 2;
+export const ROOM_STATE_VERSION = 3;
 
 const stateBase = {
     v: z.literal(ROOM_STATE_VERSION),
@@ -266,16 +313,24 @@ const stateBase = {
 
 /** No game yet, a live game with its current round, or a game that is over. */
 export const RoomState = z.union([
-    z.strictObject({ ...stateBase, game: z.null(), round: z.null() }),
+    z.strictObject({
+        ...stateBase,
+        game: z.null(),
+        round: z.null(),
+        taunts: z.null(),
+    }),
     z.strictObject({
         ...stateBase,
         game: z.strictObject({ ...gameBase, phase: z.literal('live') }),
         round: RoomRound,
+        /** A live game's taunts (T2); nothing else has any. */
+        taunts: RoomTaunts,
     }),
     z.strictObject({
         ...stateBase,
         game: z.strictObject({ ...gameBase, phase: z.literal('over') }),
         round: z.null(),
+        taunts: z.null(),
     }),
 ]);
 
@@ -289,6 +344,26 @@ export const RoomAnswer = z.strictObject({
 /** The receipt of an answer: the same for a right and a wrong one. */
 export const RoomAnswerReceipt = z.strictObject({
     status: z.enum(['accepted', 'duplicate', 'answered', 'late']),
+    revision: count,
+});
+
+/** `POST /rooms/{room}/taunts` (T2): the device's own event id, the target's row, a key of the list. Never text, never the thrower. */
+export const RoomTaunt = z.strictObject({
+    event_id: id,
+    target_id: id,
+    taunt: tauntKey,
+});
+
+/** The receipt of a taunt (T2): what was done with it; the balance comes with the next state. */
+export const RoomTauntReceipt = z.strictObject({
+    status: z.enum([
+        'accepted',
+        'duplicate',
+        'late',
+        'off',
+        'cooling',
+        'no_points',
+    ]),
     revision: count,
 });
 
@@ -309,6 +384,12 @@ export type RoomAsk = z.infer<typeof RoomAsk>;
 export type RoomMine = z.infer<typeof RoomMine>;
 export type RoomResult = z.infer<typeof RoomResult>;
 export type RoomReveal = z.infer<typeof RoomReveal>;
+export type RoomSpent = z.infer<typeof RoomSpent>;
+export type RoomTaunts = z.infer<typeof RoomTaunts>;
+export type RoomTauntReceived = z.infer<typeof RoomTauntReceived>;
+export type RoomTauntShown = z.infer<typeof RoomTauntShown>;
+export type RoomTaunt = z.infer<typeof RoomTaunt>;
+export type RoomTauntReceipt = z.infer<typeof RoomTauntReceipt>;
 export type RoomRound = z.infer<typeof RoomRound>;
 export type RoomGame = z.infer<typeof RoomGame>;
 export type RoomSetup = z.infer<typeof RoomSetup>;

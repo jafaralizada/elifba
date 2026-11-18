@@ -9,25 +9,29 @@ namespace App\Domain\Rooms\Data;
  * question's ids in the order to tap — and, for a word game, the word
  * (B6: the solution's `word`, as the round writes it; null otherwise);
  * the viewer's own answer; every player's result of the round, in the
- * order of the room's players. Before the reveal none of it leaves the
- * server.
+ * order of the room's players; and from T2 the taunts counted at this
+ * close (`spent`, ADR 029 decisions 2 and 6), each player's with a cost,
+ * in the same order. Before the reveal none of it leaves the server.
  *
  * @phpstan-import-type RoomMineArray from RoomMineData
  * @phpstan-import-type RoomResultArray from RoomResultData
+ * @phpstan-import-type RoomSpentArray from RoomSpentData
  *
- * @phpstan-type RoomRevealArray array{solution: list<string>, word: string|null, mine: RoomMineArray|null, results: list<RoomResultArray>}
+ * @phpstan-type RoomRevealArray array{solution: list<string>, word: string|null, mine: RoomMineArray|null, results: list<RoomResultArray>, spent: list<RoomSpentArray>}
  */
 final readonly class RoomRevealData
 {
     /**
      * @param  list<string>  $solution
      * @param  list<RoomResultData>  $results
+     * @param  list<RoomSpentData>  $spent
      */
     public function __construct(
         public array $solution,
         public ?string $word,
         public ?RoomMineData $mine,
         public array $results,
+        public array $spent = [],
     ) {}
 
     /**
@@ -40,6 +44,7 @@ final readonly class RoomRevealData
             $data['word'],
             $data['mine'] === null ? null : RoomMineData::fromArray($data['mine']),
             array_map(RoomResultData::fromArray(...), $data['results']),
+            array_map(RoomSpentData::fromArray(...), $data['spent']),
         );
     }
 
@@ -53,6 +58,7 @@ final readonly class RoomRevealData
             'word' => $this->word,
             'mine' => $this->mine?->toArray(),
             'results' => array_map(static fn (RoomResultData $result): array => $result->toArray(), $this->results),
+            'spent' => array_map(static fn (RoomSpentData $spent): array => $spent->toArray(), $this->spent),
         ];
     }
 }

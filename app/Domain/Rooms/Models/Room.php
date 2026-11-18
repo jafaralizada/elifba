@@ -37,7 +37,8 @@ use Illuminate\Support\Facades\Config;
  *
  * The `setup_*` columns are the host's choice of the next game (G2, ADR 026
  * decision 8), written only by `OpenRoom` and `ChooseRoomGame` and read
- * through `setup()`.
+ * through `setup()`. `taunts` is the host's switch for taunts (T2, ADR
+ * 029 decision 12), on by default, written only by `SetRoomTaunts`.
  *
  * @property string $id
  * @property int $user_id the host
@@ -49,6 +50,7 @@ use Illuminate\Support\Facades\Config;
  * @property RoomMechanic|null $setup_mechanic the choice's game; null in a room opened before G2
  * @property int|null $setup_difficulty
  * @property int|null $setup_rounds
+ * @property bool $taunts the host's switch: players may throw taunts
  * @property CarbonImmutable $created_at what the retention period counts from
  * @property CarbonImmutable $updated_at
  * @property-read User $host
@@ -67,6 +69,7 @@ class Room extends Model
      */
     protected $attributes = [
         'revision' => 0,
+        'taunts' => true,
     ];
 
     /**
@@ -221,6 +224,7 @@ class Room extends Model
             'setup_mechanic' => RoomMechanic::class,
             'setup_difficulty' => 'integer',
             'setup_rounds' => 'integer',
+            'taunts' => 'boolean',
         ];
     }
 

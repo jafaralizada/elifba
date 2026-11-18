@@ -10,8 +10,11 @@ use App\Domain\Rooms\Data\RoomResultData;
 use App\Domain\Rooms\Data\RoomRevealData;
 use App\Domain\Rooms\Data\RoomRoundData;
 use App\Domain\Rooms\Data\RoomSetupData;
+use App\Domain\Rooms\Data\RoomSpentData;
 use App\Domain\Rooms\Data\RoomStateData;
 use App\Domain\Rooms\Data\RoomSummaryData;
+use App\Domain\Rooms\Data\RoomTauntsData;
+use App\Domain\Rooms\Data\RoomTauntSeenData;
 use App\Domain\Rooms\Data\RoomViewerData;
 use App\Domain\Rooms\Enums\RoomGamePhase;
 use App\Domain\Rooms\Enums\RoomPhase;
@@ -20,8 +23,11 @@ use App\Domain\Rooms\Models\RoomAnswer;
 use App\Domain\Rooms\Models\RoomGame;
 use App\Domain\Rooms\Models\RoomPlayer;
 use App\Domain\Rooms\Models\RoomRound;
+use App\Domain\Rooms\Models\RoomTaunt;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Config;
 
 /**
  * A room's state as one account sees it (docs/architecture.md §12 "The
@@ -51,10 +57,21 @@ use Illuminate\Database\Eloquent\Collection;
  * after joining, never on the join page — and whether it is the game that
  * was just played: the latest game is over and its mechanic, difficulty
  * and number of rounds are the choice's. A closed room has none.
+ *
+ * A live game's state also carries its taunts as the viewer may see them
+ * (§12 "Taunts (T2)", ADR 029 decision 15): whether a throw is open, the
+ * viewer's balance and cooldown, the taunts aimed at the viewer within
+ * `elifba.rooms.taunts.show_ms` — and, for the big screen's request
+ * (`$screen`, `?for=screen`), every taunt of that window with its target.
+ * No other phone gets a taunt, and nothing of one is left once the game is
+ * over. A reveal lists the taunts counted at its close (`spent`).
  */
 final class RoomState
 {
-    public static function for(Room $room, User $viewer): RoomStateData
+    /**
+     * @param  bool  $screen  the big screen's request (`?for=screen`, `RoomPolicy::screen`): the taunts with their targets
+     */
+    public static function for(Room $room, User $viewer, bool $screen = false): RoomStateData
     {
         $nowMs = RoomClock::nowMs();
         $rows = RoomRanking::players($room);
@@ -91,6 +108,46 @@ final class RoomState
                     && $game->difficulty === $setup->difficulty
                     && $game->rounds->count() === $setup->rounds,
             ),
+            taunts: $live ? self::taunts($room, $game, $mine, $nowMs, $screen) : null,
+        );
+    }
+
+    /**
+     * The live game's taunts as the viewer may see them.
+     */
+    private static function taunts(Room $room, RoomGame $game, ?RoomPlayer $mine, int $nowMs, bool $screen): RoomTauntsData
+    {
+        $plays = $mine !== null && $mine->isPresent();
+        $showMs = Config::integer('elifba.rooms.taunts.show_ms');
+        $latest = $plays ? RoomTaunt::query()
+            ->where('room_game_id', $game->id)
+            ->where('room_player_id', $mine->id)
+            ->max('sent_ms') : null;
+        $readyMs = $latest === null ? null : (int) $latest + Config::integer('elifba.rooms.taunts.cooldown_ms');
+
+        // Thrown within show_ms before now, newest first: what a target's phone or the screen still shows.
+        $window = static fn (): Builder => RoomTaunt::query()
+            ->where('room_game_id', $game->id)
+            ->where('sent_ms', '>', $nowMs - $showMs)
+            ->where('sent_ms', '<=', $nowMs)
+            ->orderByDesc('sent_ms')
+            ->orderByDesc('id')
+            ->limit(RoomTauntsData::MAX_LISTED);
+
+        return new RoomTauntsData(
+            open: $plays && $room->taunts && RoomTauntWindow::open($room, $game, $nowMs),
+            balance: $plays ? RoomTauntBalance::of($game, $mine, $nowMs) : null,
+            ready_ms: $readyMs !== null && $readyMs > $nowMs ? $readyMs : null,
+            received: ! $plays || ! $room->taunts ? [] : array_values($window()
+                ->where('target_player_id', $mine->id)
+                ->get()
+                ->map(static fn (RoomTaunt $taunt): RoomTauntSeenData => new RoomTauntSeenData($taunt->id, $taunt->room_player_id, null, $taunt->taunt, $taunt->sent_ms))
+                ->all()),
+            shown: ! $screen ? null : (! $room->taunts ? [] : array_values($window()
+                ->whereNotNull('target_player_id')
+                ->get()
+                ->map(static fn (RoomTaunt $taunt): RoomTauntSeenData => new RoomTauntSeenData($taunt->id, $taunt->room_player_id, $taunt->target_player_id, $taunt->taunt, $taunt->sent_ms))
+                ->all())),
         );
     }
 
@@ -115,6 +172,7 @@ final class RoomState
         $since = RoomWaits::since($game, $index);
         $waited = $rows->filter(static fn (RoomPlayer $row): bool => RoomWaits::waitsFor($row, $since, $answers->has($row->id)));
         $own = $mine === null ? null : $answers->get($mine->id);
+        $spent = $revealed ? RoomTauntCost::spentAt($game, $index) : [];
 
         return new RoomRoundData(
             id: $round->id,
@@ -143,6 +201,10 @@ final class RoomState
 
                         return new RoomResultData($row->id, $answer->correct, $answer->points);
                     })
+                    ->all()),
+                spent: array_values($rows
+                    ->filter(static fn (RoomPlayer $row): bool => ($spent[$row->id] ?? 0) > 0)
+                    ->map(static fn (RoomPlayer $row): RoomSpentData => new RoomSpentData($row->id, $spent[$row->id]))
                     ->all()),
             ) : null,
         );

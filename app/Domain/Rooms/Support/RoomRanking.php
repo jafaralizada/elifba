@@ -10,6 +10,7 @@ use App\Domain\Rooms\Models\RoomAnswer;
 use App\Domain\Rooms\Models\RoomGame;
 use App\Domain\Rooms\Models\RoomPlayer;
 use App\Domain\Rooms\Models\RoomRound;
+use App\Domain\Rooms\Models\RoomTaunt;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
@@ -22,6 +23,14 @@ use Illuminate\Database\Eloquent\Collection;
  * cut off. The open round
  * never counts, so the list cannot tell who has just been right; a round
  * the host's end or the room's close cut off never counts at all.
+ *
+ * From T2 (§12 "Taunts (T2)", ADR 029 decisions 1–2) a game's points are
+ * its answers' points over its closed rounds less `RoomPointsRule::
+ * TAUNT_COST` for each taunt the player threw in it that counts by then
+ * (`RoomTauntCost`: from the first close after the throw, every one once
+ * the game is over), never below 0 — so a total can go down from one
+ * reveal to the next, and still changes only at a close. `room_answers`
+ * never changes for it, and nothing of it is stored.
  *
  * `ofGame()` ranks one game, `ofRoom()` every game of the room. The rows
  * are the room's players the host did not remove, nameless ones included
@@ -54,7 +63,7 @@ final class RoomRanking
      */
     public static function ofGame(RoomGame $game, int $nowMs, ?Collection $players = null): array
     {
-        return self::rank($players ?? self::players($game->room), self::points(self::closedRounds($game, $nowMs)));
+        return self::rank($players ?? self::players($game->room), self::net(self::points(self::closedRounds($game, $nowMs)), RoomTauntCost::spent($game, $nowMs)));
     }
 
     /**
@@ -66,15 +75,30 @@ final class RoomRanking
      */
     public static function ofRoom(Room $room, int $nowMs, ?Collection $players = null): array
     {
-        $rounds = [];
-
         $games = $room->relationLoaded('games') ? $room->games : $room->games()->with('rounds:id,room_game_id,position,study_ms,answer_ms,closed_ms')->get();
+        $closed = [];
 
         foreach ($games as $game) {
-            $rounds = [...$rounds, ...self::closedRounds($game, $nowMs)];
+            foreach (self::closedRounds($game, $nowMs) as $round) {
+                $closed[$round] = $game->id;
+            }
         }
 
-        return self::rank($players ?? self::players($room), self::points($rounds));
+        $answers = self::pointsByGame($closed);
+        $taunts = $games->isEmpty() ? collect() : RoomTaunt::query()
+            ->whereIn('room_game_id', $games->modelKeys())
+            ->get(['room_game_id', 'room_player_id', 'sent_ms'])
+            ->groupBy('room_game_id');
+        $points = [];
+
+        // Each game's net on its own, so that no game's taunts reach into another's points.
+        foreach ($games as $game) {
+            foreach (self::net($answers[$game->id] ?? [], RoomTauntCost::spent($game, $nowMs, $taunts->get($game->id, []))) as $player => $net) {
+                $points[$player] = ($points[$player] ?? 0) + $net;
+            }
+        }
+
+        return self::rank($players ?? self::players($room), $points);
     }
 
     /**
@@ -109,6 +133,44 @@ final class RoomRanking
 
         foreach (RoomAnswer::query()->whereIn('room_round_id', $rounds)->get(['room_player_id', 'points']) as $answer) {
             $points[$answer->room_player_id] = ($points[$answer->room_player_id] ?? 0) + $answer->points;
+        }
+
+        return $points;
+    }
+
+    /**
+     * Points per game and player row over these rounds.
+     *
+     * @param  array<string, string>  $rounds  each round's game, by the round's id
+     * @return array<string, array<string, int>>
+     */
+    private static function pointsByGame(array $rounds): array
+    {
+        $points = [];
+
+        if ($rounds === []) {
+            return $points;
+        }
+
+        foreach (RoomAnswer::query()->whereIn('room_round_id', array_keys($rounds))->get(['room_round_id', 'room_player_id', 'points']) as $answer) {
+            $game = $rounds[$answer->room_round_id];
+            $points[$game][$answer->room_player_id] = ($points[$game][$answer->room_player_id] ?? 0) + $answer->points;
+        }
+
+        return $points;
+    }
+
+    /**
+     * One game's points less the cost of its counted taunts, never below 0.
+     *
+     * @param  array<string, int>  $points  by player row
+     * @param  array<string, int>  $spent  counted taunts by player row
+     * @return array<string, int>
+     */
+    private static function net(array $points, array $spent): array
+    {
+        foreach ($spent as $player => $count) {
+            $points[$player] = max(0, ($points[$player] ?? 0) - RoomPointsRule::TAUNT_COST * $count);
         }
 
         return $points;

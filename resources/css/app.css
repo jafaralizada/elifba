@@ -458,3 +458,71 @@
     --color-rival-right-text: var(--rival-right-text);
     --color-rival-right-tint: var(--rival-right-tint);
 }
+
+/*
+ * Taunts (docs/frontend.md rule 15 "Taunts", ADR 029 decision 26): violet
+ * in both themes — a fill, its highlight, the taunt's text and two tints.
+ * Never emerald or red (right, wrong), never the strip's sky or orange,
+ * never the lamp's amber; and never alone: a taunt carries its emoji, its
+ * words and its icon. A received card pops in only when the page saw it
+ * arrive (`room-taunt-in`), and «−1» rises once from the tray after a
+ * throw (`room-taunt-rise`); both are `motion-safe:` only.
+ */
+:root {
+    --taunt: var(--color-violet-600);
+    --taunt-hi: var(--color-violet-400);
+    --taunt-text: var(--color-violet-700);
+    --taunt-tint: color-mix(in oklab, var(--color-violet-600) 9%, transparent);
+    --taunt-tint-strong: color-mix(
+        in oklab,
+        var(--color-violet-600) 16%,
+        transparent
+    );
+}
+
+.dark {
+    --taunt: var(--color-violet-500);
+    --taunt-hi: var(--color-violet-300);
+    --taunt-text: var(--color-violet-300);
+    --taunt-tint: color-mix(in oklab, var(--color-violet-500) 16%, transparent);
+    --taunt-tint-strong: color-mix(
+        in oklab,
+        var(--color-violet-500) 26%,
+        transparent
+    );
+}
+
+@theme {
+    --animate-room-taunt-in: room-taunt-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1)
+        backwards;
+    --animate-room-taunt-rise: room-taunt-rise 1100ms ease-out forwards;
+
+    @keyframes room-taunt-in {
+        0% {
+            transform: translateY(-0.5rem) scale(0.92);
+            opacity: 0;
+        }
+        60% {
+            transform: scale(1.03);
+            opacity: 1;
+        }
+        100% {
+            transform: none;
+            opacity: 1;
+        }
+    }
+
+    @keyframes room-taunt-rise {
+        0% {
+            transform: translateY(0);
+            opacity: 0;
+        }
+        15% {
+            opacity: 1;
+        }
+        100% {
+            transform: translateY(-2.125rem);
+            opacity: 0;
+        }
+    }
+}

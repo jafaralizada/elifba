@@ -454,5 +454,19 @@ describe('interimPair', () => {
         expect(before.right?.points).toBe(38);
         expect(before.gap).toBe(-14);
         expect(pairBefore(pair, null)).toBe(pair);
+
+        // A taunt counted at this close is added back: the movement starts from before the cost (ADR 029).
+        const paid = pairBefore(
+            pair,
+            [
+                { player_id: 'murad', correct: true, points: 17 },
+                { player_id: 'kamran', correct: true, points: 19 },
+            ],
+            [{ player_id: 'murad', count: 2 }],
+        );
+
+        expect(paid.left?.points).toBe(26);
+        expect(paid.right?.points).toBe(38);
+        expect(paid.gap).toBe(-12);
     });
 });

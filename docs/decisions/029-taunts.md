@@ -1,6 +1,6 @@
 # 029 — Taunts: a ready-made jibe at a rival, paid for with a point of one's own
 
-- **Status:** Accepted, 2026-11-18 (roadmap step T1: three clickable prototypes and the owner's three answers of that day). The variant and the list were taken under the owner's standing rule of 2026-11-18 — a session that would ask the owner takes its recommended option and says so — as variant A, «Zolaqda», and the ten taunts of decision 27; the owner may reverse either, and a changed phrase or emoji is a content change (decision 28). To be built by T2.
+- **Status:** Accepted, 2026-11-18 (roadmap step T1: three clickable prototypes and the owner's three answers of that day). The variant and the list were taken under the owner's standing rule of 2026-11-18 — a session that would ask the owner takes its recommended option and says so — as variant A, «Zolaqda», and the ten taunts of decision 27; the owner may reverse either, and a changed phrase or emoji is a content change (decision 28). Built by T2 (2026-11-18, the branch `feat/rooms-taunts`, on top of ADR 027's strip as it landed); what it built beyond this text is "As built (T2)" below, architecture.md §12 "Taunts (T2)", "As built (T2)" and docs/frontend.md rule 15 "Taunts", "As built (T2)".
 - **Sections:** architecture.md §1 "Tables", §12 "Scoring and what is kept", "Adults' privacy", "Guard tests", "Taunts (T2)"; docs/frontend.md rule 15 "Taunts" and "Nothing more"; glossary.md "Taunts (T2)"
 - **Amends:**
     - [024](024-adults-privacy-in-rooms.md) decision 6 ("No contact between people: no chat, no message, no reaction, no invitation") and its rejected alternative "Chat or reactions"; decision 2 (what a room keeps) and decision 10 (the notice); architecture §12 "Adults' privacy", rows "Minimum data", "No contact" and "Notice". A player may throw another present player of the same game a taunt from a closed list — an emoji with a short phrase of ours — and nothing else: still no chat, message, typed text, invitation or contact outside a game (decisions 9, 27 and 30).
@@ -197,6 +197,17 @@ T1 drew three clickable prototypes (one HTML file each, outside the repository, 
 - **Keeping who taunted whom for the retention period, or showing a count of taunts in the final:** a statistic about a person that ADR 024 decision 8 leaves out; the cost alone is kept.
 - **Taunts on every phone in the room:** noise over twenty questions; the screen is where the room looks together.
 - **A per-target cap beside the cooldown:** the price and the per-thrower cooldown bound it already; a cap would refuse a paying thrower for what others did.
+
+## As built (T2, 2026-11-18)
+
+Built on `feat/rooms-taunts` as decided above, after ADR 027's strip landed, and seen in a browser with two players (a duel at 4 × 4 cells) and with seven (a race at the 8-letter anagram), phones at 375 × 667 and the screen at 1280 × 720, light and dark, az and en, with and without reduced motion (the pictures are outside the repository, in `~/elifba-shots/taunts/built/`). The target's phone keeps every cell and tile of the question uncovered and above the tab bar (a 4 × 4 cell is about 47px, as ADR 027 measured); two taunts at once share the strip's height as two rows. Where the build says more than the decisions, or had to differ:
+
+1. **Two support classes** hold decisions 2, 3 and 10: `RoomTauntCost` (the close a taunt counts at — the first strictly after the throw, since a close's own moment is its reveal; what is counted at a moment; a reveal's `spent`) and `RoomTauntWindow` (an open room whose latest game is not over and has not passed its last close). `RoomTauntBalance` is as decision 3 says. `RoomPointsRule` gains only the constant; `points()` is unchanged.
+2. **The state** (decision 15): `shown` is bounded like `received` (3, newest first); `RoomTauntSeenData` carries `to` only in the screen's list, and the DTOs refuse a received taunt with a target, a shown one without, a balance below 0, and `taunts` on anything but a live game. `?for=screen` records no read, like a request from the screen's page, and the screen's first props are the screen's state.
+3. **The 422** on `target_id` (decision 13, item 4) says the sentence of `rooms.taunts.late`; no key of its own was added.
+4. **Content** (decision 28): `ContentValidator` also refuses a key besides `key` and `image` — a phrase in the file — and checks "none of the strip's three" against `rooms/rivalry.json` as it validated it.
+5. **The pages** (decisions 17–24): the popover stays open until the receipt and closes on `accepted` (or `duplicate`), saying a refusal in itself; the cooldown's ring fills from the first `ready_ms` the page saw, with no copy of the cooldown on the page; the page's `TAUNT_SHOW_MS` is held equal to `show_ms` by a test; the strip's count, like `Standing`'s and the lanes', starts from `points − result.points + spent`; the host's switch is also in the screen's «Oyun ayarları»; the screen's toggle shows while the room's switch is on.
+6. **Tests' guards**: the race and page tests look for the reveal's keys as keys (`"mine":`), since `mine` is also a taunt's key (decision 27).
 
 ## What would make us revisit
 

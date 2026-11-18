@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * `GET /rooms/{room}/state` (zod `RoomState`, docs/architecture.md §12 "The
@@ -24,16 +25,27 @@ use Illuminate\Http\Request;
  * `Referer` is `/rooms/{room}/screen` — records nothing. A request without
  * a `Referer` counts as the room page's: at worst the host's round waits
  * for the host, as every round did before.
+ *
+ * The screen asks with `?for=screen` (T2, ADR 029 decision 15), which only
+ * `RoomPolicy::screen` — the host of an open room — may: its state then
+ * lists the taunts of the last `show_ms` with their targets (`taunts.
+ * shown`), and the request records no read either.
  */
 final class RoomStateController extends Controller
 {
     public function __invoke(Request $request, Room $room, #[CurrentUser] User $account, RecordRoomRead $recordRead): JsonResponse
     {
-        if (! self::fromTheScreen($request, $room)) {
+        $forScreen = $request->query('for') === 'screen';
+
+        if ($forScreen) {
+            Gate::forUser($account)->authorize('screen', $room);
+        }
+
+        if (! $forScreen && ! self::fromTheScreen($request, $room)) {
             $recordRead->handle($room, $account);
         }
 
-        return new JsonResponse(RoomState::for($room, $account)->toArray(), 200, ['Cache-Control' => 'no-store, private']);
+        return new JsonResponse(RoomState::for($room, $account, $forScreen)->toArray(), 200, ['Cache-Control' => 'no-store, private']);
     }
 
     private static function fromTheScreen(Request $request, Room $room): bool
