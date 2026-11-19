@@ -16,12 +16,16 @@
 # ELIFBA_SMOKE_VOICE=1, which names it for this run and takes the address
 # 127.0.0.1 unless .env has one) it also checks our voice server (§10 "Live
 # voice"): `voice` healthy; only 7882/udp and 7881/tcp published beside the
-# proxy's ports; /rtc through Caddy answering as the voice server does, its API
-# not public and reachable from `app`; the config it runs with; a voice room
-# made through the API, joined through Caddy with a ticket minted here, whose
-# join response offers no ICE server but the instance's own address; no ticket
-# in a log; the server healthy on a network with no route out. Without the
-# profile the checks are the ones above, as many as before.
+# proxy's ports; /rtc/v1 through Caddy answering as the voice server does and
+# every other /rtc answered by Caddy, its API not public by any path and
+# reachable from `app`; the config it runs with; a voice room made through the
+# API for voice codecs only, joined through Caddy with a ticket minted here,
+# whose join response offers no ICE server but the instance's own address; no
+# ticket in a log, and none in Caddy's while the voice server is stopped; no
+# join in the voice server's log; the server healthy on a network with no
+# route out. Without the profile it checks that /rtc never reaches the app.
+# Either way: every service's log has a fixed size, the scheduler's tasks, and
+# a backup without the cache's rows.
 #
 # ELIFBA_SMOKE_BUILD=0 starts the image already built (the second run of CI's
 # `docker` job). ELIFBA_SMOKE_DOWN=1 removes the stack and its volumes at the end.
@@ -91,6 +95,11 @@ for service in $services; do
     check "$service is $health" test "$health" = healthy
 done
 
+for service in $services; do
+    logs=$(docker inspect --format '{{.HostConfig.LogConfig.Type}} {{index .HostConfig.LogConfig.Config "max-size"}} {{index .HostConfig.LogConfig.Config "max-file"}}' "$(compose ps -q "$service")" 2>/dev/null || true)
+    check "$service's log has a fixed size ($logs)" test "$logs" = "json-file 5m 3"
+done
+
 step "HTTP through Caddy"
 check "/up answers 200" test "$(status_of "$base/up")" = 200
 
@@ -136,8 +145,10 @@ if [ "$voice" = 1 ]; then
     check "only 7882/udp and 7881/tcp are published beside the proxy's ($published)" test "$published" = "$expected"
 
     upgrade=(-H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==')
-    check "/rtc through Caddy answers as the voice server does (401 without a ticket)" \
-        test "$(status_of "$base/rtc" --http1.1 "${upgrade[@]}")" = 401
+    check "/rtc/v1 through Caddy answers as the voice server does (401 without a ticket)" \
+        test "$(status_of "$base/rtc/v1" --http1.1 "${upgrade[@]}")" = 401
+    check "… and every other /rtc is Caddy's 404: the older /rtc, which takes a typed publish=" \
+        test "$(status_of "$base/rtc?publish=x" --http1.1 "${upgrade[@]}")$(status_of "$base/rtc/validate?publish=x")" = 404404
     check "the voice server's API is not public: POST /twirp/… reaches the app (404)" \
         test "$(status_of "$base/twirp/livekit.RoomService/ListRooms" -X POST -H 'Content-Type: application/json' -d '{}')" = 404
     check "app reaches the voice server on the internal network" \
@@ -152,8 +163,10 @@ if [ "$voice" = 1 ]; then
         bash -c '! grep -qE "^(webhook|turn|redis|tracing|ingress|egress|signal_relay):" <<<"$1"' _ "$config"
     check "it makes no room on its own and unmutes nobody" \
         bash -c 'grep -qE "^ +auto_create: false\$" <<<"$1" && grep -qE "^ +enable_remote_unmute: false\$" <<<"$1"' _ "$config"
-    check "it logged the address it was given ($voice_ip)" \
-        bash -c 'docker compose logs voice | grep "using explicit node IP" | grep -q "\"V4\":\"$1\""' _ "$voice_ip"
+    check "it logs warnings and errors only (logging.level: warn)" \
+        bash -c 'grep -qE "^ +level: warn\$" <<<"$1"' _ "$config"
+    check "it forwards voice codecs only (audio/opus, audio/red)" \
+        bash -c 'test "$(awk "/^ *enabled_codecs:/ { list = 1; next } list && /^ *- mime:/ { print \$3; next } list { list = 0 }" <<<"$1" | tr "\n" " ")" = "audio/opus audio/red "' _ "$config"
 
     # A ticket, as the app will mint it (HS256 with the voice secret; ADR 031 decision 20).
     b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
@@ -169,17 +182,31 @@ if [ "$voice" = 1 ]; then
             -H "Authorization: Bearer $(voice_ticket "$2")" -H 'Content-Type: application/json' \
             -d "$3" "http://voice:7880/twirp/livekit.RoomService/$1" || true
     }
-    rtc_join() { # rtc_join <ticket>: the status line and first frames of /rtc through Caddy
-        curl -s -i --http1.1 --max-time 3 "${upgrade[@]}" -H "Origin: $base" \
-            "$base/rtc?access_token=$1&protocol=16&sdk=js&version=2.24.1&auto_subscribe=1" |
+    # The join request the library sends on /rtc/v1, at its smallest: a
+    # WrappedJoinRequest of a JoinRequest with the SDK (JS) and auto_subscribe.
+    join_request=$(printf '\x12\x08\x0a\x02\x08\x01\x12\x02\x08\x01' | openssl base64 -A | tr '+/' '-_')
+    rtc_join() { # rtc_join <ticket> [curl options...]: the status line and first frames of /rtc/v1 through Caddy
+        local ticket=$1
+        shift
+        curl -s -i --http1.1 --max-time 3 "${upgrade[@]}" -H "Origin: $base" "$@" \
+            "$base/rtc/v1?access_token=$ticket&join_request=$join_request" |
             LC_ALL=C tr -c '[:print:]\n' '.' || true
     }
 
     room="elifba-smoke-$(date +%s)"
-    check "app makes a voice room through the API" \
-        grep -q "\"name\":\"$room\"" <<<"$(twirp CreateRoom '"video":{"roomCreate":true}' "{\"name\":\"$room\"}")"
+    made=$(twirp CreateRoom '"video":{"roomCreate":true}' "{\"name\":\"$room\"}")
+    check "app makes a voice room through the API" grep -q "\"name\":\"$room\"" <<<"$made"
+    check "… for voice codecs only" \
+        bash -c 'grep -q "\"mime\":\"audio/opus\"" <<<"$1" && ! grep -q "\"mime\":\"video/" <<<"$1"' _ "$(tr -d ' ' <<<"$made")"
+    tricks=$(for path in '/twirp/livekit.RoomService/ListRooms%2f..%2f..%2f..%2frtc/v1' '/twirp%2f..%2frtc/v1' \
+        '/twirp/../rtc/v1' '/RTC/v1' '/rtc/v1%2f..%2f..%2ftwirp/livekit.RoomService/ListRooms'; do
+        curl -s --path-as-is --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"names":[]}' \
+            -H "Authorization: Bearer $(voice_ticket '"video":{"roomList":true}')" "$base$path" || true
+    done)
+    check "no path that only cleans to /rtc/v1 reaches the voice server's API" \
+        bash -c '! grep -qE "\"(rooms|code)\"" <<<"$1"' _ "$tricks"
     ticket=$(voice_ticket "\"sub\":\"smoke-listener\",\"video\":{\"room\":\"$room\",\"roomJoin\":true,\"canPublish\":false,\"canPublishData\":false}")
-    join=$(rtc_join "$ticket")
+    join=$(rtc_join "$ticket" -A 'Mozilla/5.0 (Linux; Android 15; SM-S918B) elifba-smoke-agent Mobile Safari/537.36')
     check "a ticket joins it through Caddy (101)" grep -q '^HTTP/1.1 101' <<<"$join"
     offered=$(grep -oE '(stun|turn)s?:' <<<"$join" | wc -l | tr -d ' ')
     own=$(grep -oF "stun:$voice_ip:7882" <<<"$join" | wc -l | tr -d ' ')
@@ -193,6 +220,27 @@ if [ "$voice" = 1 ]; then
     signature=${ticket##*.}
     check "neither Caddy nor the voice server logged the ticket" \
         bash -c '! docker compose logs proxy voice 2>&1 | grep -qF -e "$1" -e access_token=' _ "$signature"
+    check "the voice server logged nothing of the join: no phone, browser or address" \
+        bash -c '! docker compose logs voice 2>&1 | grep -qiE "elifba-smoke-agent|SM-S918B|deviceModel|clientInfo|a=ice-pwd"'
+
+    step "Live voice while the voice server is stopped"
+    compose stop voice >/dev/null 2>&1
+    stopped=$(voice_ticket "\"sub\":\"smoke-stopped\",\"video\":{\"room\":\"$room\",\"roomJoin\":true}")
+    check "a page's try through Caddy fails (502)" \
+        grep -q '^HTTP/1.1 502' <<<"$(rtc_join "$stopped" -A elifba-smoke-agent -e "$base/rooms/elifba-smoke-room")"
+    check "… and so does its check (/rtc/v1/validate, 502)" \
+        test "$(status_of "$base/rtc/v1/validate?access_token=$stopped&join_request=$join_request" -A elifba-smoke-agent)" = 502
+    sleep 1
+    failed=$(compose logs proxy 2>&1 | grep '"status":502' || true)
+    check "Caddy logged the failure ($(grep -c . <<<"$failed") lines)" grep -q '"uri":"/rtc/v1' <<<"$failed"
+    check "… without the ticket, the join request, the browser or the page" \
+        bash -c '! docker compose logs proxy app 2>&1 | grep -qF -e "${1##*.}" -e access_token= -e join_request= -e elifba-smoke-agent -e elifba-smoke-room' _ "$stopped"
+    check "… and with the address cut (/16)" \
+        bash -c '! grep -oE "\"(remote|client)_ip\":\"[0-9.]+\"" <<<"$1" | grep -qvE "\.0\.0\"\$"' _ "$failed"
+    compose start voice >/dev/null 2>&1
+    compose up -d --wait --wait-timeout 120 voice >/dev/null 2>&1 || true
+    check "the voice server is back (healthy)" \
+        test "$(docker inspect --format '{{.State.Health.Status}}' "$(compose ps -q voice)" 2>/dev/null)" = healthy
 
     step "Live voice with no route out"
     image=$(compose config --images | grep -m 1 '^livekit/livekit-server:')
@@ -217,10 +265,16 @@ if [ "$voice" = 1 ]; then
     done
     check "the network has no route out" bash -c '! docker exec "$1" wget -qO /dev/null -T 3 http://1.1.1.1/ 2>/dev/null' _ "$offline"
     check "the voice server is healthy there ($healthy)" test "$healthy" = yes
-    check "… with the address it was given and no lookup of its own" \
-        bash -c 'docker logs "$1" 2>&1 | grep -q "using explicit node IP" && ! docker logs "$1" 2>&1 | grep -qiE "stun|external ip"' _ "$offline"
+    check "… with no lookup of its own" \
+        bash -c '! docker logs "$1" 2>&1 | grep -qiE "stun|external ip"' _ "$offline"
     docker rm -f "$offline" >/dev/null
     docker network rm "$offline" >/dev/null
+else
+    step "No voice"
+    check "/rtc never reaches the app: Caddy answers 404" \
+        test "$(status_of "$base/rtc/v1?access_token=elifba-smoke-sentinel")" = 404
+    check "… and nothing logged the ticket's place" \
+        bash -c '! docker compose logs proxy app 2>&1 | grep -qF elifba-smoke-sentinel'
 fi
 
 step "The image"
@@ -231,7 +285,7 @@ check "content is compiled (content:cache)" compose exec -T app test -f bootstra
 
 step "Scheduler"
 schedule=$(compose exec -T scheduler php artisan schedule:list 2>&1 || true)
-for task in classroom:prune-archived play:abandon-stale play:prune-old-games play:prune-guest-boards; do
+for task in classroom:prune-archived play:abandon-stale play:prune-old-games play:prune-guest-boards cache:prune-expired; do
     check "schedule:list has $task" grep -q "$task" <<<"$schedule"
 done
 
@@ -241,6 +295,8 @@ latest=$(compose exec -T backup sh -c 'ls -1t /backups/elifba-*.dump | head -n 1
 check "a dump was written ($latest)" test -n "$latest"
 check "the dump is a readable pg_dump archive" \
     bash -c 'docker compose exec -T backup pg_restore --list "$1" | grep -q "TABLE public migrations"' _ "$latest"
+check "… without the cache's rows (a limiter's counts)" \
+    bash -c 'contents=$(docker compose exec -T backup pg_restore --list "$1") && grep -qE "TABLE public cache( |\$)" <<<"$contents" && ! grep -qE "TABLE DATA public cache(_locks)?( |\$)" <<<"$contents"' _ "$latest"
 
 step "Data survives down and up"
 psql() { compose exec -T db psql -U elifba -d elifba -tAc "$1"; }

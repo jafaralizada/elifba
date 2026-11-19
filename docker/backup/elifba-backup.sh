@@ -1,7 +1,8 @@
 #!/bin/sh
 # The `backup` service (docker-compose.yml, docs/architecture.md §10), on the
-# postgres image: `pg_dump --format=custom` of Elifba's database into
-# /backups (the `backups` volume), keeping BACKUP_KEEP_DAYS days of dumps.
+# postgres image: `pg_dump --format=custom` of Elifba's database — the
+# cache's rows left out — into /backups (the `backups` volume), keeping
+# BACKUP_KEEP_DAYS days of dumps.
 #
 #   elifba-backup nightly   every day at BACKUP_AT in TZ (Asia/Baku); the service's command
 #   elifba-backup now       one dump now: `docker compose exec backup elifba-backup now`
@@ -19,7 +20,11 @@ at=${BACKUP_AT:-03:00}
 
 backup() {
     file="$dir/elifba-$(date +%Y-%m-%d_%H%M%S).dump"
-    pg_dump --format=custom --no-owner --file="$file.partial"
+    # Without the cache's rows: a cache is rebuilt, and a rate limiter's count
+    # of an account's requests belongs in no backup (ADR 031 decision 7).
+    pg_dump --format=custom --no-owner \
+        --exclude-table-data=cache --exclude-table-data=cache_locks \
+        --file="$file.partial"
     mv "$file.partial" "$file"
     echo "elifba-backup: wrote $file ($(du -h "$file" | cut -f1))"
 

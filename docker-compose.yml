@@ -56,16 +56,26 @@ x-laravel-env: &laravel-env
     ELIFBA_ROOMS_VOICE_URL: ${ELIFBA_ROOMS_VOICE_IP:+${ELIFBA_SCHEME}://${ELIFBA_DOMAIN}:${ELIFBA_PORT}}
     ELIFBA_ROOMS_VOICE_API_URL: ${ELIFBA_ROOMS_VOICE_IP:+http://voice:7880}
 
+# Every service's log is Docker's json-file of a fixed size: new lines push
+# out old ones (§10; ADR 031, "As built (C5, audit)").
+x-logging: &logging
+    driver: json-file
+    options:
+        max-size: 5m
+        max-file: '3'
+
 x-laravel: &laravel
     image: elifba:local
     build: *build
     env_file: .env
     restart: unless-stopped
+    logging: *logging
 
 services:
     proxy:
         image: caddy:2.11.9-alpine
         restart: unless-stopped
+        logging: *logging
         ports:
             - '${ELIFBA_PORT}:${ELIFBA_PORT}'
             - '${ELIFBA_REDIRECT_PORT:-80}:80'
@@ -137,6 +147,7 @@ services:
     db:
         image: postgres:17.11
         restart: unless-stopped
+        logging: *logging
         environment:
             POSTGRES_DB: elifba
             POSTGRES_USER: elifba
@@ -154,6 +165,7 @@ services:
     backup:
         image: postgres:17.11
         restart: unless-stopped
+        logging: *logging
         init: true
         entrypoint: ['sh', '/usr/local/bin/elifba-backup']
         command: ['nightly']
@@ -197,11 +209,7 @@ services:
         ports:
             - '7882:7882/udp'
             - '7881:7881/tcp'
-        logging:
-            driver: json-file
-            options:
-                max-size: 5m
-                max-file: '3'
+        logging: *logging
         healthcheck:
             test: ['CMD', 'wget', '-qO', '/dev/null', 'http://127.0.0.1:7880/']
             interval: 10s

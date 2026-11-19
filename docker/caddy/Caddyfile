@@ -12,6 +12,34 @@
 	# port mapping the address it reached is not the site's: answer such a
 	# handshake with the site's certificate.
 	default_sni {$ELIFBA_DOMAIN}
+
+	# This file has no `log` directive, so Caddy keeps no access log; but its
+	# default logger still writes a line for every request that fails with
+	# a 5xx — a /rtc upgrade while the voice server restarts or is down —
+	# with the request's address, headers and whole URI, and the URI of
+	# /rtc carries the voice ticket (`access_token`) and the join request.
+	# Neither may reach a log (ADR 031 decisions 19 and 32), nor a whole
+	# address, a browser or the page it came from: every line loses them.
+	log default {
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					delete access_token
+					delete join_request
+				}
+				request>headers delete
+				request>remote_ip ip_mask {
+					ipv4 16
+					ipv6 32
+				}
+				request>client_ip ip_mask {
+					ipv4 16
+					ipv6 32
+				}
+			}
+		}
+	}
 }
 
 {$ELIFBA_SITE} {
@@ -27,16 +55,32 @@
 	}
 
 	# The browser's WebSocket to our voice server (§10 "Live voice"), only
-	# while the instance's voice address is set. The ticket is in its query:
-	# this file has no `log` directive, so no request is access-logged. The
-	# voice server's API (/twirp/*) is not routed here: from outside it
-	# reaches the app, which has no such route.
+	# while the instance's voice address is set, and only the two paths the
+	# page's library (livekit-client 2.24.1) opens: the signalling and, after
+	# a failed upgrade, its check. They are matched on the path the browser
+	# sent as well as on the one Caddy cleans, since Caddy forwards the
+	# former: a path that only cleans to /rtc/v1 (/twirp/…%2f..%2frtc/v1)
+	# would reach the voice server's API router. The ticket is in the query
+	# (see the log filter above); the site's cookies stay here.
 	@voice {
-		path /rtc /rtc/*
-		expression "{$ELIFBA_VOICE_ROUTE}" == "on"
+		path /rtc/v1 /rtc/v1/validate
+		expression `"{$ELIFBA_VOICE_ROUTE}" == "on" && {http.request.orig_uri.path} in ['/rtc/v1', '/rtc/v1/validate']`
 	}
 	handle @voice {
-		reverse_proxy voice:7880
+		reverse_proxy voice:7880 {
+			header_up -Cookie
+		}
+	}
+
+	# Every other /rtc path is answered here — with the voice off too, so a
+	# page's retry never reaches the app and its access log with a ticket in
+	# the query. Among them the library's older /rtc, which would take a
+	# `publish=` text into a second identity (ADR 031, "As built (C5,
+	# audit)"). The voice server's API (/twirp/*) is not routed here either:
+	# from outside it reaches the app, which has no such route.
+	@rtc path /rtc /rtc/*
+	handle @rtc {
+		respond 404
 	}
 
 	# Everything else: nginx + PHP-FPM. Caddy sets X-Forwarded-For, -Proto

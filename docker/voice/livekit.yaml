@@ -33,6 +33,18 @@ room:
     auto_create: false
     # Nobody but the player turns a player's microphone on (decision 10).
     enable_remote_unmute: false
+    # Voice and nothing else: a ticket grants the microphone source only, but
+    # the server checks the source a client names, not the kind of track, so
+    # without this a video track named "microphone" would reach every phone
+    # (ADR 031 decisions 20 and 32; C5, the audit). Opus, and Chrome's RED.
+    enabled_codecs:
+        - mime: audio/opus
+        - mime: audio/red
 
+# Warnings and errors only: a refused or broken connection with the voice
+# room's name and the player's row id. At `info` every join also writes the
+# phone's system, model and browser, its addresses (private ones whole) and
+# its whole SDP, and when it opened its microphone — more than /privacy says
+# the log holds (ADR 031 decisions 17 and 27; C5, the audit).
 logging:
-    level: info
+    level: warn

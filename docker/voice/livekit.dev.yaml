@@ -16,7 +16,13 @@ rtc:
 room:
     auto_create: false
     enable_remote_unmute: false
+    # Voice only, as livekit.yaml.
+    enabled_codecs:
+        - mime: audio/opus
+        - mime: audio/red
 
+# `info` on a laptop, for the developer's own joins: a real instance logs at
+# `warn` (livekit.yaml).
 logging:
     level: info
 
