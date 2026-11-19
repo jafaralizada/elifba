@@ -205,8 +205,8 @@ function ReactionLayer({
 
 /**
  * A received taunt on the target's phone (ADR 029 decisions 39–41, 43): a
- * reaction in the middle of the whole viewport, over the header, the round
- * and the tab bar, with no card — the emoji, the thrower's name and the
+ * reaction in the middle of the whole viewport, over the game frame's top
+ * bar and the round (ADR 032), with no card — the emoji, the thrower's name and the
  * phrase in the page's locale, at `--taunt-reaction-opacity`, the words
  * haloed in the page's background. It takes no tap (`pointer-events:
  * none`), moves nothing, and stays until `sent_ms + TAUNT_REACTION_MS` by

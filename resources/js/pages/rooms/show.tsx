@@ -4,7 +4,6 @@ import {
     ChevronDown,
     CircleStop,
     Hourglass,
-    Lock,
     LogOut,
     Play,
     RotateCcw,
@@ -27,11 +26,16 @@ import {
     useRoomStart,
 } from '@/components/rooms/game-settings';
 import type { RoomChoice } from '@/components/rooms/game-settings';
-import { LiveRound } from '@/components/rooms/live-round';
+import { LiveRound, RoundTitle } from '@/components/rooms/live-round';
 import { RoomActionBar } from '@/components/rooms/room-action-bar';
 import { CodeChip, CodeDialog, InviteCard } from '@/components/rooms/room-code';
 import type { JoinLink } from '@/components/rooms/room-code';
 import { RoomConfirm } from '@/components/rooms/room-confirm';
+import {
+    FrameTitle,
+    LockedBadge,
+    RoomFrame,
+} from '@/components/rooms/room-frame';
 import type { RivalryIcons } from '@/components/rooms/rivalry-strip';
 import { tauntVoices, useTauntsHidden } from '@/components/rooms/taunt-parts';
 import type { TauntList } from '@/components/rooms/taunt-parts';
@@ -56,7 +60,7 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
-import { close, destroy, entrance, index, leave } from '@/routes/rooms';
+import { close, destroy, entrance, leave } from '@/routes/rooms';
 import { destroy as endGame } from '@/routes/rooms/game';
 import { destroy as forget } from '@/routes/rooms/name';
 import type {
@@ -123,9 +127,14 @@ type Props = {
  * aimed at the viewer is said in the board's voice as its reaction pops in,
  * unless this device hides taunts (ADR 029 as amended 2026-11-19).
  *
+ * The page has no app shell: it stands in the game frame (`RoomFrame`,
+ * ADR 032), whose top bar holds ‹ to «Oyunlar», the moment's title — in a
+ * round the round's, over the game — and the moment's buttons; the action
+ * of the moment stands at the bottom of the viewport (`RoomActionBar
+ * framed`).
+ *
  * While the host has the live voice on, its round button stands in the
- * page's head on every moment — the room's header outside a round, the
- * round's head in one — and opens the panel «Canlı səs»; the host's
+ * frame's top bar on every moment and opens the panel «Canlı səs»; the host's
  * «Otağın idarəsi» has its switch (`useRoomVoice()`, docs/frontend.md rule
  * 15 "Live voice", ADR 031). The voice is the room's, not a game's: the
  * button stays through every moment, and nothing of a round reads it.
@@ -181,16 +190,16 @@ export default function RoomsShow({
 
     if (state === null || state.setup === null) {
         return (
-            <div className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pt-4 pb-8 md:px-6">
-                <Head title={t('rooms.start.title')} />
-                <h1 className="text-2xl font-semibold tracking-tight">
-                    {t('rooms.start.title')}
-                </h1>
-                <p className="text-muted-foreground">{t('rooms.show.left')}</p>
-                <Button asChild className="h-13 text-base">
-                    <Link href={entrance()}>{t('rooms.join.title')}</Link>
-                </Button>
-            </div>
+            <RoomFrame heading={<FrameTitle title={t('rooms.start.title')} />}>
+                <div className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pt-4 pb-8 md:px-6">
+                    <p className="text-muted-foreground">
+                        {t('rooms.show.left')}
+                    </p>
+                    <Button asChild className="h-13 text-base">
+                        <Link href={entrance()}>{t('rooms.join.title')}</Link>
+                    </Button>
+                </div>
+            </RoomFrame>
         );
     }
 
@@ -199,10 +208,26 @@ export default function RoomsShow({
 
     if (game !== null && game.phase === 'live' && round !== null) {
         return (
-            <div className="flex flex-1 flex-col">
+            <RoomFrame
+                heading={
+                    <RoundTitle
+                        game={game}
+                        round={round}
+                        motion={motion.round}
+                    />
+                }
+                tools={
+                    <>
+                        {sounds !== null && <SoundToggle sound={sound} />}
+                        {voiceButton}
+                        {state.room.code !== null && (
+                            <CodeChip code={state.room.code} join={join} />
+                        )}
+                    </>
+                }
+            >
                 <Head title={t('rooms.start.title')} />
                 <div className="mx-auto flex w-full max-w-xl flex-col gap-5 px-4 pt-4 pb-6 md:px-6">
-                    <h1 className="sr-only">{t('rooms.start.title')}</h1>
                     <LiveRound
                         roomId={room.id}
                         state={state}
@@ -218,20 +243,6 @@ export default function RoomsShow({
                         taunts={taunts}
                         tauntsHidden={tauntsHidden}
                         onTauntsHiddenChange={setTauntsHidden}
-                        aside={
-                            <>
-                                {sounds !== null && (
-                                    <SoundToggle sound={sound} />
-                                )}
-                                {voiceButton}
-                                {state.room.code !== null && (
-                                    <CodeChip
-                                        code={state.room.code}
-                                        join={join}
-                                    />
-                                )}
-                            </>
-                        }
                     />
                     {can.host && (
                         <div className="flex justify-center border-t pt-4">
@@ -260,7 +271,7 @@ export default function RoomsShow({
                         </div>
                     )}
                 </div>
-            </div>
+            </RoomFrame>
         );
     }
 
@@ -298,36 +309,6 @@ export default function RoomsShow({
     );
 }
 
-/** A page's header outside a round: its title, «Kilidli» while locked, and the host's tools. */
-function RoomHeader({
-    title,
-    locked,
-    tools,
-}: {
-    title: string;
-    locked: boolean;
-    tools?: ReactNode;
-}) {
-    const { t } = useTranslation();
-
-    return (
-        <header className="flex min-h-11 items-center gap-2">
-            <Head title={title} />
-            <h1 className="min-w-0 truncate text-xl font-semibold tracking-tight">
-                {title}
-            </h1>
-            {locked && (
-                <Badge variant="outline" className="h-7 shrink-0 gap-1">
-                    <Lock aria-hidden />
-                    {t('rooms.show.locked_badge')}
-                </Badge>
-            )}
-            <span className="flex-1" />
-            {tools}
-        </header>
-    );
-}
-
 /**
  * The host's page outside a game: the start screen, or after a game its
  * final with «Yenidən oyna» and the other games. One choice, one start and
@@ -355,7 +336,7 @@ function HostRoom({
     placeLabels: string[];
     motion: RoomMotion;
     refresh: () => void;
-    /** The live voice's button in the header, while the host has the voice on. */
+    /** The live voice's button in the top bar, while the host has the voice on. */
     voice?: ReactNode;
 }) {
     const { t } = useTranslation();
@@ -390,20 +371,27 @@ function HostRoom({
     );
 
     return (
-        <div className="flex flex-1 flex-col">
-            <div className="mx-auto flex w-full max-w-xl flex-col gap-2.5 px-4 pt-1 pb-4 md:px-6">
+        <RoomFrame
+            heading={
+                <FrameTitle
+                    title={t(
+                        over !== null
+                            ? 'rooms.start.final'
+                            : 'rooms.start.invite',
+                    )}
+                    badge={state.room.locked ? <LockedBadge /> : null}
+                />
+            }
+            tools={
+                <>
+                    {voice}
+                    {tools}
+                </>
+            }
+        >
+            <div className="mx-auto flex w-full max-w-xl flex-col gap-2.5 px-4 pt-3 pb-4 md:px-6">
                 {over !== null ? (
                     <>
-                        <RoomHeader
-                            title={t('rooms.start.final')}
-                            locked={state.room.locked}
-                            tools={
-                                <>
-                                    {voice}
-                                    {tools}
-                                </>
-                            }
-                        />
                         <GameOver
                             state={state}
                             game={over}
@@ -432,16 +420,6 @@ function HostRoom({
                     </>
                 ) : (
                     <>
-                        <RoomHeader
-                            title={t('rooms.start.invite')}
-                            locked={state.room.locked}
-                            tools={
-                                <>
-                                    {voice}
-                                    {tools}
-                                </>
-                            }
-                        />
                         {state.game !== null && (
                             <StandingCard
                                 state={state}
@@ -475,7 +453,7 @@ function HostRoom({
                 )}
             </div>
 
-            <RoomActionBar>
+            <RoomActionBar framed>
                 {(failed || (over !== null && choice.failed)) && (
                     <InputError
                         message={
@@ -536,7 +514,7 @@ function HostRoom({
                 onOpenChange={setSettings}
                 taunts={tauntsSwitch}
             />
-        </div>
+        </RoomFrame>
     );
 }
 
@@ -619,7 +597,7 @@ function PlayerRoom({
     placeLabels: string[];
     motion: RoomMotion;
     canLeave: boolean;
-    /** The live voice's button in the header, while the host has the voice on. */
+    /** The live voice's button in the top bar, while the host has the voice on. */
     voice?: ReactNode;
 }) {
     const { t } = useTranslation();
@@ -643,15 +621,21 @@ function PlayerRoom({
     );
 
     return (
-        <div className="flex flex-1 flex-col">
-            <div className="mx-auto flex w-full max-w-xl flex-col gap-2.5 px-4 pt-1 pb-4 md:px-6">
+        <RoomFrame
+            heading={
+                <FrameTitle
+                    title={t(
+                        over !== null
+                            ? 'rooms.start.final'
+                            : 'rooms.start.title',
+                    )}
+                />
+            }
+            tools={voice}
+        >
+            <div className="mx-auto flex w-full max-w-xl flex-col gap-2.5 px-4 pt-3 pb-4 md:px-6">
                 {over !== null ? (
                     <>
-                        <RoomHeader
-                            title={t('rooms.start.final')}
-                            locked={false}
-                            tools={voice}
-                        />
                         <GameOver
                             state={state}
                             game={over}
@@ -662,11 +646,6 @@ function PlayerRoom({
                     </>
                 ) : (
                     <>
-                        <RoomHeader
-                            title={t('rooms.start.title')}
-                            locked={false}
-                            tools={voice}
-                        />
                         {state.game !== null && (
                             <StandingCard
                                 state={state}
@@ -717,7 +696,7 @@ function PlayerRoom({
                 )}
             </div>
 
-            <RoomActionBar>
+            <RoomActionBar framed>
                 <p className="flex min-h-11 items-center justify-center gap-2 text-center text-sm text-muted-foreground">
                     <Hourglass aria-hidden className="size-4 shrink-0" />
                     {over !== null
@@ -725,7 +704,7 @@ function PlayerRoom({
                         : t('rooms.show.waiting')}
                 </p>
             </RoomActionBar>
-        </div>
+        </RoomFrame>
     );
 }
 
@@ -801,112 +780,117 @@ function ClosedRoom({
     const { t } = useTranslation();
 
     return (
-        <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pt-4 pb-10 md:px-6">
-            <Head title={t('rooms.show.results')} />
-            <header className="flex flex-col gap-1">
-                <div className="flex min-h-11 items-center gap-3">
-                    <h1 className="text-2xl font-semibold tracking-tight">
-                        {t('rooms.show.results')}
-                    </h1>
-                    <Badge variant="secondary" className="h-7">
-                        {t('rooms.show.closed_badge')}
-                    </Badge>
-                </div>
+        <RoomFrame
+            back="past"
+            heading={
+                <FrameTitle
+                    title={t('rooms.show.results')}
+                    badge={
+                        <Badge variant="secondary" className="h-6 shrink-0">
+                            {t('rooms.show.closed_badge')}
+                        </Badge>
+                    }
+                />
+            }
+        >
+            <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pt-4 pb-10 md:px-6">
                 <p className="text-sm text-muted-foreground">
                     {t('rooms.show.closed')}
                 </p>
-            </header>
 
-            {state !== null && (
-                <section className="flex flex-col gap-2">
-                    <h2 className="font-semibold">
-                        {t('rooms.game.standing')}
-                    </h2>
-                    {games.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                            {t('rooms.show.no_games')}
-                        </p>
-                    ) : (
-                        <Standing
-                            ranking={state.ranking}
-                            players={state.players}
-                            me={state.me.player_id}
-                            placeLabels={placeLabels}
-                        />
-                    )}
-                </section>
-            )}
-
-            {state !== null && games.length > 0 && (
-                <section className="flex flex-col gap-2">
-                    <h2 className="font-semibold">
-                        {t('rooms.show.games_count', { count: games.length })}
-                    </h2>
-                    {games.map((played, position) => (
-                        <GameResult
-                            key={played.id}
-                            game={played}
-                            state={state}
-                            placeLabels={placeLabels}
-                            defaultOpen={position === 0}
-                        />
-                    ))}
-                </section>
-            )}
-
-            {(can.forget || can.delete) && (
-                <section className="flex flex-col gap-5 border-t pt-6">
-                    {can.forget && (
-                        <div className="flex flex-col gap-2">
+                {state !== null && (
+                    <section className="flex flex-col gap-2">
+                        <h2 className="font-semibold">
+                            {t('rooms.game.standing')}
+                        </h2>
+                        {games.length === 0 ? (
                             <p className="text-sm text-muted-foreground">
-                                {t('rooms.show.forget_line')}
+                                {t('rooms.show.no_games')}
                             </p>
-                            <RoomConfirm
-                                trigger={
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="h-11"
-                                    >
-                                        <UserMinus />
-                                        {t('rooms.show.forget')}
-                                    </Button>
-                                }
-                                title={t('rooms.show.forget_title')}
-                                description={t('rooms.show.forget_line')}
-                                confirmLabel={t('rooms.show.forget')}
-                                destructive
-                                form={forget.form(room.id)}
+                        ) : (
+                            <Standing
+                                ranking={state.ranking}
+                                players={state.players}
+                                me={state.me.player_id}
+                                placeLabels={placeLabels}
                             />
-                        </div>
-                    )}
-                    {can.delete && (
-                        <div className="flex flex-col gap-2">
-                            <p className="text-sm text-muted-foreground">
-                                {t('rooms.show.delete_line')}
-                            </p>
-                            <RoomConfirm
-                                trigger={
-                                    <Button
-                                        type="button"
-                                        variant="destructive"
-                                        className="h-11"
-                                    >
-                                        <Trash2 />
-                                        {t('rooms.show.delete')}
-                                    </Button>
-                                }
-                                title={t('rooms.show.delete_title')}
-                                description={t('rooms.show.delete_line')}
-                                confirmLabel={t('rooms.show.delete')}
-                                destructive
-                                form={destroy.form(room.id)}
+                        )}
+                    </section>
+                )}
+
+                {state !== null && games.length > 0 && (
+                    <section className="flex flex-col gap-2">
+                        <h2 className="font-semibold">
+                            {t('rooms.show.games_count', {
+                                count: games.length,
+                            })}
+                        </h2>
+                        {games.map((played, position) => (
+                            <GameResult
+                                key={played.id}
+                                game={played}
+                                state={state}
+                                placeLabels={placeLabels}
+                                defaultOpen={position === 0}
                             />
-                        </div>
-                    )}
-                </section>
-            )}
-        </div>
+                        ))}
+                    </section>
+                )}
+
+                {(can.forget || can.delete) && (
+                    <section className="flex flex-col gap-5 border-t pt-6">
+                        {can.forget && (
+                            <div className="flex flex-col gap-2">
+                                <p className="text-sm text-muted-foreground">
+                                    {t('rooms.show.forget_line')}
+                                </p>
+                                <RoomConfirm
+                                    trigger={
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="h-11"
+                                        >
+                                            <UserMinus />
+                                            {t('rooms.show.forget')}
+                                        </Button>
+                                    }
+                                    title={t('rooms.show.forget_title')}
+                                    description={t('rooms.show.forget_line')}
+                                    confirmLabel={t('rooms.show.forget')}
+                                    destructive
+                                    form={forget.form(room.id)}
+                                />
+                            </div>
+                        )}
+                        {can.delete && (
+                            <div className="flex flex-col gap-2">
+                                <p className="text-sm text-muted-foreground">
+                                    {t('rooms.show.delete_line')}
+                                </p>
+                                <RoomConfirm
+                                    trigger={
+                                        <Button
+                                            type="button"
+                                            variant="destructive"
+                                            className="h-11"
+                                        >
+                                            <Trash2 />
+                                            {t('rooms.show.delete')}
+                                        </Button>
+                                    }
+                                    title={t('rooms.show.delete_title')}
+                                    description={t('rooms.show.delete_line')}
+                                    confirmLabel={t('rooms.show.delete')}
+                                    destructive
+                                    form={destroy.form(room.id)}
+                                />
+                            </div>
+                        )}
+                    </section>
+                )}
+            </div>
+        </RoomFrame>
     );
 }
 
@@ -965,7 +949,3 @@ function GameResult({
         </div>
     );
 }
-
-RoomsShow.layout = {
-    breadcrumbs: [{ title: 'nav.rooms', href: index() }],
-};

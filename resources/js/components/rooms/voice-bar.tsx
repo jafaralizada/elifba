@@ -220,7 +220,7 @@ const NOTE_ICONS: Record<RoomVoiceNote, typeof Mic> = {
     'errors.no_mic': MicOff,
 };
 
-/** A note for its moment (`NOTE_MS`), over the page under the app's header. */
+/** A note for its moment (`NOTE_MS`), over the page under the game frame's top bar (ADR 032). */
 function VoiceNote({ note }: { note: RoomVoiceNote }) {
     const { t } = useTranslation();
     const Icon = NOTE_ICONS[note];

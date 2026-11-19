@@ -2798,7 +2798,7 @@ Learned while building it (2026-11-19):
 
 ### The game frame (F2)
 
-Designed in F1 (2026-11-19, ADR 032; variant A, «Başlıq», of three clickable prototypes — the private Artifact <https://claude.ai/artifact/Gp8hGfAjX7JntEfG78gXTX>, the files in `~/elifba-shots/game-frame/` — taken under the owner's standing rule); built by F2. Until F2 lands, `rooms/show` is drawn inside the area's shell as above. The owner, on 2026-11-19: in a game the app's header and sidebar look unprofessional — a room's game should feel like the children's remote, a game of its own.
+Designed in F1 (2026-11-19, ADR 032; variant A, «Başlıq», of three clickable prototypes — the private Artifact <https://claude.ai/artifact/Gp8hGfAjX7JntEfG78gXTX>, the files in `~/elifba-shots/game-frame/` — taken under the owner's standing rule); built by F2, which landed on 2026-11-19 ("As built (F2)" below), so the subsections above read as amended here where they place a room's page against the app's shell. The owner, on 2026-11-19: in a game the app's header and sidebar look unprofessional — a room's game should feel like the children's remote, a game of its own.
 
 **Which pages.** `rooms/show`, in every state — the start screen, a round in each phase, the final, a player who left an open room, a closed room — has no app shell: `app.tsx`'s layout callback returns none for it, as for `rooms/screen`, and the page draws `RoomFrame` (`components/rooms/room-frame.tsx`). «Oyunlar» (`rooms/index`), «Keçmiş oyunlar» (`rooms/past`) and the entrance (`rooms/join`, `/oyun` and `/oyun/{code}`) keep `AppLayout` as the area's navigation; the frame begins after «Qoşul».
 
@@ -2814,13 +2814,15 @@ Designed in F1 (2026-11-19, ADR 032; variant A, «Başlıq», of three clickable
 
 **Nothing else changes.** The state, the protocol, the clock, the channel, the points, the strip, the taunts, the sounds, the final, the live voice, `rooms/screen`, the children's pages and `RoomsApartTest`: ADR 032 "What does not change" lists them by record.
 
-**Guard tests** (F2): a pure function of the page's name chooses the layout, under Vitest — `rooms/show` and `rooms/screen` without the shell, `rooms/index`, `rooms/past` and `rooms/join` with it; `RoomsApartTest` keeps `room-frame.tsx` apart from the children's side; `recall-cells.tsx`'s limit is measured by F2's browser check ("What each step builds", "Game frame (F1–F2)"), not by a unit test.
+**Guard tests** (F2): a pure function of the page's name chooses the layout, under Vitest (`resources/js/lib/page-shell.test.ts`: "draws a room's page in its own game frame, never inside the app's shell (ADR 032)", "decides the shell of every room page by name") — `rooms/show` and `rooms/screen` without the shell, `rooms/index`, `rooms/past` and `rooms/join` with it, and no room page left to the default; `RoomsApartTest` keeps `room-frame.tsx` apart from the children's side; `recall-cells.tsx`'s limit is measured by F2's browser check ("What each step builds", "Game frame (F1–F2)"), not by a unit test.
 
 **Why.** The shell is for moving between the area's pages; inside a game there is one page and one thing to do. The remote's single line is the precedent the owner named, and the screen's top bar already has the room's order. Keeping the tokens keeps every colour decision of ADRs 025–031 valid.
 
 **Rejected.** B, «Səhnə» (a room surface of its own: every colour checked again, the choice's row gone from the start screen); C, «Dok» (the way out and the code beside the taps row and «Yenidən oyna», no heading in a round, the 6 × 6 cells at 44px); hiding only the tab bar in a round; the Fullscreen API; `/oyun/{code}` without the shell.
 
 ---
+
+**As built (F2, 2026-11-19).** As above, with ADR 032 "As built (F2)": the shell is chosen by `pageShell()` (`resources/js/lib/page-shell.ts`), which `page-shell.test.ts` holds — `rooms/show` without the shell, every room page named; the round's title is `RoundTitle`, the page's `h1`; `RoomActionBar framed` is the frame's bar, while «Oyunlar» and the entrance keep it above the tab bar; the bar's ground is a layer of its own so the voice's `fixed` note is placed against the viewport. Measured in a harness outside the repository (`~/elifba-shots/game-frame/f2/`): every mechanic fits 375 × 667, 390 × 844 and an installed 375 × 647 with the voice on and the fan open, items ≥ 44px (6 × 6: 50, 55, 46px) and nothing covered; the host, a player and the screen played a game to its final, «Yenidən oyna» and a closed room in light and dark (`~/elifba-shots/game-frame/after/`).
 
 ## What each step builds
 
@@ -3163,6 +3165,7 @@ F1 (2026-11-19) shot today's `rooms/show` (`~/elifba-shots/game-frame/before/`),
     - _Files._ `resources/js/app.tsx` (and the pure layout choice it calls, with its Vitest file), `resources/js/pages/rooms/show.tsx`, `resources/js/components/rooms/{room-frame.tsx,live-round.tsx,room-action-bar.tsx,room-code.tsx,voice-bar.tsx,mechanics/recall-cells.tsx}`. Not `lang/*`, not `rooms/screen`, not a children's page, not the server.
     - _Tests._ The layout choice under Vitest; `RoomsApartTest` passing with `room-frame.tsx`; `RoomPagesTest`, `TranslationsTest`, `RoomsWordingTest` passing unchanged; `composer ci:check`; the `pgsql` job.
     - _Finish line._ With the switch on, the host, two players and the screen (the harness of `~/elifba-shots/game-frame/before.mjs`): at 375 × 667 and 390 × 844, light and dark, reduced motion, the voice on and off, installed and in a browser — the start screen, a question at 4 × 4, 5 × 5 and 6 × 6 (no scroll, cells ≥ 44px), the fan, a reveal, the final, a closed room, ‹ to «Oyunlar» and «Oyuna qayıt» back in a running round; at 1280 × 800 no sidebar; `rooms/index`, `rooms/past` and `/oyun/{code}` still with the shell. Shots beside the «before» ones.
+    - _As built._ Landed 2026-11-19, after the owner confirmed variant A («a variantı»): §12 "The game frame (F2)", "As built (F2)", ADR 032 "As built (F2)" and rule 15 "The game frame", "As built (F2)" — the shell chosen by `lib/page-shell.ts` under Vitest, `RoundTitle` in the top bar, `RoomActionBar framed`, the bar's ground on its own layer; every mechanic measured at 375 × 667, 390 × 844 and installed, and a live game to its final, «Yenidən oyna» and a closed room in both themes (`~/elifba-shots/game-frame/{after,f2}/`).
 
 ## Open questions for the owner
 

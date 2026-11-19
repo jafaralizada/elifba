@@ -27,10 +27,10 @@ type Grid = { cols: number; rows: number };
 
 /**
  * The grid's columns and its width, square cells. On a phone as wide as
- * the page allows and no taller than what 375 × 667 leaves beside the
- * shell, the rivalry strip (ADR 027) and the round's head and footer
- * (`100svh − 28.5rem`), never with cells under 44px; on the screen up to
- * 62vh.
+ * the page allows and no taller than what 375 × 667 leaves beside the game
+ * frame's top bar (ADR 032), the rivalry strip (ADR 027), the round's time
+ * row and the line and row around the grid (`100svh − 21.25rem`), never
+ * with cells under 44px; on the screen up to 62vh.
  */
 function gridStyle(grid: Grid, big: boolean): CSSProperties {
     const side = Math.max(grid.cols, grid.rows);
@@ -40,7 +40,7 @@ function gridStyle(grid: Grid, big: boolean): CSSProperties {
         gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`,
         width: big
             ? `min(${(62 * grid.cols) / side}vh, ${(46 * grid.cols) / side}vw)`
-            : `max(${least}rem, min(100%, ${grid.cols * 4.75}rem, calc((100svh - 28.5rem) * ${grid.cols / grid.rows})))`,
+            : `max(${least}rem, min(100%, ${grid.cols * 4.75}rem, calc((100svh - 21.25rem) * ${grid.cols / grid.rows})))`,
     };
 }
 

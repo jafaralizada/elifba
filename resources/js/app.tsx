@@ -5,30 +5,24 @@ import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { pageShell } from '@/lib/page-shell';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Elifba';
 
 void createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
+    // The shell by the page's name (`lib/page-shell.ts`, docs/frontend.md
+    // rule 1): the board, the remote, a room's screen and a room's page
+    // draw their own frame.
     layout: (name) => {
-        switch (true) {
-            case name === 'welcome' || name === 'privacy' || name === 'credits':
+        switch (pageShell(name)) {
+            case 'none':
                 return null;
-            // The board fills the projector and the remote the phone: no app
-            // shell (architecture §4).
-            case name === 'games/board' ||
-                name === 'games/remote' ||
-                name === 'lovhe' ||
-                name.startsWith('pult/'):
-                return null;
-            // A room's screen fills a laptop or a television (docs/frontend.md rule 15).
-            case name === 'rooms/screen':
-                return null;
-            case name.startsWith('auth/'):
+            case 'auth':
                 return AuthLayout;
-            case name.startsWith('settings/'):
+            case 'settings':
                 return [AppLayout, SettingsLayout];
-            default:
+            case 'app':
                 return AppLayout;
         }
     },

@@ -83,8 +83,9 @@ type Sent = {
  * cell tapped again) has its own sound (`sound`, the page's: rule 15
  * "Sound"); the answer sent and the verdict sound from the state.
  *
- * Above the round's head stands the rivalry strip (rule 15 "Rivals face
- * to face", ADR 027): the viewer against the nearest rival, or the
+ * Its title is the game frame's top bar (`RoundTitle`, ADR 032), and the
+ * round opens with the rivalry strip (rule 15 "Rivals face to face", ADR
+ * 027) over the time row: the viewer against the nearest rival, or the
  * screen's pair for a host who does not play. It moves only in a reveal
  * the page saw begin.
  *
@@ -106,7 +107,6 @@ export function LiveRound({
     placeLabels,
     refresh,
     onGone,
-    aside = null,
     motion,
     sound = null,
     icons = null,
@@ -122,8 +122,6 @@ export function LiveRound({
     placeLabels: string[];
     refresh: () => void;
     onGone: () => void;
-    /** Beside the round's number: «Oyun səsləri», the live voice's button and the room's code chip. */
-    aside?: ReactNode;
     /** Whether the page saw this round and this phase begin (`useRoomMotion()`). */
     motion: RoomMotion;
     /** The page's sound, for the viewer's own taps. */
@@ -292,13 +290,7 @@ export function LiveRound({
                 hidden={tauntsHidden}
             />
 
-            <RoundHead
-                game={game}
-                round={round}
-                now={now}
-                aside={aside}
-                motion={motion.round}
-            />
+            <RoundHead game={game} round={round} now={now} />
 
             <div
                 key={`${round.index}:${round.phase}`}
@@ -603,29 +595,78 @@ function phaseEnd(round: RoomRound): number | null {
     }
 }
 
+/** «Raund :index / :total» — in the reveal «Raund :index / :total bitdi», so the head says in words that the round is over. */
+function useRoundTitle(round: RoomRound): string {
+    const { t } = useTranslation();
+
+    return t(
+        round.phase === 'reveal' ? 'rooms.game.round_over' : 'rooms.game.round',
+        { index: round.index + 1, total: round.total },
+    );
+}
+
 /**
- * A round's head: «Raund :index / :total» — in the reveal «Raund :index /
- * :total bitdi» — over the game and its difficulty, with `aside` (the code
- * chip) beside them, then the time bar with the seconds left. On the
- * screen (`big`) the same, larger.
+ * A round's title in the game frame's top bar (ADR 032 decision 4; rule 15
+ * "The game frame"): the page's `h1`, «Raund :index / :total» — «… bitdi»
+ * in the reveal — over the game and its difficulty, one line each,
+ * truncated. It pops when the page saw the round begin (`motion`, ADR 025).
+ */
+export function RoundTitle({
+    game,
+    round,
+    motion = false,
+}: {
+    game: RoomGame;
+    round: RoomRound;
+    motion?: boolean;
+}) {
+    const { t } = useTranslation();
+    const title = useRoundTitle(round);
+
+    return (
+        <>
+            <h1
+                key={round.index}
+                id="round-heading"
+                className={cn(
+                    'origin-left truncate text-base leading-tight font-semibold tabular-nums',
+                    motion && 'motion-safe:animate-room-pop',
+                )}
+            >
+                {title}
+            </h1>
+            <p className="truncate text-xs text-muted-foreground">
+                {t(`rooms.mechanics.${game.mechanic}.name`)}
+                {' · '}
+                {t(`rooms.difficulty.${game.difficulty}`)}
+            </p>
+        </>
+    );
+}
+
+/**
+ * A round's head. On a phone its time row only — the time bar with the
+ * seconds left, or «Növbəti: :seconds san.» in the reveal: the round's
+ * title is the game frame's top bar (`RoundTitle`, ADR 032). On the screen
+ * (`big`) the game and its difficulty over «Raund :index / :total» — «…
+ * bitdi» in the reveal — and the seconds, then the time bar.
  */
 export function RoundHead({
     game,
     round,
     now,
-    aside = null,
     big = false,
     motion = false,
 }: {
     game: RoomGame;
     round: RoomRound;
     now: number | null;
-    aside?: ReactNode;
     big?: boolean;
-    /** The page saw this round begin: its number pops in. */
+    /** The page saw this round begin: its number pops in (on the screen). */
     motion?: boolean;
 }) {
     const { t } = useTranslation();
+    const title = useRoundTitle(round);
     const end = phaseEnd(round);
     const seconds = end === null ? null : secondsUntil(end, now);
     const last = round.index + 1 === round.total;
@@ -643,11 +684,6 @@ export function RoundHead({
         seconds > 0 &&
         round.bell_ms - now <= URGENT_MS;
     const pop = motion ? 'motion-safe:animate-room-pop' : undefined;
-    // In the reveal the head says in words that the round is over.
-    const title = t(
-        round.phase === 'reveal' ? 'rooms.game.round_over' : 'rooms.game.round',
-        { index: round.index + 1, total: round.total },
-    );
     const time =
         left === null ? null : (
             <span
@@ -697,31 +733,9 @@ export function RoundHead({
     }
 
     return (
-        <div className="flex flex-col gap-2">
-            <div className="flex min-h-11 items-center gap-3">
-                <div className="flex min-w-0 flex-1 flex-col">
-                    <h2
-                        key={round.index}
-                        id="round-heading"
-                        className={cn(
-                            'origin-left leading-tight font-semibold tabular-nums',
-                            pop,
-                        )}
-                    >
-                        {title}
-                    </h2>
-                    <p className="truncate text-xs text-muted-foreground">
-                        {t(`rooms.mechanics.${game.mechanic}.name`)}
-                        {' · '}
-                        {t(`rooms.difficulty.${game.difficulty}`)}
-                    </p>
-                </div>
-                {aside}
-            </div>
-            <div className="flex min-h-5 items-center gap-3">
-                {bar}
-                {time}
-            </div>
+        <div className="flex min-h-5 items-center gap-3">
+            {bar}
+            {time}
         </div>
     );
 }

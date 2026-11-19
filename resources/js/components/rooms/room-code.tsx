@@ -168,7 +168,11 @@ export function CodeDialog({
     );
 }
 
-/** The code in a round's header: a chip that opens it with its QR (`CodeDialog`). */
+/**
+ * The code in a round's top bar (ADR 032 decision 3): below `sm` a 44px
+ * round QR button, from `sm` a chip with the digits; either opens it with
+ * its QR (`CodeDialog`) and is named with the code to screen readers.
+ */
 export function CodeChip({
     code,
     join,
@@ -186,13 +190,13 @@ export function CodeChip({
                 <Button
                     type="button"
                     variant="outline"
-                    className="h-11 gap-2 rounded-full px-4 tabular-nums"
+                    className="h-11 min-w-11 shrink-0 gap-2 rounded-full px-0 tabular-nums sm:px-4"
                     aria-label={t('rooms.show.code_chip', {
                         code: spacedCode(code),
                     })}
                 >
                     <QrCode aria-hidden />
-                    {spacedCode(code)}
+                    <span className="hidden sm:inline">{spacedCode(code)}</span>
                 </Button>
             }
         />
