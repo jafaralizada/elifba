@@ -1,6 +1,6 @@
 # 008 — Google sign-in for teachers
 
-- **Status:** Accepted, 2026-11-10; decision 6 amended by [017 remembered login](017-remembered-login.md) (2026-11-13): a Google login follows the page's «Məni xatırla» box, and the two-factor challenge carries the same choice.
+- **Status:** Accepted, 2026-11-10; decision 6 amended by [017 remembered login](017-remembered-login.md) (2026-11-13): a Google login follows the page's «Məni xatırla» box, and the two-factor challenge carries the same choice. The completion page amended by [033 the invitation link](033-invitation-link.md) (2026-11-19, I1; built by I2): while a room invitation is under way and the rooms switch is on, it also offers the player role's sentence as a tick of its own and the account it creates holds the player role, given through `GrantRole`; the address rules, linking and refusals are unchanged.
 - **Sections:** architecture.md §1, §7, §8, §10
 - **Why it is hard to reverse:** once teachers sign in with Google, many accounts have no password. Removing the button later locks them out until each one sets a password through a reset mail, which a self-hosted instance without SMTP cannot send.
 

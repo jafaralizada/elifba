@@ -288,6 +288,19 @@ Players of a room talking while they play (ADR 031, architecture §12 "Live voic
 | səs düyməsi                   | voice button              | `VoiceButton` (`components/rooms/voice-bar.tsx`)                                                                       | A round button in the room page's head on every moment; its icon is the viewer's standing, a tap opens the panel (ADR 031 decision 34 as amended).                               |
 | səsdəkilər                    | people in the voice       | `VoicePanel`                                                                                                           | The panel the button opens: the join, the microphone, the rows; the host's «Susdur», «Səsə burax», «Canlı səsi söndür».                                                          |
 
+### The invitation link (I2)
+
+How a room's link is sent and opened, and how a newcomer gets in from it (ADR 033, architecture §12 "The invitation link (I2)", docs/frontend.md rule 15 "The invitation link"), designed in I1 on 2026-11-19 and built by I2.
+
+| Azərbaycanca      | English              | Code                                                                                             | Notes                                                                                                                                                                     |
+| ----------------- | -------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| oyunun linki      | invitation link      | `RoomJoinLink::of()` `url`: `{APP_URL}/oyun/{code}?t={tag}`                                      | The QR's and the share row's address; it stops working when the room closes.                                                                                              |
+| linkin nişanı     | link tag             | `RoomJoinLink::tag()`, the query `t`                                                             | 6 hex characters derived from the room's id. Grants nothing; refuses an old link at a room that later drew the same code.                                                 |
+| paylaşma sırası   | share row            | `ShareRow` (`components/rooms/room-code.tsx`), `rooms/share.ts` (`whatsAppHref()`, `shareWay()`) | «WhatsApp» (a `wa.me` link the person taps) and «Paylaş» or «Linki kopyala»; on the start screen and in `CodeDialog`, never on the screen. The message names nobody.      |
+| toxunaraq açılmış | opened by hand       | `RoomInvitation::openedByHand()`                                                                 | A top-level `GET` the person started (`navigate`, `document`, and `Sec-Fetch-Site: none` or `Sec-Fetch-User: ?1`), nothing speculative, Inertia or JSON. Joins at once.   |
+| yolda olan dəvət  | invitation under way | session `rooms.invitation`, `RememberRoomInvitation` (`rooms.invitation`)                        | The code and tag of a link this browser opened by hand, for `elifba.rooms.invitation_minutes` (60); used once, to join at the end of the path. Nothing about a person.    |
+| dəvət qapısı      | the door             | page `rooms/invited`, `GET` and `POST /oyun/qeydiyyat`, `CreateInvitedPlayer`                    | A visitor's way in from a link: Google first, a short form, the privacy note's and the player's ticks apart. The only room route outside the player group; reads no room. |
+
 ## Project
 
 | Azərbaycanca        | English               | Code                                             | Notes                                                                                                  |

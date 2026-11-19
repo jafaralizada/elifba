@@ -1,6 +1,6 @@
 # 019 — The rooms area: a third role, `player`, behind a switch
 
-- **Status:** Proposed, 2026-11-17 (roadmap step B1; accepted when the owner approves the design in B1-O; built in B2)
+- **Status:** Proposed, 2026-11-17 (roadmap step B1; accepted when the owner approves the design in B1-O; built in B2). Decisions 2, 3 and 6 amended by [033 the invitation link](033-invitation-link.md) (2026-11-19, I1; built by I2): the invitation's door (`GET` and `POST /oyun/qeydiyyat`, `rooms.enabled` and `guest`) is the one room route outside the player group and reads no room; the player's sentence is also accepted there and on Google's completion page while an invitation is under way, a tick of its own stamped through `GrantRole`; a visitor who opened a link by hand comes to the door instead of the login. `verified` stays on the group.
 - **Sections:** architecture.md §0, §1 "Accounts and roles", §7 "Agreements", §12 "The area and the switch"
 - **Amends:** [010](010-account-roles.md): the third role its last consequence foresaw, a fifth route group, and a role that can be switched off. [013](013-parents-and-their-childrens-privacy.md) decision 2: a third sentence, for the third role.
 - **Why it is hard to reverse:** every account that plays gets a role row and a stamped agreement, every room route is placed in an area by that role, and the public privacy page names the role. Taking the role out again means deciding what happens to the rooms and results those accounts hold.
