@@ -169,20 +169,27 @@ export class VoiceLink {
         this.micOn = false;
         this.report({ kind: 'joining' });
 
-        let lib: VoiceLibrary;
+        // The library and the ticket at once, not one after the other: on a
+        // phone's network the ticket is a round trip and the library's first
+        // download most of a second (ADR 031 decision 31, as C5 measured it).
+        const [lib, outcome] = await Promise.all([
+            this.lib !== null
+                ? Promise.resolve(this.lib)
+                : this.load().catch(() => null),
+            this.askTicket(agree),
+        ]);
 
-        try {
-            lib = this.lib ?? (await this.load());
+        if (lib !== null) {
             this.lib = lib;
-        } catch {
-            this.fail('unreachable');
+        }
 
+        if (!this.wanted || this.disposed) {
             return;
         }
 
-        const outcome = await this.askTicket(agree);
+        if (lib === null) {
+            this.fail('unreachable');
 
-        if (!this.wanted || this.disposed) {
             return;
         }
 

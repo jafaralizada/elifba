@@ -445,6 +445,57 @@ describe('VoiceLink', () => {
         });
     });
 
+    it('asks for its ticket while the library is still loading, and says so when the library never comes', async () => {
+        FakeRoom.made = [];
+        const asked: boolean[] = [];
+        const seen: VoiceConnection[] = [];
+        const make = (load: () => Promise<VoiceLibrary>) =>
+            new VoiceLink({
+                load,
+                ticket: async (agree) => {
+                    asked.push(agree);
+
+                    return ticket(1);
+                },
+                onChange: (connection) => seen.push(connection),
+                page: fakePage().page,
+                audio: { append: () => {} },
+                wait: async () => {},
+            });
+        let release: (library: VoiceLibrary) => void = () => {};
+        const link = make(
+            () =>
+                new Promise((resolve) => {
+                    release = resolve;
+                }),
+        );
+
+        const joining = link.join(true);
+        await settle();
+        // On a phone's network both are round trips (C5): neither waits for the other.
+        expect(asked).toEqual([true]);
+        expect(FakeRoom.made).toHaveLength(0);
+        release(lib);
+        await joining;
+        expect(FakeRoom.made).toHaveLength(1);
+        expect(seen.at(-1)).toMatchObject({ kind: 'in' });
+
+        let refuse: (error: Error) => void = () => {};
+        const failing = make(
+            () =>
+                new Promise((_resolve, reject) => {
+                    refuse = reject;
+                }),
+        );
+        const failed = failing.join(false);
+        await settle();
+        expect(asked).toEqual([true, false]);
+        refuse(new Error('the chunk did not load'));
+        await failed;
+        expect(seen.at(-1)).toEqual({ kind: 'failed', trouble: 'unreachable' });
+        expect(FakeRoom.made).toHaveLength(1);
+    });
+
     it('says a dropped connection, and a refused or missing microphone in words', async () => {
         const { link, seen, room } = setup();
         const errors: string[] = [];
