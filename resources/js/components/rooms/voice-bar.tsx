@@ -2,7 +2,6 @@ import { Link } from '@inertiajs/react';
 import {
     Ban,
     Check,
-    ChevronUp,
     HeadphoneOff,
     Headphones,
     Hourglass,
@@ -41,21 +40,22 @@ import type {
     VoiceRow,
     VoiceRowState,
     VoiceSpeaker,
+    VoiceTrouble,
+    VoiceView,
 } from '@/rooms/voice-view';
 
 /**
- * The voice bar (docs/frontend.md rule 15 "Live voice", ADR 031 decision 34,
- * variant A «Zolaq»): how a player meets the live voice, on every moment of
- * the room page while the host has it on — a 56px bar over the tab bar,
- * with a line above it for a note or, on the host's phone, for a newcomer
- * who waits. Its forms: invited («Səsə qoşul»), waiting, in the voice (who
- * speaks, as one button that opens the sheet «Canlı səs», and the
- * microphone as a worded pill), and trouble. It draws `voice.view` and
- * nothing it worked out itself, and nothing of it is there while the voice
- * is off. The sheets it opens are here too: the sentence before a first
- * join (`VoiceConsent`) and «Canlı səs» (`VoiceSheet`).
+ * The live voice on a room page (docs/frontend.md rule 15 "Live voice", ADR
+ * 031 decision 34 as amended 2026-11-19): one round 44px button in the
+ * page's head — the room's header outside a round, the round's head beside
+ * «Oyun səsləri» in one — whose icon says the viewer's standing, and the
+ * panel «Canlı səs» it opens, where everything of the voice is done: the
+ * join, the microphone, who is in, «Səsdən çıx» and the host's tools. A
+ * note stands over the page for a moment. It draws `voice.view` and nothing
+ * it worked out itself, and nothing of it is there while the voice is off.
+ * The sentence before a first join (`VoiceConsent`) is here too.
  */
-export function VoiceBar({ voice }: { voice: RoomVoice }) {
+export function VoiceButton({ voice }: { voice: RoomVoice }) {
     const { view, note } = voice;
 
     if (view === null && note === null) {
@@ -63,67 +63,153 @@ export function VoiceBar({ voice }: { voice: RoomVoice }) {
     }
 
     return (
-        <div data-voice-bar="">
-            {note !== null && <NoteRow note={note} />}
-            {view !== null && view.waiting !== null && (
-                <WaitingRow
-                    name={view.waiting.name}
-                    pending={voice.pending === view.waiting.id}
-                    onAdmit={() =>
-                        view.waiting !== null &&
-                        voice.act(view.waiting.id, 'admit')
-                    }
-                />
+        <>
+            {view !== null && (
+                <VoiceIcon view={view} onOpen={() => voice.setSheet(true)} />
             )}
-            {view !== null && <Bar bar={view.bar} voice={voice} />}
+            {note !== null && <VoiceNote note={note} />}
             {view !== null && (
                 <>
                     <VoiceConsent voice={voice} />
-                    <VoiceSheet voice={voice} />
+                    <VoicePanel voice={voice} />
                 </>
             )}
-        </div>
+        </>
     );
 }
 
-/**
- * The bar in a round, where no action bar stands: stuck above the tab bar
- * as the action bar is, at the page's end (`mt-auto`).
- */
-export function VoiceDock({ voice }: { voice: RoomVoice }) {
-    if (voice.view === null && voice.note === null) {
-        return null;
+/** The voice's filled button and pill: the fill in the voice's colour, its text readable on it. */
+const FILLED =
+    'border-(--voice) bg-(--voice) text-(--voice-on) hover:bg-(--voice)/90 hover:text-(--voice-on)';
+
+const TINTED = 'border-(--voice)/40 bg-(--voice-tint) text-(--voice-text)';
+
+/** The head's button: the standing as an icon, a ring while the microphone is open, a dot or a count where something waits for a tap. */
+function VoiceIcon({ view, onOpen }: { view: VoiceView; onOpen: () => void }) {
+    const { t } = useTranslation();
+    const bar = view.bar;
+    const waiting = view.host
+        ? view.rows.filter((row) => row.state === 'waiting').length
+        : 0;
+    let icon: ReactNode;
+    let look: string;
+    let label: string;
+    let ring = false;
+    let dot = false;
+
+    switch (bar.form) {
+        case 'insecure':
+            icon = <HeadphoneOff className="size-5" />;
+            look = 'border-transparent bg-muted text-muted-foreground';
+            label = t('rooms.voice.errors.insecure');
+            break;
+        case 'waiting':
+            icon = <Hourglass className="size-5" />;
+            look = TINTED;
+            label = t('rooms.voice.state.waiting');
+            break;
+        case 'invited':
+            icon = bar.joining ? (
+                <Spinner className="size-5" />
+            ) : (
+                <Headphones className="size-5" />
+            );
+            look = cn(TINTED, 'border-(--voice)');
+            label = t('rooms.voice.invite');
+            dot = true;
+            break;
+        case 'trouble':
+            icon =
+                bar.trouble === 'reconnecting' ? (
+                    <Spinner className="size-5" />
+                ) : (
+                    <HeadphoneOff className="size-5" />
+                );
+            look =
+                bar.trouble === 'reconnecting'
+                    ? TINTED
+                    : 'border-transparent bg-muted text-muted-foreground';
+            label = troubleLine(bar.trouble, t);
+            dot = bar.trouble !== 'reconnecting';
+            break;
+        case 'in':
+            icon =
+                bar.mic === 'opening' ? (
+                    <Spinner className="size-5" />
+                ) : bar.mic === 'on' ? (
+                    <Mic className="size-5" />
+                ) : (
+                    <MicOff className="size-5" />
+                );
+            look =
+                bar.mic === 'on'
+                    ? FILLED
+                    : bar.mic === 'muted'
+                      ? 'border-dashed border-muted-foreground/50 bg-background text-muted-foreground'
+                      : cn(
+                            TINTED,
+                            bar.speaker.kind !== 'none' && 'border-(--voice)',
+                        );
+            label =
+                bar.mic === 'on'
+                    ? t('rooms.voice.state.mic')
+                    : bar.mic === 'muted'
+                      ? t('rooms.voice.state.muted')
+                      : t('rooms.voice.state.listening');
+            ring = bar.mic === 'on';
+            break;
     }
 
     return (
-        <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 mt-auto lg:bottom-0">
-            <VoiceBar voice={voice} />
-        </div>
+        <button
+            type="button"
+            data-voice-button={bar.form === 'in' ? bar.mic : bar.form}
+            aria-haspopup="dialog"
+            aria-label={`${t('rooms.voice.title')}: ${label}`}
+            title={t('rooms.voice.title')}
+            onClick={onOpen}
+            className={cn(
+                'relative inline-flex size-11 shrink-0 items-center justify-center rounded-full border-[1.5px] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                look,
+            )}
+        >
+            {ring && (
+                <span
+                    aria-hidden
+                    className="absolute -inset-[3px] rounded-full border-2 border-(--voice) opacity-60 motion-safe:animate-ping"
+                />
+            )}
+            <span aria-hidden className="contents">
+                {icon}
+            </span>
+            {waiting > 0 ? (
+                <span
+                    aria-hidden
+                    className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-(--voice) px-1 text-[0.6875rem] font-bold text-(--voice-on) ring-2 ring-background"
+                >
+                    {waiting}
+                </span>
+            ) : (
+                dot && (
+                    <span
+                        aria-hidden
+                        className="absolute top-0 right-0 size-3 rounded-full bg-(--voice) ring-2 ring-background"
+                    />
+                )
+            )}
+        </button>
     );
 }
 
-/** One row of the bar's width: the page's column inside a full-width band. */
-function Band({
-    children,
-    className,
-    inner,
-}: {
-    children: ReactNode;
-    className?: string;
-    inner?: string;
-}) {
-    return (
-        <div className={cn('border-t bg-background', className)}>
-            <div
-                className={cn(
-                    'mx-auto flex w-full max-w-xl items-center gap-2 px-4 md:px-6',
-                    inner,
-                )}
-            >
-                {children}
-            </div>
-        </div>
-    );
+function troubleLine(
+    trouble: VoiceTrouble | 'reconnecting',
+    t: (key: string) => string,
+): string {
+    return trouble === 'reconnecting'
+        ? t('rooms.voice.reconnecting')
+        : trouble === 'elsewhere'
+          ? t('rooms.voice.elsewhere')
+          : t('rooms.voice.errors.unreachable');
 }
 
 const NOTE_ICONS: Record<RoomVoiceNote, typeof Mic> = {
@@ -134,214 +220,79 @@ const NOTE_ICONS: Record<RoomVoiceNote, typeof Mic> = {
     'errors.no_mic': MicOff,
 };
 
-function NoteRow({ note }: { note: RoomVoiceNote }) {
+/** A note for its moment (`NOTE_MS`), over the page under the app's header. */
+function VoiceNote({ note }: { note: RoomVoiceNote }) {
     const { t } = useTranslation();
     const Icon = NOTE_ICONS[note];
 
     return (
-        <Band className="bg-muted" inner="min-h-11 py-2">
-            <Icon
-                aria-hidden
-                className="size-4 shrink-0 text-muted-foreground"
-            />
-            <p
-                role="status"
-                className="min-w-0 flex-1 text-[0.8125rem] leading-snug"
-            >
-                {t(`rooms.voice.${note}`)}
-            </p>
-        </Band>
+        <p
+            role="status"
+            className="fixed inset-x-4 top-[calc(env(safe-area-inset-top)+4.25rem)] z-50 mx-auto flex max-w-md items-center gap-2.5 rounded-2xl border bg-background px-4 py-2.5 text-[0.8125rem] leading-snug shadow-lg"
+        >
+            <Icon aria-hidden className="size-4 shrink-0 text-(--voice-text)" />
+            {t(`rooms.voice.${note}`)}
+        </p>
     );
 }
 
-function WaitingRow({
-    name,
-    pending,
-    onAdmit,
+/**
+ * The microphone in the panel, its strongest button, saying what a tap
+ * does: «Mikrofonu aç», filled in the voice's colour; «Mikrofonu söndür»
+ * with a pulsing dot while open; «Susdurulub», dashed, with why.
+ */
+function MicToggle({
+    mic,
+    onTap,
 }: {
-    name: string | null;
-    pending: boolean;
-    onAdmit: () => void;
+    mic: 'off' | 'opening' | 'on' | 'muted';
+    onTap: () => void;
 }) {
     const { t } = useTranslation();
+    const open = mic === 'on';
 
-    return (
-        <Band className="bg-muted" inner="min-h-12 py-1.5">
-            <Hourglass
-                aria-hidden
-                className="size-4 shrink-0 text-muted-foreground"
-            />
-            <span className="min-w-0 flex-1 text-[0.8125rem] leading-snug">
-                {t('rooms.voice.waiting_host', {
-                    name: name ?? t('rooms.show.nameless'),
-                })}
-            </span>
-            <Button
-                type="button"
-                variant="outline"
-                className="h-10 shrink-0"
-                disabled={pending}
-                onClick={onAdmit}
-            >
-                {pending ? <Spinner /> : <Check />}
-                {t('rooms.voice.admit')}
-            </Button>
-        </Band>
-    );
-}
-
-/** The voice's filled button and pill: the fill in the voice's colour, its text readable on it. */
-const FILLED =
-    'border-(--voice) bg-(--voice) text-(--voice-on) hover:bg-(--voice)/90 hover:text-(--voice-on)';
-
-function Bar({ bar, voice }: { bar: VoiceBarForm; voice: RoomVoice }) {
-    const { t } = useTranslation();
-
-    switch (bar.form) {
-        case 'insecure':
-            return (
-                <Band inner="min-h-14 py-1.5">
-                    <HeadphoneOff
-                        aria-hidden
-                        className="size-5 shrink-0 text-muted-foreground"
-                    />
-                    <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-                        {t('rooms.voice.errors.insecure')}
-                    </p>
-                </Band>
-            );
-        case 'waiting':
-            return (
-                <Band inner="min-h-14 py-1.5">
-                    <Hourglass
-                        aria-hidden
-                        className="size-5 shrink-0 text-(--voice-text)"
-                    />
-                    <p className="min-w-0 flex-1 text-[0.8125rem] leading-snug">
-                        {t('rooms.voice.waiting_you')}
-                    </p>
-                </Band>
-            );
-        case 'invited':
-            return (
-                <Band className="bg-(--voice-tint)" inner="min-h-14 py-1.5">
-                    <Headphones
-                        aria-hidden
-                        className="size-5 shrink-0 text-(--voice-text)"
-                    />
-                    <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-[0.90625rem] font-semibold">
-                            {t('rooms.voice.invite')}
-                        </span>
-                        <span className="truncate text-xs text-muted-foreground">
-                            {t('rooms.voice.invite_line')}
-                        </span>
-                    </span>
-                    <Button
-                        type="button"
-                        className={cn(
-                            'h-11 shrink-0 rounded-full px-4',
-                            FILLED,
-                        )}
-                        disabled={bar.joining}
-                        onClick={voice.join}
-                    >
-                        {bar.joining ? <Spinner /> : <Headphones />}
-                        {t('rooms.voice.join')}
-                    </Button>
-                </Band>
-            );
-        case 'trouble':
-            return <Trouble trouble={bar.trouble} voice={voice} />;
-        case 'in':
-            return (
-                <Band
-                    className={cn(bar.mic === 'on' && 'bg-(--voice-tint)')}
-                    inner="min-h-14 py-1 pr-3 md:pr-5"
-                >
-                    <button
-                        type="button"
-                        aria-haspopup="dialog"
-                        onClick={() => voice.setSheet(true)}
-                        className="-ml-1 flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg pl-1 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                    >
-                        {bar.speaker.kind === 'none' ? (
-                            <Headphones
-                                aria-hidden
-                                className="size-5 shrink-0 text-(--voice-text)"
-                            />
-                        ) : (
-                            <SpeakingBars className="text-[1.25rem] text-(--voice-text)" />
-                        )}
-                        <span className="flex min-w-0 flex-col">
-                            <span className="truncate text-[0.90625rem] font-semibold">
-                                <SpeakerLine speaker={bar.speaker} />
-                            </span>
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                {t('rooms.voice.count', { count: bar.count })}
-                                <ChevronUp aria-hidden className="size-3.5" />
-                            </span>
-                        </span>
-                    </button>
-                    <MicPill mic={bar.mic} onTap={voice.tapMic} />
-                </Band>
-            );
-    }
-}
-
-function Trouble({
-    trouble,
-    voice,
-}: {
-    trouble: Extract<VoiceBarForm, { form: 'trouble' }>['trouble'];
-    voice: RoomVoice;
-}) {
-    const { t } = useTranslation();
-
-    if (trouble === 'reconnecting') {
+    if (mic === 'muted') {
         return (
-            <Band inner="min-h-14 py-1.5">
-                <Spinner className="size-5 shrink-0 text-(--voice-text)" />
-                <p role="status" className="min-w-0 flex-1 text-sm">
-                    {t('rooms.voice.reconnecting')}
+            <div className="flex flex-col items-center gap-1.5">
+                <span
+                    data-voice-mic="muted"
+                    className="inline-flex h-13 w-full items-center justify-center gap-2 rounded-full border-[1.5px] border-dashed text-base font-semibold text-muted-foreground"
+                >
+                    <MicOff aria-hidden className="size-5" />
+                    {t('rooms.voice.mic.muted')}
+                </span>
+                <p className="text-center text-[0.8125rem] text-muted-foreground">
+                    {t('rooms.voice.muted_you')}
                 </p>
-            </Band>
+            </div>
         );
     }
 
-    const Icon = trouble === 'elsewhere' ? Smartphone : HeadphoneOff;
-    const line =
-        trouble === 'elsewhere'
-            ? t('rooms.voice.elsewhere')
-            : t('rooms.voice.errors.unreachable');
-    const action =
-        trouble === 'elsewhere'
-            ? t('rooms.voice.here')
-            : trouble === 'dropped'
-              ? t('rooms.voice.rejoin')
-              : t('rooms.voice.retry');
-
     return (
-        <Band inner="min-h-14 py-1.5">
-            <Icon
-                aria-hidden
-                className="size-5 shrink-0 text-muted-foreground"
-            />
-            <p
-                role="status"
-                className="min-w-0 flex-1 text-[0.8125rem] leading-snug"
-            >
-                {line}
-            </p>
-            <Button
-                type="button"
-                variant="outline"
-                className="h-11 shrink-0 rounded-full"
-                onClick={voice.retry}
-            >
-                {action}
-            </Button>
-        </Band>
+        <button
+            type="button"
+            data-voice-mic={mic}
+            disabled={mic === 'opening'}
+            onClick={onTap}
+            className={cn(
+                'inline-flex h-13 w-full items-center justify-center gap-2.5 rounded-full border-[1.5px] text-base font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-wait',
+                open
+                    ? 'border-(--voice) bg-(--voice-tint) text-(--voice-text)'
+                    : cn(FILLED, 'shadow-sm'),
+            )}
+        >
+            {mic === 'opening' ? (
+                <Spinner className="size-5" />
+            ) : open ? (
+                <span aria-hidden className="relative flex size-2.5">
+                    <span className="absolute inline-flex size-full rounded-full bg-(--voice) opacity-60 motion-safe:animate-ping" />
+                    <span className="relative inline-flex size-2.5 rounded-full bg-(--voice)" />
+                </span>
+            ) : (
+                <Mic aria-hidden className="size-5" />
+            )}
+            {open ? t('rooms.voice.mic.close') : t('rooms.voice.mic.open')}
+        </button>
     );
 }
 
@@ -388,59 +339,6 @@ export function SpeakingBars({ className }: { className?: string }) {
                 />
             ))}
         </span>
-    );
-}
-
-/**
- * The microphone, the bar's strongest control (docs/frontend.md rule 15
- * "Live voice"): a 48px button that says what a tap does — «Mikrofonu aç»,
- * filled in the voice's colour; «Mikrofonu söndür» with a pulsing dot while
- * open, outlined on the bar the open microphone tints; «Susdurulub», dashed.
- */
-function MicPill({
-    mic,
-    onTap,
-}: {
-    mic: 'off' | 'opening' | 'on' | 'muted';
-    onTap: () => void;
-}) {
-    const { t } = useTranslation();
-    const open = mic === 'on';
-
-    return (
-        <button
-            type="button"
-            data-voice-mic={mic}
-            title={mic === 'muted' ? t('rooms.voice.muted_you') : undefined}
-            disabled={mic === 'opening'}
-            onClick={onTap}
-            className={cn(
-                'inline-flex h-12 shrink-0 items-center gap-2 rounded-full border-[1.5px] px-4 text-[0.9375rem] font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-wait',
-                open
-                    ? 'border-(--voice) bg-background text-(--voice-text)'
-                    : mic === 'muted'
-                      ? 'border-dashed bg-card text-muted-foreground'
-                      : cn(FILLED, 'shadow-sm'),
-            )}
-        >
-            {mic === 'opening' ? (
-                <Spinner className="size-5" />
-            ) : open ? (
-                <span aria-hidden className="relative flex size-2.5">
-                    <span className="absolute inline-flex size-full rounded-full bg-(--voice) opacity-60 motion-safe:animate-ping" />
-                    <span className="relative inline-flex size-2.5 rounded-full bg-(--voice)" />
-                </span>
-            ) : mic === 'muted' ? (
-                <MicOff aria-hidden className="size-5" />
-            ) : (
-                <Mic aria-hidden className="size-5" />
-            )}
-            {open
-                ? t('rooms.voice.mic.close')
-                : mic === 'muted'
-                  ? t('rooms.voice.mic.muted')
-                  : t('rooms.voice.mic.open')}
-        </button>
     );
 }
 
@@ -523,20 +421,26 @@ const ROW_ICONS: Record<Exclude<VoiceRowState, 'speaking'>, typeof Mic> = {
 };
 
 /**
- * «Canlı səs» (rule 15 "The sheet «Canlı səs»"): «Səsdə: :count nəfər», a
- * 52px row for the host and each present player — the state's icon on a
- * disc, the name with «siz» or «aparıcı», the state in words — those who
- * speak first; «Səsdən çıx»; and for the host one 40px button on each
- * other row and «Canlı səsi söndür» at the end. No confirmation: each is
- * undone by its opposite.
+ * The panel «Canlı səs» the head's button opens (rule 15 "The panel «Canlı
+ * səs»"), in every standing: the invitation with «Səsə qoşul», the wait,
+ * the trouble with its way back, or — in the voice — who speaks, the
+ * microphone, a 52px row for the host and each present player (the state's
+ * icon on a disc, the name with «siz» or «aparıcı», the state in words,
+ * those who speak first) and «Səsdən çıx»; for the host the rows and one
+ * 40px button on each other row in every standing, and «Canlı səsi söndür»
+ * at the end. No confirmation: each is undone by its opposite.
  */
-function VoiceSheet({ voice }: { voice: RoomVoice }) {
+function VoicePanel({ voice }: { voice: RoomVoice }) {
     const { t } = useTranslation();
     const view = voice.view;
 
-    if (view === null || view.bar.form !== 'in') {
+    if (view === null) {
         return null;
     }
+
+    const bar = view.bar;
+    const inVoice = bar.form === 'in';
+    const rows = inVoice || view.host;
 
     return (
         <Dialog open={voice.sheet} onOpenChange={voice.setSheet}>
@@ -554,9 +458,11 @@ function VoiceSheet({ voice }: { voice: RoomVoice }) {
                             />
                             {t('rooms.voice.title')}
                         </DialogTitle>
-                        <span className="text-[0.8125rem] text-muted-foreground">
-                            {t('rooms.voice.count', { count: view.bar.count })}
-                        </span>
+                        {inVoice && (
+                            <span className="text-[0.8125rem] text-muted-foreground">
+                                {t('rooms.voice.count', { count: bar.count })}
+                            </span>
+                        )}
                     </span>
                     <DialogClose asChild>
                         <Button
@@ -569,32 +475,41 @@ function VoiceSheet({ voice }: { voice: RoomVoice }) {
                         </Button>
                     </DialogClose>
                 </div>
-                <div className="flex max-h-[60dvh] flex-col overflow-y-auto px-4">
-                    <h3 className="sr-only">{t('rooms.voice.people')}</h3>
-                    <ul className="flex flex-col divide-y">
-                        {view.rows.map((row) => (
-                            <PersonRow
-                                key={row.id}
-                                row={row}
-                                pending={voice.pending === row.id}
-                                onAct={(action) => voice.act(row.id, action)}
-                            />
-                        ))}
-                    </ul>
+                <div className="flex flex-col gap-3 px-4 pt-4 pb-1">
+                    <PanelStanding bar={bar} voice={voice} />
                 </div>
+                {rows && (
+                    <div className="flex max-h-[45dvh] flex-col overflow-y-auto px-4">
+                        <h3 className="sr-only">{t('rooms.voice.people')}</h3>
+                        <ul className="flex flex-col divide-y">
+                            {view.rows.map((row) => (
+                                <PersonRow
+                                    key={row.id}
+                                    row={row}
+                                    pending={voice.pending === row.id}
+                                    onAct={(action) =>
+                                        voice.act(row.id, action)
+                                    }
+                                />
+                            ))}
+                        </ul>
+                    </div>
+                )}
                 <div className="flex flex-col gap-2 border-t px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
                     {voice.failed && (
                         <InputError message={t('rooms.setup.change_failed')} />
                     )}
-                    <Button
-                        type="button"
-                        variant="outline"
-                        className="h-11"
-                        onClick={voice.leave}
-                    >
-                        <LogOut />
-                        {t('rooms.voice.leave')}
-                    </Button>
+                    {inVoice && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="h-11"
+                            onClick={voice.leave}
+                        >
+                            <LogOut />
+                            {t('rooms.voice.leave')}
+                        </Button>
+                    )}
                     {view.host && (
                         <Button
                             type="button"
@@ -607,9 +522,154 @@ function VoiceSheet({ voice }: { voice: RoomVoice }) {
                             {t('rooms.voice.turn_off')}
                         </Button>
                     )}
+                    {!inVoice && !view.host && (
+                        <DialogClose asChild>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                className="h-11"
+                            >
+                                {t('rooms.voice.not_now')}
+                            </Button>
+                        </DialogClose>
+                    )}
                 </div>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** The panel's first part: what the viewer can do in the voice now. */
+function PanelStanding({
+    bar,
+    voice,
+}: {
+    bar: VoiceBarForm;
+    voice: RoomVoice;
+}) {
+    const { t } = useTranslation();
+
+    switch (bar.form) {
+        case 'insecure':
+            return (
+                <Line icon={HeadphoneOff}>
+                    {t('rooms.voice.errors.insecure')}
+                </Line>
+            );
+        case 'waiting':
+            return (
+                <Line icon={Hourglass} voiced>
+                    {t('rooms.voice.waiting_you')}
+                </Line>
+            );
+        case 'invited':
+            return (
+                <>
+                    <span className="flex flex-col gap-0.5">
+                        <span className="text-[0.9375rem] font-semibold">
+                            {t('rooms.voice.invite')}
+                        </span>
+                        <span className="text-[0.8125rem] text-muted-foreground">
+                            {t('rooms.voice.invite_line')}
+                        </span>
+                    </span>
+                    <Button
+                        type="button"
+                        className={cn('h-13 rounded-full text-base', FILLED)}
+                        disabled={bar.joining}
+                        onClick={voice.join}
+                    >
+                        {bar.joining ? <Spinner /> : <Headphones />}
+                        {t('rooms.voice.join')}
+                    </Button>
+                </>
+            );
+        case 'trouble': {
+            if (bar.trouble === 'reconnecting') {
+                return (
+                    <p
+                        role="status"
+                        className="flex items-center gap-2.5 text-sm"
+                    >
+                        <Spinner className="size-5 shrink-0 text-(--voice-text)" />
+                        {t('rooms.voice.reconnecting')}
+                    </p>
+                );
+            }
+
+            const action =
+                bar.trouble === 'elsewhere'
+                    ? t('rooms.voice.here')
+                    : bar.trouble === 'dropped'
+                      ? t('rooms.voice.rejoin')
+                      : t('rooms.voice.retry');
+
+            return (
+                <>
+                    <Line
+                        icon={
+                            bar.trouble === 'elsewhere'
+                                ? Smartphone
+                                : HeadphoneOff
+                        }
+                    >
+                        {troubleLine(bar.trouble, t)}
+                    </Line>
+                    <Button
+                        type="button"
+                        className={cn('h-12 rounded-full text-base', FILLED)}
+                        onClick={voice.retry}
+                    >
+                        {action}
+                    </Button>
+                </>
+            );
+        }
+        case 'in':
+            return (
+                <>
+                    <p className="flex min-h-6 items-center gap-2.5 text-[0.9375rem] font-semibold">
+                        {bar.speaker.kind === 'none' ? (
+                            <Headphones
+                                aria-hidden
+                                className="size-5 shrink-0 text-(--voice-text)"
+                            />
+                        ) : (
+                            <SpeakingBars className="text-[1.25rem] text-(--voice-text)" />
+                        )}
+                        <span className="min-w-0 truncate">
+                            <SpeakerLine speaker={bar.speaker} />
+                        </span>
+                    </p>
+                    <MicToggle mic={bar.mic} onTap={voice.tapMic} />
+                </>
+            );
+    }
+}
+
+function Line({
+    icon: Icon,
+    voiced = false,
+    children,
+}: {
+    icon: typeof Mic;
+    voiced?: boolean;
+    children: ReactNode;
+}) {
+    return (
+        <p
+            role="status"
+            className="flex items-start gap-2.5 text-[0.9375rem] leading-snug"
+        >
+            <Icon
+                aria-hidden
+                className={cn(
+                    'mt-0.5 size-5 shrink-0',
+                    voiced ? 'text-(--voice-text)' : 'text-muted-foreground',
+                )}
+            />
+            {children}
+        </p>
     );
 }
 

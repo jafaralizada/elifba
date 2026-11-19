@@ -13,7 +13,7 @@ import type {
     VoiceView,
 } from '@/rooms/voice-view';
 
-/** A line above the bar, said once and gone after `NOTE_MS` or the next tap of the microphone. */
+/** A note over the page, said once and gone after `NOTE_MS` or the next tap of the microphone. */
 export type RoomVoiceNote =
     | 'hidden_mic'
     | 'muted_you'
@@ -22,7 +22,7 @@ export type RoomVoiceNote =
 
 export const NOTE_MS = 6000;
 
-/** The page's live voice as `VoiceBar` draws it and the taps it offers. */
+/** The page's live voice as `VoiceButton` and its panel draw it, and the taps they offer. */
 export type RoomVoice = {
     /** What is drawn (`voiceView()`); null: nothing of voice. */
     view: VoiceView | null;
@@ -30,7 +30,7 @@ export type RoomVoice = {
     /** The sheet with the sentence, before an account's first join. */
     consent: boolean;
     setConsent: (open: boolean) => void;
-    /** The sheet «Canlı səs». */
+    /** The panel «Canlı səs» the head's button opens, in every standing. */
     sheet: boolean;
     setSheet: (open: boolean) => void;
     /** «Səsə qoşul»: the sentence first while the account has not accepted it. */
@@ -39,13 +39,13 @@ export type RoomVoice = {
     agree: () => void;
     /** «Yenidən cəhd et», «Yenidən qoşul», «Burada qoşul». */
     retry: () => void;
-    /** The microphone's pill: the owner's tap, or why it is muted. */
+    /** The panel's microphone: the owner's tap, or why it is muted. */
     tapMic: () => void;
     /** «Səsdən çıx». */
     leave: () => void;
     /** The host's write in flight: a row's id, or `off`. */
     pending: string | null;
-    /** The host's write that failed: the sheet says so. */
+    /** The host's write that failed: the panel says so. */
     failed: boolean;
     /** «Susdur», «Danışmağa icazə ver», «Səsə burax». */
     act: (member: string, action: VoiceRowAction) => void;
@@ -232,17 +232,20 @@ export function useRoomVoice({
         note: note?.note ?? null,
         consent,
         setConsent,
-        sheet: sheet && view?.bar.form === 'in',
+        sheet: sheet && view !== null,
         setSheet,
         join: () => {
             if (state?.voice?.agreed === true) {
                 void linkFor().join(false);
             } else {
+                // One dialog at a time: the sentence in place of the panel, which comes back after «Razıyam, qoşul».
+                setSheet(false);
                 setConsent(true);
             }
         },
         agree: () => {
             setConsent(false);
+            setSheet(true);
             void linkFor().join(true);
         },
         retry: () => void linkFor().join(false),

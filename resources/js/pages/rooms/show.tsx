@@ -15,7 +15,7 @@ import {
     UserPlus,
 } from 'lucide-react';
 import { useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import InputError from '@/components/input-error';
 import { withGame } from '@/components/rooms/catalog';
 import type { GameSetupOptions } from '@/components/rooms/catalog';
@@ -49,11 +49,7 @@ import { useRoomMotion } from '@/components/rooms/use-motion';
 import type { RoomMotion } from '@/components/rooms/use-motion';
 import { useRoomSound } from '@/components/rooms/use-room-sound';
 import { useRoomVoice } from '@/components/rooms/use-room-voice';
-import {
-    VoiceBar,
-    VoiceDock,
-    VoiceSwitchRow,
-} from '@/components/rooms/voice-bar';
+import { VoiceButton, VoiceSwitchRow } from '@/components/rooms/voice-bar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -124,13 +120,14 @@ type Props = {
  * sound is the viewer's own and quiet, and in a room without a screen the
  * room's too (`useRoomSound()`, ADR 028 as amended 2026-11-19).
  *
- * While the host has the live voice on, the voice bar stands over the tab
- * bar on every moment of the page — the start screen, a round, a reveal,
- * the final — and the host's «Otağın idarəsi» has its switch
- * (`useRoomVoice()`, docs/frontend.md rule 15 "Live voice", ADR 031). The
- * voice is the room's, not a game's: the bar stays through every moment,
- * and nothing of a round reads it. While the state has no voice nothing of
- * it is drawn and the library is never loaded.
+ * While the host has the live voice on, its round button stands in the
+ * page's head on every moment — the room's header outside a round, the
+ * round's head in one — and opens the panel «Canlı səs»; the host's
+ * «Otağın idarəsi» has its switch (`useRoomVoice()`, docs/frontend.md rule
+ * 15 "Live voice", ADR 031). The voice is the room's, not a game's: the
+ * button stays through every moment, and nothing of a round reads it.
+ * While the state has no voice nothing of it is drawn and the library is
+ * never loaded.
  */
 export default function RoomsShow({
     room,
@@ -149,7 +146,7 @@ export default function RoomsShow({
     const motion = useRoomMotion(state);
     const sound = useRoomSound({ speaker: 'phone', sounds, state, clock });
     const voice = useRoomVoice({ roomId: room.id, state, onChanged: refresh });
-    const voiceShown = voice.view !== null || voice.note !== null;
+    const voiceButton = <VoiceButton voice={voice} />;
     // A game opens at its top, where the rivalry strip stands (ADR 027).
     useTopOnTurn(
         state?.game?.phase === 'live' ? `live:${state.game.id}` : 'room',
@@ -187,22 +184,9 @@ export default function RoomsShow({
 
     if (game !== null && game.phase === 'live' && round !== null) {
         return (
-            <div
-                className="flex flex-1 flex-col"
-                // With the voice's bar the round's grid is shorter by what the bar takes and its round gives back (rule 15 "Fit").
-                style={
-                    voiceShown
-                        ? ({ '--room-voice': '2.5rem' } as CSSProperties)
-                        : undefined
-                }
-            >
+            <div className="flex flex-1 flex-col">
                 <Head title={t('rooms.start.title')} />
-                <div
-                    className={cn(
-                        'mx-auto flex w-full max-w-xl flex-col gap-5 px-4 pb-6 md:px-6',
-                        voiceShown ? 'pt-2' : 'pt-4',
-                    )}
-                >
+                <div className="mx-auto flex w-full max-w-xl flex-col gap-5 px-4 pt-4 pb-6 md:px-6">
                     <h1 className="sr-only">{t('rooms.start.title')}</h1>
                     <LiveRound
                         roomId={room.id}
@@ -217,12 +201,12 @@ export default function RoomsShow({
                         sound={sound}
                         icons={rivalry}
                         taunts={taunts}
-                        compact={voiceShown}
                         aside={
                             <>
                                 {sounds !== null && (
                                     <SoundToggle sound={sound} />
                                 )}
+                                {voiceButton}
                                 {state.room.code !== null && (
                                     <CodeChip
                                         code={state.room.code}
@@ -259,13 +243,11 @@ export default function RoomsShow({
                         </div>
                     )}
                 </div>
-                <VoiceDock voice={voice} />
             </div>
         );
     }
 
     const over = game !== null && state.setup.played ? game : null;
-    const voiceBar = voiceShown ? <VoiceBar voice={voice} /> : undefined;
 
     if (can.host && catalog !== null) {
         return (
@@ -279,7 +261,7 @@ export default function RoomsShow({
                 placeLabels={placeLabels}
                 motion={motion}
                 refresh={refresh}
-                voice={voiceBar}
+                voice={voiceButton}
             />
         );
     }
@@ -294,7 +276,7 @@ export default function RoomsShow({
             placeLabels={placeLabels}
             motion={motion}
             canLeave={can.leave}
-            voice={voiceBar}
+            voice={voiceButton}
         />
     );
 }
@@ -356,7 +338,7 @@ function HostRoom({
     placeLabels: string[];
     motion: RoomMotion;
     refresh: () => void;
-    /** The voice bar over the action, while the host has the voice on. */
+    /** The live voice's button in the header, while the host has the voice on. */
     voice?: ReactNode;
 }) {
     const { t } = useTranslation();
@@ -398,7 +380,12 @@ function HostRoom({
                         <RoomHeader
                             title={t('rooms.start.final')}
                             locked={state.room.locked}
-                            tools={tools}
+                            tools={
+                                <>
+                                    {voice}
+                                    {tools}
+                                </>
+                            }
                         />
                         <GameOver
                             state={state}
@@ -431,7 +418,12 @@ function HostRoom({
                         <RoomHeader
                             title={t('rooms.start.invite')}
                             locked={state.room.locked}
-                            tools={tools}
+                            tools={
+                                <>
+                                    {voice}
+                                    {tools}
+                                </>
+                            }
                         />
                         {state.game !== null && (
                             <StandingCard
@@ -466,7 +458,7 @@ function HostRoom({
                 )}
             </div>
 
-            <RoomActionBar voice={voice}>
+            <RoomActionBar>
                 {(failed || (over !== null && choice.failed)) && (
                     <InputError
                         message={
@@ -610,7 +602,7 @@ function PlayerRoom({
     placeLabels: string[];
     motion: RoomMotion;
     canLeave: boolean;
-    /** The voice bar over the waiting line, while the host has the voice on. */
+    /** The live voice's button in the header, while the host has the voice on. */
     voice?: ReactNode;
 }) {
     const { t } = useTranslation();
@@ -641,6 +633,7 @@ function PlayerRoom({
                         <RoomHeader
                             title={t('rooms.start.final')}
                             locked={false}
+                            tools={voice}
                         />
                         <GameOver
                             state={state}
@@ -655,6 +648,7 @@ function PlayerRoom({
                         <RoomHeader
                             title={t('rooms.start.title')}
                             locked={false}
+                            tools={voice}
                         />
                         {state.game !== null && (
                             <StandingCard
@@ -706,7 +700,7 @@ function PlayerRoom({
                 )}
             </div>
 
-            <RoomActionBar voice={voice}>
+            <RoomActionBar>
                 <p className="flex min-h-11 items-center justify-center gap-2 text-center text-sm text-muted-foreground">
                     <Hourglass aria-hidden className="size-4 shrink-0" />
                     {over !== null
