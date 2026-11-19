@@ -689,6 +689,24 @@ it('gives the start screen, the screen and the round the link with the room\'s t
     expect(json_encode(DB::table('rooms')->where('id', $room->id)->first()))->not->toContain($tag);
 });
 
+it('writes the link without a port its scheme implies, as a chat shows it', function (string $appUrl, string $root): void {
+    // ADR 033 "As built (I2)": docker-compose builds `APP_URL` as `https://elifba.io:443`.
+    config(['app.url' => $appUrl]);
+    $room = Rooms::open($this->resad);
+
+    expect(RoomJoinLink::of($room))->toBe([
+        'url' => "{$root}/oyun/{$room->code}?t=".RoomJoinLink::tag($room),
+        'entry_url' => "{$root}/oyun",
+    ]);
+})->with([
+    'https on 443' => ['https://elifba.io:443', 'https://elifba.io'],
+    'http on 80' => ['http://elifba.example:80', 'http://elifba.example'],
+    'a trailing slash' => ['https://elifba.io:443/', 'https://elifba.io'],
+    'another port stays' => ['http://192.168.1.20:8000', 'http://192.168.1.20:8000'],
+    'https on 80 stays' => ['https://elifba.example:80', 'https://elifba.example:80'],
+    'no port' => ['https://elifba.io', 'https://elifba.io'],
+]);
+
 it('shows nothing of a room at the door', function (): void {
     // ADR 033 decision 11: the door reads no room — not the code, the game, the host or who has joined.
     $room = Rooms::open($this->resad);

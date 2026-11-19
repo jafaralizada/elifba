@@ -11,10 +11,10 @@ use Illuminate\Support\Facades\URL;
  * joining", "The big screen", "Games first", "The invitation link (I2)"):
  * `url`, the QR's and the shared link's address `{APP_URL}/oyun/{code}?t={tag}`,
  * and `entry_url`, the code field `{APP_URL}/oyun` for a code typed instead
- * (`/otaq` only redirects there, ADR 026 decision 6). Built on `APP_URL`,
- * not on the request's host, as a pairing card's are (§4), so `composer
- * dev:lan` and a proxy give phones an address they can open. A closed room
- * has no code, so no link.
+ * (`/otaq` only redirects there, ADR 026 decision 6). Built on `APP_URL`
+ * (without a port its scheme implies), not on the request's host, as a
+ * pairing card's are (§4), so `composer dev:lan` and a proxy give phones an
+ * address they can open. A closed room has no code, so no link.
  *
  * The tag (ADR 033 decision 5) says which room a link was made for: codes
  * are unique only among open rooms, so a link opened weeks later from a
@@ -37,7 +37,7 @@ final class RoomJoinLink
         }
 
         return [
-            'url' => URL::format(Config::string('app.url'), route('rooms.join', ['code' => $room->code, 't' => self::tag($room)], false)),
+            'url' => URL::format(self::root(), route('rooms.join', ['code' => $room->code, 't' => self::tag($room)], false)),
             'entry_url' => self::entrance(),
         ];
     }
@@ -48,7 +48,18 @@ final class RoomJoinLink
      */
     public static function entrance(): string
     {
-        return URL::format(Config::string('app.url'), route('rooms.entrance', [], false));
+        return URL::format(self::root(), route('rooms.entrance', [], false));
+    }
+
+    /**
+     * `APP_URL` without a port its scheme already implies, as a browser
+     * writes an address: docker-compose builds `https://elifba.io:443`, and
+     * a link sent in a chat reads `https://elifba.io/oyun/…` (ADR 033 "As
+     * built (I2)"). Any other port stays: `composer dev:lan`'s `:8000`.
+     */
+    private static function root(): string
+    {
+        return (string) preg_replace('#^(?:(https://[^/:]+):443|(http://[^/:]+):80)(?=/|$)#i', '$1$2', rtrim(Config::string('app.url'), '/'));
     }
 
     /** The room's tag: the first six lowercase hex characters of an HMAC of its id under `APP_KEY`. */
