@@ -9,10 +9,16 @@ use App\Domain\Rooms\Enums\RoomVoiceStanding;
 use App\Domain\Rooms\Exceptions\RoomVoiceNotCut;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomPlayer;
+use App\Domain\Rooms\Support\RoomVoiceServer;
 use App\Models\User;
+use Carbon\CarbonImmutable;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Http;
+use Tests\Support\FakeVoiceServer;
 use Tests\Support\Rooms;
 
 /*
@@ -367,4 +373,98 @@ it('repeats the call of a leave or a mute of the last minute, and gives a player
     $this->artisan('rooms:voice-sweep')->expectsOutput('Closed 1 voice rooms.');
     expect($calls())->toBe([['DeleteRoom', null, null]])
         ->and($this->room->refresh()->voice_epoch)->toBe(1);
+});
+
+it('closes the voice room under a new epoch at once when a muted player or one who left joins again after the fact', function (): void {
+    $sweep = fn (): mixed => $this->artisan('rooms:voice-sweep')->assertSuccessful();
+
+    // Muted, and back two seconds later with a ticket or a refreshed token
+    // from before the mute that may still publish: not the mute's own cut
+    // on its way but a replay, so the first sweep closes the room for all.
+    $name = $this->room->voiceRoom();
+    app(SetRoomPlayerVoice::class)->handle($this->room, $this->aygunRow, new RoomPlayerVoiceData(RoomVoiceStanding::Muted));
+    $this->travel(3)->seconds();
+    $this->voice->joins($name, $this->aygunRow->id, true);
+    $this->voice->sent = [];
+    $sweep()->expectsOutput('Closed 1 voice rooms.');
+    expect($this->room->refresh()->voice_epoch)->toBe(1)
+        ->and($this->voice->calls('UpdateParticipant'))->toBe([])
+        ->and($this->voice->rooms)->not->toHaveKey($name);
+
+    // Left, and back a few seconds later the same way: the same.
+    $name = $this->room->voiceRoom();
+    $this->voice->joins($name, $this->hostRow->id);
+    $this->actingAs($this->aygun)->post(route('rooms.leave', $this->room));
+    $this->travel(5)->seconds();
+    $this->voice->joins($name, $this->aygunRow->id, false);
+    $this->voice->sent = [];
+    $sweep()->expectsOutput('Closed 1 voice rooms.');
+    expect($this->room->refresh()->voice_epoch)->toBe(2)
+        ->and($this->voice->calls('RemoveParticipant'))->toBe([])
+        ->and($this->voice->rooms)->not->toHaveKey($name);
+});
+
+it('repeats the cut for a join a moment after the mute, made with a ticket signed just before it', function (): void {
+    $name = $this->room->voiceRoom();
+    $muted = Rooms::join($this->room);
+    app(SetRoomPlayerVoice::class)->handle($this->room, $muted, new RoomPlayerVoiceData(RoomVoiceStanding::Open));
+    app(SetRoomPlayerVoice::class)->handle($this->room, $muted, new RoomPlayerVoiceData(RoomVoiceStanding::Muted));
+    // The mute is stored to the second; the join lands within the slack after it.
+    $this->travel(1500)->milliseconds();
+    $this->voice->joins($name, $muted->id, true);
+    $this->voice->sent = [];
+
+    $this->artisan('rooms:voice-sweep')->expectsOutput('Closed 0 voice rooms.');
+
+    expect(array_column($this->voice->calls('UpdateParticipant'), 'body'))->toBe([[
+        'room' => $name, 'identity' => $muted->id, 'permission' => voicePermission(false),
+    ]])->and($this->room->refresh()->voice_epoch)->toBe(0);
+});
+
+it('lists when each participant joined, as the voice server says it', function (): void {
+    $this->travelTo('2026-11-24 10:00:07.250');
+    $this->voice->joins($this->room->voiceRoom(), $this->aygunRow->id, false);
+
+    $participants = app(RoomVoiceServer::class)->participants($this->room->voiceRoom());
+
+    expect($participants)->toBe([
+        ['identity' => $this->hostRow->id, 'can_publish' => true, 'joined_at_ms' => CarbonImmutable::parse('2026-11-24 10:00:00')->getTimestampMs()],
+        ['identity' => $this->aygunRow->id, 'can_publish' => false, 'joined_at_ms' => CarbonImmutable::parse('2026-11-24 10:00:07.250')->getTimestampMs()],
+    ]);
+});
+
+it('signs each of its own calls with a token for that kind of call alone, for half a minute', function (): void {
+    app(SetRoomPlayerVoice::class)->handle($this->room, $this->aygunRow, new RoomPlayerVoiceData(RoomVoiceStanding::Muted));
+    $this->actingAs($this->aygun)->post(route('rooms.leave', $this->room));
+    $this->artisan('rooms:voice-sweep')->assertSuccessful();
+    app(SetRoomVoice::class)->handle($this->room->refresh(), new RoomVoiceSwitchData(false));
+    app(SetRoomVoice::class)->handle($this->room->refresh(), new RoomVoiceSwitchData(true));
+
+    $grants = [];
+
+    foreach (Http::recorded() as [$request]) {
+        $call = basename((string) parse_url($request->url(), PHP_URL_PATH));
+        JWT::$timestamp = now()->getTimestamp();
+        $claims = json_decode((string) json_encode(JWT::decode(
+            str_replace('Bearer ', '', $request->header('Authorization')[0]),
+            new Key(FakeVoiceServer::SECRET, 'HS256'),
+        )), true);
+        JWT::$timestamp = null;
+
+        // The app's own name, no join, no name of anyone's, half a minute.
+        expect($claims['exp'] - $claims['nbf'])->toBe(30, $call)
+            ->and($claims['sub'])->toBe('elifba', $call)
+            ->and($claims)->not->toHaveKey('name')
+            ->and($claims['video'])->not->toHaveKey('roomJoin');
+        $grants[$call][] = $claims['video'];
+    }
+
+    $room = $this->room->id.'.0';
+    expect(array_keys($grants))->toEqualCanonicalizing(['CreateRoom', 'DeleteRoom', 'UpdateParticipant', 'RemoveParticipant', 'ListRooms', 'ListParticipants'])
+        ->and(array_unique($grants['CreateRoom'], SORT_REGULAR))->toBe([['roomCreate' => true]])
+        ->and(array_unique($grants['DeleteRoom'], SORT_REGULAR))->toBe([['roomCreate' => true]])
+        ->and(array_unique($grants['UpdateParticipant'], SORT_REGULAR))->toBe([['roomAdmin' => true, 'room' => $room]])
+        ->and(array_unique($grants['RemoveParticipant'], SORT_REGULAR))->toBe([['roomAdmin' => true, 'room' => $room]])
+        ->and(array_unique($grants['ListParticipants'], SORT_REGULAR))->toBe([['roomAdmin' => true, 'room' => $room]])
+        ->and(array_unique($grants['ListRooms'], SORT_REGULAR))->toBe([['roomList' => true]]);
 });

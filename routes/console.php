@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Cache\PruneExpiredCache;
 use App\Domain\Classroom\Actions\PruneArchived;
 use App\Domain\Play\Actions\AbandonStaleGames;
 use App\Domain\Play\Actions\PruneGuestBoards;
@@ -43,6 +44,10 @@ Artisan::command('rooms:prune', function (PruneOldRooms $prune) {
     $this->info("Deleted {$prune->handle()} rooms with their players.");
 })->purpose('Delete rooms created longer than elifba.retention_days ago');
 
+Artisan::command('cache:prune-expired', function (PruneExpiredCache $prune) {
+    $this->info("Deleted {$prune->handle()} expired cache rows.");
+})->purpose('Delete the database cache\'s expired rows, a rate limiter\'s counts among them');
+
 Artisan::command('rooms:voice-sweep', function (SweepRoomVoices $sweep) {
     $this->info("Closed {$sweep->handle(RoomsArea::voice())} voice rooms.");
 })->purpose('Make the voice server match the rooms: close the voice rooms that should not be open');
@@ -55,5 +60,7 @@ Schedule::command('play:prune-old-games')->daily();
 Schedule::command('play:prune-guest-boards')->hourly();
 Schedule::command('rooms:close-idle')->hourly();
 Schedule::command('rooms:prune')->daily();
+// A limiter's count of an account's requests (the voice's tickets among them) lives a minute, not until its next one.
+Schedule::command('cache:prune-expired')->everyMinute();
 // Every 15 seconds, and only while a voice server is named (§12 "Live voice", ADR 031 decision 23).
 SweepRoomVoices::schedule(app(Scheduler::class));

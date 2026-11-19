@@ -2,6 +2,7 @@
 
 namespace App\Domain\Rooms\Exceptions;
 
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -20,5 +21,15 @@ final class RoomVoiceNotCut extends RuntimeException
         string $cause,
     ) {
         parent::__construct("{$call} for room {$roomId} did not reach the voice server: {$cause}.");
+    }
+
+    /**
+     * One line, with no context: Laravel would add the account's id — the
+     * host who muted, the player who left — to a reported exception
+     * (ADR 031 decision 7; C5, the audit).
+     */
+    public function report(): void
+    {
+        Log::error($this->getMessage());
     }
 }

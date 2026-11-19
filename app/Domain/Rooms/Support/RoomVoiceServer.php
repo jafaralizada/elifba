@@ -126,9 +126,13 @@ final class RoomVoiceServer
     }
 
     /**
-     * Who is in a voice room, by identity, and whether each may publish.
+     * Who is in a voice room, by identity, whether each may publish, and
+     * when each joined (the voice server's `joined_at_ms`, Unix
+     * milliseconds: a session the library resumed keeps the moment it
+     * first joined, a new join — with a ticket or a refreshed token — gets
+     * a new one). Null when the answer has no moment.
      *
-     * @return list<array{identity: string, can_publish: bool}>
+     * @return list<array{identity: string, can_publish: bool, joined_at_ms: int|null}>
      */
     public function participants(string $name): array
     {
@@ -144,10 +148,34 @@ final class RoomVoiceServer
             $participants[] = [
                 'identity' => $participant['identity'],
                 'can_publish' => ($permission['can_publish'] ?? false) === true,
+                'joined_at_ms' => self::joinedAtMs($participant),
             ];
         }
 
         return $participants;
+    }
+
+    /**
+     * A participant's `joined_at_ms` — protojson writes 64-bit numbers as
+     * strings — or its `joined_at` in seconds; null when neither is there.
+     *
+     * @param  array<array-key, mixed>  $participant
+     */
+    private static function joinedAtMs(array $participant): ?int
+    {
+        $ms = $participant['joined_at_ms'] ?? null;
+
+        if ((is_string($ms) || is_int($ms)) && preg_match('/^[1-9]\d{0,15}$/', (string) $ms) === 1) {
+            return (int) $ms;
+        }
+
+        $seconds = $participant['joined_at'] ?? null;
+
+        if ((is_string($seconds) || is_int($seconds)) && preg_match('/^[1-9]\d{0,12}$/', (string) $seconds) === 1) {
+            return (int) $seconds * 1000;
+        }
+
+        return null;
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Domain\Rooms\Exceptions;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -12,7 +13,8 @@ use RuntimeException;
  * and an epoch — and the cause by its class or status only: never a
  * ticket, a token, a secret, a name or an identity. A ticket request that
  * meets it answers 503 `{status: "unavailable"}`; an action's cut turns it
- * into `RoomVoiceNotCut`.
+ * into `RoomVoiceNotCut`. Reported as one line without the account
+ * (`report()`).
  */
 final class RoomVoiceUnreachable extends RuntimeException
 {
@@ -22,6 +24,17 @@ final class RoomVoiceUnreachable extends RuntimeException
         public readonly string $cause,
     ) {
         parent::__construct('The voice server did not answer '.$call.($voiceRoom === null ? '' : " for {$voiceRoom}").": {$cause}.");
+    }
+
+    /**
+     * One line with the call, the voice room and the cause, and no
+     * context: Laravel would add the account's id to a reported
+     * exception, and a refused ticket would then keep who tried to join
+     * which room's voice and when (ADR 031 decision 7; C5, the audit).
+     */
+    public function report(): void
+    {
+        Log::warning($this->getMessage());
     }
 
     public function render(): JsonResponse

@@ -10,6 +10,7 @@ use App\Domain\Rooms\Support\RoomLock;
 use App\Domain\Rooms\Support\RoomVoice;
 use App\Domain\Rooms\Support\RoomVoiceServer;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Config;
@@ -37,11 +38,15 @@ use Illuminate\Support\Facades\DB;
  * One exception keeps an honest leave or mute from cutting everyone (C3,
  * §12 "As built (C3)"): within `ticket_seconds` of the player's own leave
  * or mute the action's cut may still be on its way, or a ticket signed a
- * moment before may have joined after it; then the sweep makes that one
- * call itself — `RemoveParticipant`, or `UpdateParticipant` without the
- * microphone — and raises nothing. And a player the host let speak who is
- * listed without the microphone gets it back: that direction grants
- * nothing the facts do not.
+ * moment before may have joined just after it; then the sweep makes that
+ * one call itself — `RemoveParticipant`, or `UpdateParticipant` without
+ * the microphone — and raises nothing. Only for a participant who joined
+ * before the fact or within `JOIN_SLACK_MS` of it (the voice server's
+ * `joined_at_ms`): one who joined later came back with a ticket or a
+ * refreshed token from before the fact, and gets the new epoch at once
+ * (C5, the audit). And a player the host let speak who is listed without
+ * the microphone gets it back: that direction grants nothing the facts do
+ * not.
  *
  * It reads and writes no round, no clock and nothing of `RoomWaits`. A
  * voice server that does not answer is reported as `RoomVoiceNotCut` and
@@ -51,6 +56,14 @@ final readonly class SweepRoomVoices
 {
     /** A voice room's name the app gives: `{rooms.id}.{voice_epoch}`. */
     private const string NAME = '/^([0-9a-hjkmnp-tv-z]{26})\.(\d{1,9})$/';
+
+    /**
+     * How long after a leave or a mute a join may still be the honest one
+     * — a ticket signed a moment before the fact, joined a moment after it
+     * — rather than a replay: the facts are stored to the second, so at
+     * least one second, and a second more for the join itself.
+     */
+    private const int JOIN_SLACK_MS = 2_000;
 
     public function __construct(private RoomVoiceServer $server) {}
 
@@ -164,15 +177,15 @@ final readonly class SweepRoomVoices
             $standing = RoomVoice::standingOf($room, $row);
 
             if (! RoomVoice::mayListen($room, $row)) {
-                // A player who left a moment ago: the leave's own cut, again.
-                if ($row->user_id === null || $row->left_at === null || $row->left_at->lte($recent)) {
+                // A player who left a moment ago and was in before: the leave's own cut, again.
+                if ($row->user_id === null || ! self::cutOnItsWay($row->left_at, $participant['joined_at_ms'], $recent)) {
                     return null;
                 }
 
                 $patches[] = fn () => $this->server->removeParticipant($name, $identity);
             } elseif ($participant['can_publish'] && $standing !== RoomVoiceStanding::Open) {
-                // Muted a moment ago: the mute's own cut, again.
-                if ($row->voice_muted_at === null || $row->voice_muted_at->lte($recent)) {
+                // Muted a moment ago and in before: the mute's own cut, again.
+                if (! self::cutOnItsWay($row->voice_muted_at, $participant['joined_at_ms'], $recent)) {
                     return null;
                 }
 
@@ -184,6 +197,24 @@ final readonly class SweepRoomVoices
         }
 
         return $patches;
+    }
+
+    /**
+     * Whether a participant still listed after a player's own leave or mute
+     * is that fact's cut still on its way — the fact is younger than
+     * `ticket_seconds` and the participant joined before it, or within
+     * `JOIN_SLACK_MS` after it with a ticket signed just before — rather
+     * than a ticket or a refreshed token from before the fact, joined
+     * again after it (C5, the audit: the sweep then raises the epoch at
+     * once, instead of repeating the cut each time it is rejoined).
+     */
+    private static function cutOnItsWay(?CarbonInterface $fact, ?int $joinedAtMs, CarbonImmutable $recent): bool
+    {
+        if ($fact === null || $fact->lte($recent)) {
+            return false;
+        }
+
+        return $joinedAtMs === null || $joinedAtMs <= $fact->getTimestampMs() + self::JOIN_SLACK_MS;
     }
 
     private static function roomIdOf(string $name): string

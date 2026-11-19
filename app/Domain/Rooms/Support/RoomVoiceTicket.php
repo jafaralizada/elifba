@@ -8,6 +8,7 @@ use App\Domain\Rooms\Models\RoomPlayer;
 use Carbon\CarbonImmutable;
 use Firebase\JWT\JWT;
 use Illuminate\Support\Facades\Config;
+use LogicException;
 
 /**
  * A ticket to a room's voice room (docs/architecture.md §12 "Live voice",
@@ -27,8 +28,15 @@ use Illuminate\Support\Facades\Config;
  */
 final class RoomVoiceTicket
 {
+    /**
+     * @throws LogicException for a row of another room: a ticket names its own room's row only (C5, the audit)
+     */
     public static function for(Room $room, RoomPlayer $row): string
     {
+        if ($row->room_id !== $room->id) {
+            throw new LogicException('A voice ticket is for a row of its own room.');
+        }
+
         $now = CarbonImmutable::now()->getTimestamp();
 
         return JWT::encode([

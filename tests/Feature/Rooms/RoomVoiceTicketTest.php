@@ -12,13 +12,19 @@ use App\Domain\Rooms\Data\RoomVoiceSwitchData;
 use App\Domain\Rooms\Enums\RoomVoiceStanding;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomPlayer;
+use App\Domain\Rooms\Support\RoomVoiceTicket;
+use App\Enums\Role;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Firebase\JWT\ExpiredException;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
+use Illuminate\Cache\RateLimiter;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Testing\TestResponse;
 use Tests\Support\FakeVoiceServer;
@@ -314,4 +320,122 @@ it('puts no ticket and no name in a log', function (): void {
         ->and($log)->not->toContain('Rəşad')
         ->and($log)->not->toContain('aygun@example.test')
         ->and($log)->not->toContain(FakeVoiceServer::SECRET);
+});
+
+it('reports a voice server that does not answer without the account', function (): void {
+    $logged = [];
+    Event::listen(MessageLogged::class, static function (MessageLogged $event) use (&$logged): void {
+        $logged[] = $event;
+    });
+    $this->voice->down();
+
+    // A refused ticket, a mute and a leave whose cuts did not arrive.
+    askTicket($this->aygun, $this->room)->assertStatus(503);
+    $this->actingAs($this->host)->putJson(route('rooms.members.voice.update', ['room' => $this->room, 'member' => $this->aygunRow]), ['standing' => 'muted'])->assertNoContent();
+    $this->actingAs($this->aygun)->post(route('rooms.leave', $this->room));
+
+    expect($logged)->toHaveCount(3)
+        ->and(array_map(static fn (MessageLogged $event): string => $event->level, $logged))->toBe(['warning', 'error', 'error']);
+
+    foreach ($logged as $event) {
+        // The room by its id, and nothing that says whose request it was.
+        expect($event->message)->toContain($this->room->id)
+            ->and($event->context)->toBe([]);
+    }
+});
+
+it('refuses an admitted player who is no longer verified or no longer has the player role', function (): void {
+    $calls = count($this->voice->sent);
+
+    $this->aygun->forceFill(['email_verified_at' => null])->save();
+    askTicket($this->aygun, $this->room)->assertForbidden();
+    $this->aygun->forceFill(['email_verified_at' => now()])->save();
+
+    // No role at all: the role's choice first; another role: not the player group.
+    $this->aygun->removeRole(Role::Player->value);
+    $this->aygun->forceFill(['area' => null])->save();
+    expect(askTicket($this->aygun->refresh(), $this->room)->status())->toBe(409);
+    $this->aygun->assignRole(Role::Teacher->value);
+    askTicket($this->aygun->refresh(), $this->room)->assertForbidden();
+
+    expect($this->voice->sent)->toHaveCount($calls);
+});
+
+it('keeps a ticket inside its own room for an account in two rooms', function (): void {
+    $otherHost = User::factory()->player()->create();
+    $roomB = Rooms::open($otherHost);
+    app(SetRoomVoice::class)->handle($roomB, new RoomVoiceSwitchData(true));
+    // Let in to the first room, waiting in the second.
+    $aygunInB = Rooms::join($roomB, $this->aygun);
+    $calls = count($this->voice->sent);
+
+    askTicket($this->aygun, $roomB->refresh())->assertForbidden();
+    expect($this->voice->sent)->toHaveCount($calls);
+
+    $a = ticketClaims((string) askTicket($this->aygun, $this->room)->assertOk()->json('token'));
+    expect($a['sub'])->toBe($this->aygunRow->id)
+        ->and($a['video']['room'])->toBe($this->room->id.'.0');
+
+    app(SetRoomPlayerVoice::class)->handle($roomB, $aygunInB, new RoomPlayerVoiceData(RoomVoiceStanding::Open));
+    $b = ticketClaims((string) askTicket($this->aygun, $roomB->refresh())->assertOk()->json('token'));
+    expect($b['sub'])->toBe($aygunInB->id)
+        ->and($b['video']['room'])->toBe($roomB->id.'.0');
+
+    // Each host reaches only their own room, and a row of the other room is no member here.
+    askTicket($this->host, $roomB)->assertNotFound();
+    askTicket($otherHost, $this->room)->assertNotFound();
+    $this->actingAs($this->host)->putJson(route('rooms.members.voice.update', ['room' => $this->room, 'member' => $aygunInB]), ['standing' => 'muted'])->assertNotFound();
+    expect($aygunInB->refresh()->voice_muted_at)->toBeNull();
+
+    // And the ticket itself is for a row of its own room only.
+    expect(fn () => RoomVoiceTicket::for($this->room, $aygunInB))->toThrow(LogicException::class);
+});
+
+it('gives twelve tickets a minute to an account, refusals counted, and nobody else\'s', function (): void {
+    foreach (range(1, 12) as $try) {
+        askTicket($this->aygun, $this->room)->assertOk();
+    }
+
+    askTicket($this->aygun, $this->room)->assertTooManyRequests();
+    askTicket($this->host, $this->room)->assertOk();
+
+    $newcomer = User::factory()->player()->create(['voice_agreed_at' => now()]);
+    Rooms::join($this->room, $newcomer);
+
+    foreach (range(1, 12) as $try) {
+        askTicket($newcomer, $this->room)->assertForbidden();
+    }
+
+    askTicket($newcomer, $this->room)->assertTooManyRequests();
+
+    $this->travel(61)->seconds();
+    askTicket($this->aygun, $this->room)->assertOk();
+});
+
+it('keeps an account\'s count of tickets no longer than its minute and one more', function (): void {
+    // The instance's cache is the database (docker-compose.yml): the limiter's two rows land there.
+    $limiter = new RateLimiter(Cache::store('database'));
+    $key = md5('room-voice'.$this->aygun->id);
+    $limiter->hit($key, 60);
+    Cache::store('database')->forever('elifba-kept', 'kept');
+    $rows = static fn (): int => DB::table('cache')->where('key', 'like', '%'.$key.'%')->count();
+
+    expect($rows())->toBe(2);
+
+    // Still counting within its minute.
+    $this->travel(59)->seconds();
+    $this->artisan('cache:prune-expired')->assertSuccessful();
+    expect($rows())->toBe(2);
+
+    // Gone at the next run after it, whether or not the account asks again; a row kept forever stays.
+    $this->travel(2)->seconds();
+    $this->artisan('cache:prune-expired')->expectsOutput('Deleted 2 expired cache rows.');
+    expect($rows())->toBe(0)
+        ->and(Cache::store('database')->get('elifba-kept'))->toBe('kept');
+
+    // Every minute, by the scheduler that already runs.
+    $events = collect(app(Schedule::class)->events())
+        ->filter(static fn (Illuminate\Console\Scheduling\Event $event): bool => str_contains((string) $event->command, 'cache:prune-expired'));
+    expect($events)->toHaveCount(1)
+        ->and($events->first()->expression)->toBe('* * * * *');
 });

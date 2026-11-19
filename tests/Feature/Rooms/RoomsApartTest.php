@@ -384,17 +384,19 @@ it('takes the taunts\' images from the room\'s own list, never from the children
 
 /**
  * Every module a TypeScript file names — static, type-only and dynamic
- * imports and re-exports — resolved to a path under resources/js, or left
- * as the package's name.
+ * imports and re-exports, in any of the three quotes and after a comment
+ *
+ * such as `/* @vite-ignore *\/` — resolved to a path under resources/js,
+ * or left as the package's name.
  *
  * @return list<string>
  */
 function jsImportsOf(string $js, string $path): array
 {
-    preg_match_all("/(?:\\bfrom|\\bimport)\\s*\\(?\\s*'([^']+)'/", (string) file_get_contents("{$js}/{$path}"), $matches);
+    preg_match_all('/(?:\\bfrom|\\bimport)\\s*\\(?\\s*(?:\\/\\*.*?\\*\\/\\s*)*([\'"`])([^\'"`]+)\\1/s', (string) file_get_contents("{$js}/{$path}"), $matches);
     $resolved = [];
 
-    foreach ($matches[1] as $import) {
+    foreach ($matches[2] as $import) {
         $base = match (true) {
             str_starts_with($import, '@/') => substr($import, 2),
             str_starts_with($import, '.') => dirname($path).'/'.$import,
@@ -443,7 +445,8 @@ it('keeps the voice library inside the room\'s voice module', function (): void 
     foreach ($files as $path) {
         $imports = jsImportsOf($js, $path);
 
-        if (in_array('livekit-client', $imports, true)) {
+        // The library by any of its entry points, or its protocol package.
+        if (array_filter($imports, static fn (string $import): bool => preg_match('#^(livekit-client($|/)|@livekit/)#', $import) === 1) !== []) {
             $importers[] = $path;
         }
 
@@ -487,4 +490,9 @@ it('keeps the voice library inside the room\'s voice module', function (): void 
 
     expect(array_values(array_intersect($connection, array_keys($reached))))->toBe([])
         ->and($reached)->toHaveKey('rooms/voice-view.ts');
+
+    // And no file it reaches imports what the walk cannot read: a glob, or an `import()` of a name.
+    $unread = array_values(array_filter(array_keys($reached), static fn (string $path): bool => is_file("{$js}/{$path}")
+        && preg_match('/import\\.meta\\.glob\\s*\\(|\\bimport\\s*\\(\\s*(?:\\/\\*.*?\\*\\/\\s*)*[^\'"`\\s\\/]/s', (string) file_get_contents("{$js}/{$path}")) === 1));
+    expect($unread)->toBe([]);
 });

@@ -58,6 +58,13 @@ final class FakeVoiceServer
      */
     public array $rooms = [];
 
+    /**
+     * When each participant joined, Unix milliseconds, by voice room and identity.
+     *
+     * @var array<string, array<string, int>>
+     */
+    private array $joinedAt = [];
+
     private bool $down = false;
 
     /** @var array<string, Closure(): void> what happens at the voice server while a call of that name is answered, once */
@@ -91,10 +98,15 @@ final class FakeVoiceServer
         $this->during[$call] = $meanwhile;
     }
 
-    /** Someone with a ticket is in the voice room, publishing or not. */
+    /**
+     * Someone with a ticket is in the voice room, publishing or not, from
+     * this moment of the app's clock (a test may have travelled): the
+     * voice server's `joined_at_ms`, which a new join renews.
+     */
     public function joins(string $room, string $identity, bool $canPublish = true): void
     {
         $this->rooms[$room][$identity] = $canPublish;
+        $this->joinedAt[$room][$identity] = CarbonImmutable::now()->getTimestampMs();
     }
 
     /**
@@ -214,7 +226,7 @@ final class FakeVoiceServer
             return self::error(404, 'not_found', 'requested room does not exist');
         }
 
-        unset($this->rooms[$name]);
+        unset($this->rooms[$name], $this->joinedAt[$name]);
 
         return Http::response([]);
     }
@@ -231,7 +243,7 @@ final class FakeVoiceServer
             return self::error(404, 'not_found', 'participant does not exist');
         }
 
-        unset($this->rooms[$name][$identity]);
+        unset($this->rooms[$name][$identity], $this->joinedAt[$name][$identity]);
 
         return Http::response([]);
     }
@@ -252,7 +264,7 @@ final class FakeVoiceServer
         $permission = is_array($body['permission'] ?? null) ? $body['permission'] : [];
         $this->rooms[$name][$identity] = ($permission['can_publish'] ?? false) === true;
 
-        return Http::response($this->participantInfo($identity, $this->rooms[$name][$identity]));
+        return Http::response($this->participantInfo($identity, $this->rooms[$name][$identity], $this->joinedAt[$name][$identity] ?? null));
     }
 
     /**
@@ -287,7 +299,7 @@ final class FakeVoiceServer
         $participants = [];
 
         foreach ($this->rooms[$name] ?? [] as $identity => $canPublish) {
-            $participants[] = $this->participantInfo((string) $identity, $canPublish);
+            $participants[] = $this->participantInfo((string) $identity, $canPublish, $this->joinedAt[$name][(string) $identity] ?? null);
         }
 
         return $participants;
@@ -298,16 +310,18 @@ final class FakeVoiceServer
      *
      * @return array<string, mixed>
      */
-    private function participantInfo(string $identity, bool $canPublish): array
+    private function participantInfo(string $identity, bool $canPublish, ?int $joinedAtMs = null): array
     {
+        $joinedAtMs ??= 1795034002954;
+
         return [
             'sid' => 'PA_'.substr(md5($identity), 0, 12),
             'identity' => $identity,
             'state' => 'ACTIVE',
             'tracks' => [],
             'metadata' => '',
-            'joined_at' => '1795034002',
-            'joined_at_ms' => '1795034002954',
+            'joined_at' => (string) intdiv($joinedAtMs, 1000),
+            'joined_at_ms' => (string) $joinedAtMs,
             'name' => '',
             'version' => 2,
             'permission' => [
