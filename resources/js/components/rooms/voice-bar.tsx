@@ -2,6 +2,7 @@ import { Link } from '@inertiajs/react';
 import {
     Ban,
     Check,
+    ChevronDown,
     HeadphoneOff,
     Headphones,
     Hourglass,
@@ -36,6 +37,7 @@ import { privacy } from '@/routes';
 import { update as setVoiceRoute } from '@/routes/rooms/voice';
 import type { RoomState } from '@/rooms/contract';
 import { roomRequest } from '@/rooms/http';
+import { headMic } from '@/rooms/voice-view';
 import type {
     VoiceBarForm,
     VoiceRow,
@@ -57,7 +59,9 @@ import type {
  * The sentence before a first join (`VoiceConsent`) is here too. From ADR
  * 031 as amended 2026-11-19 the page is in the voice by itself, so the
  * button's first look is «in the voice» for an account that agreed; its
- * dot asks for a tap where the browser holds the voice back.
+ * dot asks for a tap where the browser holds the voice back. In the voice
+ * the head is the microphone itself and a ⌄ for the panel (`HeadVoice`,
+ * decision 44): one tap opens the microphone.
  */
 export function VoiceButton({ voice }: { voice: RoomVoice }) {
     const { view, note } = voice;
@@ -68,9 +72,15 @@ export function VoiceButton({ voice }: { voice: RoomVoice }) {
 
     return (
         <>
-            {view !== null && (
-                <VoiceIcon view={view} onOpen={() => voice.setSheet(true)} />
-            )}
+            {view !== null &&
+                (headMic(view.bar) !== null ? (
+                    <HeadVoice view={view} voice={voice} />
+                ) : (
+                    <VoiceIcon
+                        view={view}
+                        onOpen={() => voice.setSheet(true)}
+                    />
+                ))}
             {note !== null && <VoiceNote note={note} />}
             {view !== null && (
                 <>
@@ -209,6 +219,125 @@ function VoiceIcon({ view, onOpen }: { view: VoiceView; onOpen: () => void }) {
     );
 }
 
+/**
+ * The head's microphone (ADR 031 decisions 44 and 45): a pill of the
+ * microphone — in the voice one tap opens it and one closes it, a muted
+ * player's says why; out of the voice its tap brings the page in with the
+ * microphone open — and a narrow ⌄ that opens the panel, with the host's
+ * count of newcomers who wait, and the dot of a held voice or of a voice
+ * the viewer is not in.
+ */
+function HeadVoice({ view, voice }: { view: VoiceView; voice: RoomVoice }) {
+    const { t } = useTranslation();
+    const bar = view.bar;
+    const mic = headMic(bar);
+
+    if ((bar.form !== 'in' && bar.form !== 'invited') || mic === null) {
+        return null;
+    }
+
+    const inVoice = bar.form === 'in';
+    const open = mic === 'on';
+    const held = inVoice && bar.held;
+    const speaking = inVoice && bar.speaker.kind !== 'none';
+    const waiting = view.host
+        ? view.rows.filter((row) => row.state === 'waiting').length
+        : 0;
+    const label = !inVoice
+        ? t('rooms.voice.invite')
+        : held
+          ? t('rooms.voice.tap_to_hear')
+          : open
+            ? t('rooms.voice.state.mic')
+            : mic === 'muted'
+              ? t('rooms.voice.state.muted')
+              : t('rooms.voice.state.listening');
+
+    return (
+        <div
+            data-voice-head
+            className={cn(
+                'relative flex h-11 shrink-0 items-center rounded-full border-[1.5px]',
+                mic === 'muted'
+                    ? 'border-dashed border-muted-foreground/50 bg-background'
+                    : cn(
+                          TINTED,
+                          (open || !inVoice || held || speaking) &&
+                              'border-(--voice)',
+                      ),
+            )}
+        >
+            <button
+                type="button"
+                data-voice-head-mic={mic}
+                aria-pressed={open}
+                aria-label={
+                    open
+                        ? t('rooms.voice.mic.close')
+                        : t('rooms.voice.mic.open')
+                }
+                title={
+                    open
+                        ? t('rooms.voice.mic.close')
+                        : t('rooms.voice.mic.open')
+                }
+                disabled={mic === 'opening'}
+                onClick={() => voice.tapMic(true)}
+                className={cn(
+                    'relative -m-[1.5px] inline-flex size-11 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-wait',
+                    open
+                        ? 'bg-(--voice) text-(--voice-on)'
+                        : mic === 'muted'
+                          ? 'text-muted-foreground'
+                          : 'text-(--voice-text)',
+                )}
+            >
+                {open && (
+                    <span
+                        aria-hidden
+                        className="absolute -inset-[3px] rounded-full border-2 border-(--voice) opacity-60 motion-safe:animate-ping"
+                    />
+                )}
+                <span aria-hidden className="contents">
+                    {mic === 'opening' ? (
+                        <Spinner className="size-5" />
+                    ) : open ? (
+                        <Mic className="size-5" />
+                    ) : (
+                        <MicOff className="size-5" />
+                    )}
+                </span>
+            </button>
+            <button
+                type="button"
+                data-voice-button={inVoice ? mic : bar.form}
+                aria-haspopup="dialog"
+                aria-label={`${t('rooms.voice.title')}: ${label}`}
+                title={t('rooms.voice.title')}
+                onClick={() => voice.setSheet(true)}
+                className="relative inline-flex h-full w-7 shrink-0 items-center justify-center rounded-r-full pr-1 text-(--voice-text) outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+                <ChevronDown aria-hidden className="size-4" />
+                {waiting > 0 ? (
+                    <span
+                        aria-hidden
+                        className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-(--voice) px-1 text-[0.6875rem] font-bold text-(--voice-on) ring-2 ring-background"
+                    >
+                        {waiting}
+                    </span>
+                ) : (
+                    (held || !inVoice) && (
+                        <span
+                            aria-hidden
+                            className="absolute -top-0.5 -right-0.5 size-3 rounded-full bg-(--voice) ring-2 ring-background"
+                        />
+                    )
+                )}
+            </button>
+        </div>
+    );
+}
+
 function troubleLine(
     trouble: VoiceTrouble | 'reconnecting',
     t: (key: string) => string,
@@ -226,6 +355,7 @@ function troubleLine(
 }
 
 const NOTE_ICONS: Record<RoomVoiceNote, typeof Mic> = {
+    always_allow: Mic,
     hidden_mic: MicOff,
     muted_you: MicOff,
     turned_off: HeadphoneOff,
@@ -605,24 +735,20 @@ function PanelStanding({
                 </Line>
             );
         case 'invited':
+            // No joining step (decision 45): the microphone brings the viewer in, open.
             return (
                 <>
-                    <span className="flex flex-col gap-0.5">
-                        <span className="text-[0.9375rem] font-semibold">
-                            {t('rooms.voice.invite')}
-                        </span>
-                        <span className="text-[0.8125rem] text-muted-foreground">
-                            {t('rooms.voice.invite_line')}
-                        </span>
+                    <span className="text-[0.9375rem] font-semibold">
+                        {t('rooms.voice.invite')}
                     </span>
                     <Button
                         type="button"
                         className={cn('h-13 rounded-full text-base', FILLED)}
                         disabled={bar.joining}
-                        onClick={voice.join}
+                        onClick={() => voice.tapMic()}
                     >
-                        {bar.joining ? <Spinner /> : <Headphones />}
-                        {t('rooms.voice.join')}
+                        {bar.joining ? <Spinner /> : <Mic />}
+                        {t('rooms.voice.mic.open')}
                     </Button>
                 </>
             );
@@ -701,7 +827,7 @@ function PanelStanding({
                     <MicToggle
                         mic={bar.mic}
                         alwaysAllow={bar.alwaysAllow}
-                        onTap={voice.tapMic}
+                        onTap={() => voice.tapMic()}
                     />
                 </>
             );

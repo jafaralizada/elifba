@@ -486,6 +486,27 @@ describe('VoiceLink', () => {
         expect(track()).not.toBe(mic);
     });
 
+    it('opens the microphone in the tap that brings the page into the voice', async () => {
+        const { link, seen, asked, room } = setup();
+
+        // Out of the voice, the microphone's tap (decision 45): in, and the microphone open, one capture.
+        await link.join(false, true);
+        expect(asked).toEqual([false]);
+        expect(createLocalAudioTrack).toHaveBeenCalledTimes(1);
+        expect(room().localParticipant.published.size).toBe(1);
+        expect(seen.at(-1)).toMatchObject({
+            kind: 'in',
+            mic: 'on',
+            captured: true,
+        });
+
+        // A refused ticket captures nothing.
+        const refused = setup([{ kind: 'refused' }]);
+        await refused.link.join(false, true);
+        expect(createLocalAudioTrack).not.toHaveBeenCalled();
+        expect(refused.seen.at(-1)).toEqual({ kind: 'idle' });
+    });
+
     it('closes the microphone by disabling its track, sending no sound', async () => {
         const { link, seen, room, track } = setup();
 
@@ -719,6 +740,34 @@ describe('VoiceLink', () => {
         });
         await link.setMic(true);
         expect(createLocalAudioTrack).toHaveBeenCalledTimes(2);
+    });
+
+    it('tells the page when the library leaves with it while the microphone is open', async () => {
+        const leftOpen = vi.fn();
+        FakeRoom.made = [];
+        const link = new VoiceLink({
+            load: async () => lib,
+            ticket: async () => ticket(1),
+            onChange: () => {},
+            onLeftOpen: leftOpen,
+            page: fakePage().page,
+            audio: { append: () => {} },
+            wait: async () => {},
+        });
+
+        // A reload: the library leaves at `beforeunload` with the microphone open (decision 46).
+        await link.join(false, true);
+        await FakeRoom.made[0].disconnect();
+        await settle();
+        expect(leftOpen).toHaveBeenCalledTimes(1);
+
+        // Closed before, or the player's own «Səsdən çıx»: nothing to carry over.
+        await link.join(false);
+        await FakeRoom.made[1].disconnect();
+        await settle();
+        await link.join(false, true);
+        await link.leave();
+        expect(leftOpen).toHaveBeenCalledTimes(1);
     });
 
     it('asks for a new ticket when the voice room is closed under it, and stops after the last try', async () => {

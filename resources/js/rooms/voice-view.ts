@@ -241,6 +241,29 @@ function barForm(
     }
 }
 
+/**
+ * What the head's microphone shows (ADR 031 decisions 44 and 45): wherever
+ * the viewer is admitted on a secure page, the head is the microphone — in
+ * the voice `off` (a tap opens it), `on` (a tap closes it), `opening`
+ * while the browser asks, `muted` by the host (a tap opens nothing); out
+ * of the voice `off`, whose tap brings the page in with its microphone
+ * open, and `opening` while it joins. Null where there is no microphone to
+ * open — a newcomer who waits, a failure, an insecure page — and the head
+ * is the one button that opens the panel.
+ */
+export function headMic(
+    bar: VoiceBarForm,
+): 'off' | 'opening' | 'on' | 'muted' | null {
+    switch (bar.form) {
+        case 'in':
+            return bar.mic;
+        case 'invited':
+            return bar.joining ? 'opening' : 'off';
+        default:
+            return null;
+    }
+}
+
 /** Admitted (`open` or `muted`) into a room whose voice is on. */
 function admitted(state: RoomState): boolean {
     if (state.voice === null || !state.voice.on) {

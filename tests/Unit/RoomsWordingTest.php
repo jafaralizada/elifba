@@ -234,7 +234,7 @@ it('words the live voice in exactly the strings ADR 031 lists, in both languages
     // ADR 031 "Words" and decisions 14–17 and 25; docs/frontend.md rule 15 "Live voice" → "Words".
     $adr = liveVoiceWordsOfAdr031();
 
-    expect($adr['az'])->toHaveCount(63)->and(array_keys($adr['en']))->toBe(array_keys($adr['az']));
+    expect($adr['az'])->toHaveCount(61)->and(array_keys($adr['en']))->toBe(array_keys($adr['az']));
 
     foreach (['az', 'en'] as $locale) {
         /** @var array<string, string> $translations */

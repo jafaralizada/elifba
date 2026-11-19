@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vite-plus/test';
 import { RoomState } from './contract';
 import { VOICE_OUT_KEEP, VOICE_OUT_KEY, VoiceOut } from './voice-out';
+import { REOPEN_MS, VOICE_REOPEN_KEY, VoiceReopen } from './voice-reopen';
 import type { VoiceOutStorage } from './voice-out';
 import {
+    headMic,
     joinsByItself,
     mayJoinByItself,
     myVoiceRow,
@@ -384,6 +386,59 @@ describe('the voice on by default', () => {
     });
 });
 
+describe('headMic', () => {
+    it('puts the microphone in the head wherever there is one to open, and says what a tap does', () => {
+        const head = (viewer: RoomState, connection: VoiceConnection) => {
+            const view = voiceView(viewer, connection);
+
+            return view === null ? undefined : headMic(view.bar);
+        };
+
+        // In the voice: closed (a tap opens), open (a tap closes), asking, muted by the host (a tap opens nothing).
+        expect(head(on, inVoice({ here: [AYGUN] }))).toBe('off');
+        expect(head(on, inVoice({ here: [AYGUN] }, 'on'))).toBe('on');
+        expect(
+            head(on, {
+                kind: 'in',
+                live: { here: [AYGUN], open: [], speaking: [] },
+                mic: 'opening',
+                captured: false,
+                reconnecting: false,
+            }),
+        ).toBe('opening');
+        expect(head(as(on, TURAL, false), inVoice({ here: [TURAL] }))).toBe(
+            'muted',
+        );
+        // Out of the voice it is the microphone too: its tap joins and opens it (decision 45), a spinner while joining.
+        expect(head(on, { kind: 'idle' })).toBe('off');
+        expect(head(on, { kind: 'joining' })).toBe('opening');
+        expect(
+            head(
+                { ...on, voice: { on: true, agreed: false } },
+                { kind: 'idle' },
+            ),
+        ).toBe('off');
+        // No microphone to open: a failure, a reconnection, a newcomer who waits, an insecure page.
+        expect(head(on, { kind: 'failed', trouble: 'busy' })).toBeNull();
+        expect(
+            head(on, {
+                kind: 'in',
+                live: { here: [AYGUN], open: [], speaking: [] },
+                mic: 'off',
+                captured: false,
+                reconnecting: true,
+            }),
+        ).toBeNull();
+        expect(head(as(on, LEYLA, false), { kind: 'idle' })).toBeNull();
+        // An insecure page: its one line, no microphone.
+        const insecure = voiceView(on, inVoice({ here: [AYGUN] }), false);
+        expect(insecure?.bar.form).toBe('insecure');
+        expect(
+            insecure === null ? undefined : headMic(insecure.bar),
+        ).toBeNull();
+    });
+});
+
 describe('VoiceOut', () => {
     it('keeps the last twenty rooms left, and survives a storage that throws', () => {
         const kept = new Map<string, string>();
@@ -456,6 +511,83 @@ describe('VoiceOut', () => {
             expect(memory.has(AYGUN)).toBe(true);
             expect(() => memory.back(AYGUN)).not.toThrow();
             expect(memory.has(AYGUN)).toBe(false);
+        }
+    });
+});
+
+describe('VoiceReopen', () => {
+    it('opens the microphone again only on a reload of that room within a minute, once', () => {
+        const kept = new Map<string, string>();
+        const storage = {
+            getItem: (key: string) => kept.get(key) ?? null,
+            setItem: (key: string, value: string) => {
+                kept.set(key, value);
+            },
+            removeItem: (key: string) => {
+                kept.delete(key);
+            },
+        };
+        let now = 1_000_000;
+        const reopen = new VoiceReopen(
+            () => storage,
+            () => now,
+        );
+
+        // Gone with the microphone open, back 3 s later: open again — once.
+        reopen.remember(HOST);
+        expect(JSON.parse(kept.get(VOICE_REOPEN_KEY) ?? 'null')).toEqual({
+            room: HOST,
+            at: 1_000_000,
+        });
+        now += 3_000;
+        expect(reopen.take(HOST)).toBe(true);
+        expect(reopen.take(HOST)).toBe(false);
+        expect(kept.has(VOICE_REOPEN_KEY)).toBe(false);
+
+        // Another room's page takes nothing, and the note goes.
+        reopen.remember(HOST);
+        expect(reopen.take(AYGUN)).toBe(false);
+        expect(reopen.take(HOST)).toBe(false);
+
+        // Later than the minute: closed.
+        reopen.remember(HOST);
+        now += REOPEN_MS + 1;
+        expect(REOPEN_MS).toBe(60_000);
+        expect(reopen.take(HOST)).toBe(false);
+
+        // Shown again without a reload: forgotten; another room's forget leaves it.
+        reopen.remember(HOST);
+        reopen.forget(AYGUN);
+        expect(kept.has(VOICE_REOPEN_KEY)).toBe(true);
+        reopen.forget(HOST);
+        expect(reopen.take(HOST)).toBe(false);
+
+        // A clock that went back, or a note that is not one: closed.
+        reopen.remember(HOST);
+        now -= 5_000;
+        expect(reopen.take(HOST)).toBe(false);
+        kept.set(VOICE_REOPEN_KEY, '{"room": 1}');
+        expect(reopen.take(HOST)).toBe(false);
+        kept.set(VOICE_REOPEN_KEY, 'not json');
+        expect(reopen.take(HOST)).toBe(false);
+
+        // A storage that throws, or none: nothing is opened, nothing throws.
+        const refusing = {
+            getItem: () => {
+                throw new DOMException('denied', 'SecurityError');
+            },
+            setItem: () => {
+                throw new DOMException('full', 'QuotaExceededError');
+            },
+            removeItem: () => {
+                throw new DOMException('denied', 'SecurityError');
+            },
+        };
+        for (const reach of [() => refusing, () => null]) {
+            const none = new VoiceReopen(reach, () => now);
+            expect(() => none.remember(HOST)).not.toThrow();
+            expect(none.take(HOST)).toBe(false);
+            expect(() => none.forget(HOST)).not.toThrow();
         }
     });
 });

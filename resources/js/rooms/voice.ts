@@ -131,6 +131,8 @@ export type VoiceOptions = {
     onMicError?: (error: MicError) => void;
     /** The page was hidden while its microphone was open, and closed it (`rooms.voice.hidden_mic`). */
     onHiddenMic?: () => void;
+    /** The library left the voice with the page (`beforeunload`, `pagehide`, a frozen tab) while the microphone was open: a reload may open it again (ADR 031 decision 46). */
+    onLeftOpen?: () => void;
     /** Whether the browser plays the voice yet; false until a tap unlocks it (`unlockAudio()`). */
     onAudio?: (playing: boolean) => void;
     page: ShownPage;
@@ -192,11 +194,13 @@ export class VoiceLink {
     }
 
     /**
-     * The page joining by itself (ADR 031 decision 40), or the player's tap
-     * on «Səsə qoşul» or «Razıyam, qoşul» (`agree`), «Yenidən cəhd et»,
-     * «Yenidən qoşul», «Burada qoşul». It listens and captures nothing.
+     * The page joining by itself (ADR 031 decision 40), listening and
+     * capturing nothing; or the player's tap — on the microphone out of the
+     * voice (`open`, decision 45: in and the microphone open, one tap), on
+     * «Razıyam, qoşul» (`agree`), «Yenidən cəhd et», «Yenidən qoşul»,
+     * «Burada qoşul».
      */
-    async join(agree = false): Promise<void> {
+    async join(agree = false, open = false): Promise<void> {
         if (
             this.disposed ||
             this.room !== null ||
@@ -256,11 +260,11 @@ export class VoiceLink {
 
                 return;
             case 'ticket':
-                if (
-                    !(await this.connect(lib, outcome.ticket)) &&
-                    this.wanted &&
-                    !this.disposed
-                ) {
+                if (await this.connect(lib, outcome.ticket)) {
+                    if (open) {
+                        await this.setMic(true);
+                    }
+                } else if (this.wanted && !this.disposed) {
                     this.fail('unreachable');
                 }
         }
@@ -592,6 +596,10 @@ export class VoiceLink {
         }
 
         if (reason === R.CLIENT_INITIATED) {
+            if (this.micOn) {
+                this.options.onLeftOpen?.();
+            }
+
             // The library left with the page (`pagehide`, a frozen tab), and stopped the capture with it: back in, listening, when the page is shown.
             this.releaseMic();
             this.report({

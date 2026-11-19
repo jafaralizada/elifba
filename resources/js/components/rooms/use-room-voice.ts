@@ -7,9 +7,11 @@ import { roomRequest } from '@/rooms/http';
 import { VoiceLink, VoiceTicket } from '@/rooms/voice';
 import type { MicError, VoiceTicketOutcome } from '@/rooms/voice';
 import { voiceOut } from '@/rooms/voice-out';
+import { voiceReopen } from '@/rooms/voice-reopen';
 import {
     joinsByItself,
     mayJoinByItself,
+    myVoiceRow,
     opensSentenceByItself,
     voiceView,
 } from '@/rooms/voice-view';
@@ -25,6 +27,8 @@ export type RoomVoiceNote =
     | 'hidden_mic'
     | 'muted_you'
     | 'turned_off'
+    /** A head tap that brings the browser's question (ADR 031 decision 44). */
+    | 'always_allow'
     | `errors.${MicError}`;
 
 export const NOTE_MS = 6000;
@@ -41,14 +45,17 @@ export type RoomVoice = {
     /** The panel «Canlı səs» the head's button opens, in every standing. */
     sheet: boolean;
     setSheet: (open: boolean) => void;
-    /** «Səsə qoşul»: the sentence first while the account has not accepted it. */
-    join: () => void;
-    /** «Razıyam, qoşul». */
+    /** «Razıyam, qoşul»: the agreement, then in — with the microphone open when its tap asked for the sentence. */
     agree: () => void;
     /** «Yenidən cəhd et», «Yenidən qoşul», «Burada qoşul». */
     retry: () => void;
-    /** The panel's microphone: the owner's tap, or why it is muted. */
-    tapMic: () => void;
+    /**
+     * The microphone, in the panel or in the head (`head`, ADR 031 decisions
+     * 44, 45): the owner's tap — it opens or closes the microphone in the
+     * voice, and out of it brings the page in with the microphone open (the
+     * sentence first for an account that never agreed) — or why it is muted.
+     */
+    tapMic: (head?: boolean) => void;
     /** «Səsdən çıx», remembered for the room on this device. */
     leave: () => void;
     /** The panel's «İndi yox», remembered for the room on this device. */
@@ -177,6 +184,10 @@ export function useRoomVoice({
     // The microphone closed by a hidden page: said when the page is shown again.
     const hiddenMic = useRef(false);
     const [consent, setConsent] = useState(false);
+    // The sentence was asked for by the microphone's tap: after «Razıyam, qoşul» the microphone opens too (decision 45).
+    const micAfterAgree = useRef(false);
+    // This room's microphone was open when its page went away a moment ago: open again at the first join (decision 46).
+    const reopenAtLoad = useRef(false);
     const [sheet, setSheet] = useState(false);
     const [pending, setPending] = useState<string | null>(null);
     const [failed, setFailed] = useState(false);
@@ -228,7 +239,10 @@ export function useRoomVoice({
             onMicError: (error) => say(`errors.${error}`),
             onHiddenMic: () => {
                 hiddenMic.current = true;
+                // Hidden with the microphone open: a reload now keeps it open (decision 46).
+                voiceReopen.remember(roomId);
             },
+            onLeftOpen: () => voiceReopen.remember(roomId),
             onAudio: (playing) => setAudioHeld(!playing),
             page: document,
             audio: { append: (element) => document.body.append(element) },
@@ -279,9 +293,21 @@ export function useRoomVoice({
         [],
     );
 
+    // A reload of this room within a minute of its page going away with the microphone open (decision 46): taken once, here.
+    useEffect(() => {
+        reopenAtLoad.current = voiceReopen.take(roomId);
+    }, [roomId]);
+
     // In without a tap (ADR 031 decision 40): when the page may be in the voice and is not — at the
     // page's opening, an admission, the voice coming on — never again while that stays so.
     useEffect(() => {
+        // Only the join at the page's load reopens, and never for a player the host muted.
+        const reopen =
+            reopenAtLoad.current &&
+            state !== null &&
+            myVoiceRow(state)?.voice === 'open';
+        reopenAtLoad.current = false;
+
         if (
             may &&
             state !== null &&
@@ -292,7 +318,7 @@ export function useRoomVoice({
                 secure,
             )
         ) {
-            void linkFor().join(false);
+            void linkFor().join(false, reopen);
         }
         // Only on the rise of `may`: a refusal or a failure that leaves the page idle waits for a tap.
     }, [may]);
@@ -303,15 +329,36 @@ export function useRoomVoice({
         }
 
         const shown = () => {
-            if (document.visibilityState === 'visible' && hiddenMic.current) {
+            if (document.visibilityState !== 'visible') {
+                return;
+            }
+
+            // Shown again without a reload: nothing to carry over (decision 46).
+            voiceReopen.forget(roomId);
+
+            if (hiddenMic.current) {
                 hiddenMic.current = false;
                 setNote({ note: 'hidden_mic' });
             }
         };
-        document.addEventListener('visibilitychange', shown);
+        // Going away with the microphone still open (a navigation without a hidden moment first).
+        const away = () => {
+            const now = link.current?.current;
 
-        return () => document.removeEventListener('visibilitychange', shown);
-    }, [out]);
+            if (now?.kind === 'in' && now.mic === 'on') {
+                voiceReopen.remember(roomId);
+            }
+        };
+        document.addEventListener('visibilitychange', shown);
+        window.addEventListener('beforeunload', away);
+        window.addEventListener('pagehide', away);
+
+        return () => {
+            document.removeEventListener('visibilitychange', shown);
+            window.removeEventListener('beforeunload', away);
+            window.removeEventListener('pagehide', away);
+        };
+    }, [out, roomId]);
 
     // A note goes after a while.
     useEffect(() => {
@@ -359,36 +406,58 @@ export function useRoomVoice({
         note: note?.note ?? null,
         consent,
         dismissConsent: () => {
+            micAfterAgree.current = false;
             setConsent(false);
             setSentenceSelf(false);
             voiceOut.leave(roomId);
         },
         sheet: sheet && view !== null,
         setSheet,
-        join: () => {
-            voiceOut.back(roomId);
-
-            if (state?.voice?.agreed === true) {
-                void linkFor().join(false);
-            } else {
-                // One dialog at a time: the sentence in place of the panel, which comes back after «Razıyam, qoşul».
-                setSheet(false);
-                setSentenceSelf(false);
-                setConsent(true);
-            }
-        },
         agree: () => {
+            const open = micAfterAgree.current;
+            micAfterAgree.current = false;
             voiceOut.back(roomId);
             setConsent(false);
             setSentenceSelf(false);
-            setSheet(true);
-            void linkFor().join(true);
+            // No panel after it: the head's microphone is at hand (decision 44).
+            void linkFor().join(true, open);
         },
         retry: () => {
             voiceOut.back(roomId);
             void linkFor().join(false);
         },
-        tapMic: () => {
+        tapMic: (head = false) => {
+            const bar = view?.bar;
+
+            // Out of the voice there is no joining step: the tap brings the page in, its microphone open.
+            if (bar?.form === 'invited') {
+                if (bar.joining) {
+                    return;
+                }
+
+                voiceOut.back(roomId);
+                setSheet(false);
+
+                if (state?.voice?.agreed !== true) {
+                    // The sentence first, once per account; one dialog at a time.
+                    micAfterAgree.current = true;
+                    setSentenceSelf(false);
+                    setConsent(true);
+
+                    return;
+                }
+
+                if (head && (question === 'prompt' || question === 'unknown')) {
+                    say('always_allow');
+                } else {
+                    setNote(null);
+                }
+
+                void linkFor().join(false, true);
+
+                return;
+            }
+
             if (view?.bar.form !== 'in') {
                 return;
             }
@@ -399,8 +468,16 @@ export function useRoomVoice({
                 return;
             }
 
-            setNote(null);
-            void linkFor().setMic(view.bar.mic === 'off');
+            const opening = view.bar.mic === 'off';
+
+            // The panel shows the line under its button; the head says it while the browser asks.
+            if (head && opening && view.bar.alwaysAllow) {
+                say('always_allow');
+            } else {
+                setNote(null);
+            }
+
+            void linkFor().setMic(opening);
         },
         leave: () => {
             setSheet(false);

@@ -314,7 +314,8 @@ it('says what the live voice is, that it is not recorded and what the operator c
 })->with([
     'az' => [null, [
         'Canlı səs hər otaqda açıq başlayır',
-        'Mikrofon həmişə sönülü başlayır və onu yalnız oyunçu özü açır',
+        'Mikrofon sönülü başlayır və onu yalnız oyunçu özü açır',
+        'səhifəni yeniləyəndə əvvəl açıq idisə, açıq qalır',
         'Səs yazılmır, mətnə çevrilmir və saxlanılmır',
         'Böyük ekran səsi nə səsləndirir, nə də dinləyir',
         'Uçdan-uca şifrələmə yoxdur: serveri idarə edən, hər bir zəng serverində olduğu kimi, texniki cəhətdən canlı səsə çıxış əldə edə bilər',
@@ -323,7 +324,8 @@ it('says what the live voice is, that it is not recorded and what the operator c
     ], 'Canlı səs də saxlanılmır', 'öz səs serverindən keçir', 'canlı səsdən dərhal kəsilir'],
     'en' => ['en', [
         'The live voice starts on in every room',
-        'The microphone always starts off and only the player turns it on',
+        'The microphone starts off and only the player turns it on',
+        'if it was on when you reload the page, it stays on',
         'The voice is not recorded, not turned into text and not kept',
         'The big screen neither plays the voice nor listens',
         'There is no end-to-end encryption: whoever runs the server could technically get access to the live voice, as with any call server',
