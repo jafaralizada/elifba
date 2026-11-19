@@ -149,6 +149,21 @@ it('closes the voice room under a new epoch on a removal, the voice going off an
         ->and($quiet->refresh()->voice_epoch)->toBe(0);
 });
 
+it('closes no voice room when the host removes a newcomer who waits', function (): void {
+    // A newcomer who came in after the voice was turned on waits: no ticket was ever issued for that row (C5).
+    $stranger = Rooms::join($this->room, User::factory()->player()->create(['name' => 'Tural Səfərov']));
+    expect($stranger->refresh()->voice_admitted_at)->toBeNull();
+    $this->voice->sent = [];
+
+    $this->actingAs($this->host)->delete(route('rooms.members.destroy', ['room' => $this->room, 'member' => $stranger]));
+
+    // Removed for good, and nobody in the voice is cut for it.
+    expect($stranger->refresh()->removed_at)->not->toBeNull()
+        ->and($this->room->refresh()->voice_epoch)->toBe(0)
+        ->and($this->voice->calls('DeleteRoom'))->toBe([])
+        ->and($this->voice->rooms)->toHaveKey($this->room->voiceRoom());
+});
+
 it('removes a player who left', function (): void {
     $name = $this->room->voiceRoom();
 

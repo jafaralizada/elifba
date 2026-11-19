@@ -21,10 +21,11 @@ use Illuminate\Support\Facades\DB;
  * for has answered closes now (`RoomRoundClose`).
  *
  * While the room's voice is on (§12 "Live voice", ADR 031 decision 22) the
- * removal also raises the epoch, and once it is committed and signalled
- * the voice room of the epoch before is deleted (`RoomVoiceCut`): the
- * removed player is cut at once and no old ticket joins again; the others'
- * pages come back with new tickets.
+ * removal of a player let into the voice also raises the epoch, and once it
+ * is committed and signalled the voice room of the epoch before is deleted
+ * (`RoomVoiceCut`): the removed player is cut at once and no old ticket
+ * joins again; the others' pages come back with new tickets. A newcomer who
+ * waits was never given a ticket, so removing one cuts nobody (C5).
  */
 final readonly class RemoveRoomPlayer
 {
@@ -41,7 +42,8 @@ final readonly class RemoveRoomPlayer
             $row->removed_at = now();
             $row->save();
 
-            $voiceBefore = $locked->voiceIsOn() ? $locked->voice_epoch : null;
+            // Only a row let into the voice can hold a ticket (decision 18); `voice_admitted_at` is never cleared.
+            $voiceBefore = $locked->voiceIsOn() && $row->voice_admitted_at !== null ? $locked->voice_epoch : null;
 
             if ($voiceBefore !== null) {
                 $locked->voice_epoch = $voiceBefore + 1;

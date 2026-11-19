@@ -233,6 +233,8 @@ it('runs every room test without a voice server', function (): void {
     $row = Rooms::join($room);
     $other = Rooms::join($room);
     $room->forceFill(['voice_at' => now()])->save();
+    // Let into the voice, so that its removal is a cut (a newcomer who waits holds no ticket; C5).
+    $other->forceFill(['voice_admitted_at' => now()])->save();
     app(LeaveRoom::class)->handle($room, $row);
     app(RemoveRoomPlayer::class)->handle($room, $other);
     app(CloseRoom::class)->handle($room);
