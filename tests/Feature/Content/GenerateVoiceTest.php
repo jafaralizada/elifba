@@ -8,6 +8,7 @@ use App\Domain\Content\Models\CustomWord;
 use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Content\Support\ContentValidator;
 use App\Domain\Content\Support\NameVoices;
+use App\Domain\Content\Support\TauntVoices;
 use App\Domain\Content\Support\VoiceClips;
 use App\Domain\Family\Models\Child;
 use App\Models\User;
@@ -25,7 +26,8 @@ use Tests\Support\ContentFixture;
  * ADR 016) on a fixture content root, never on the real content/:
  * ElevenLabs is faked (Http::fake) and so is ffmpeg (Process::fake), so no
  * test makes a real call or pays for a character. The fixture's name list
- * has seven names, Nihat's clip made.
+ * has seven names, Nihat's clip made; its taunts' list has eight taunts,
+ * the turtle's clip made.
  */
 
 const VOICE_KEY = 'sk_test_never_printed_0123456789';
@@ -231,7 +233,7 @@ it('deletes only with --prune the clips nothing needs any more', function (): vo
         File::put($this->root.'/assets/'.VoiceClips::path($hash), 'OLD');
     }
 
-    File::put($this->root.'/voice-clips.json', json_encode(['clips' => [...listedClips($this->root), $orphan => '[playful] Köhnə sözünü tap!', $stale => '[calm] Alma hansıdır?'], 'names' => listedClips($this->root, 'names')], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    File::put($this->root.'/voice-clips.json', json_encode(['clips' => [...listedClips($this->root), $orphan => '[playful] Köhnə sözünü tap!', $stale => '[calm] Alma hansıdır?'], 'names' => listedClips($this->root, 'names'), 'taunts' => listedClips($this->root, 'taunts')], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     expect((new ContentValidator($this->root))->validate())->toBe(["voice-clips.json: clips.{$stale} is not the clip of \"[calm] Alma hansıdır?\" in the voice of voice.json; make it again (php artisan content:voice) and remove the old one (--prune)"]);
     fakeElevenLabs();
 
@@ -270,8 +272,8 @@ it('sends the list\'s names and reads no student or child', function (): void {
         ->and($sent->filter(static fn (string $text): bool => preg_match('/nigar|gülnarə|firuzə/iu', $text) === 1)->all())->toBe([])
         // Every name of names.json but Nihat, made already: Aysel because she is listed, not because a student bears the name.
         ->and($names)->toBe(['[excited] Aysel!', '[excited] Əli!', '[excited] Hüseyin!', '[excited] Hüseyn!', '[excited] İlkin!', '[excited] Zəhra!'])
-        // Every clip content needs but the six the fixture has made, and the six names.
-        ->and($sent->count())->toBe(count(voiceClips()->needed(app(ContentRepository::class))) - 6 + 6);
+        // Every clip content needs but the six the fixture has made, the six names, and the seven taunts but the turtle's.
+        ->and($sent->count())->toBe(count(voiceClips()->needed(app(ContentRepository::class))) - 6 + 6 + 7);
 });
 
 it('makes a name clip under content/voice-names and never under content/assets', function (): void {
@@ -428,5 +430,133 @@ it('makes a name that says what a phrase says its own clip, apart from the publi
         ->and(listedClips($this->root))->toHaveKey($line->hash)
         ->and(listedClips($this->root, 'names'))->toHaveKey($line->hash)
         ->and(nameVoices()->file('Afərin'))->toBe($this->root.'/'.NameVoices::path($line->hash))
+        ->and((new ContentValidator($this->root))->validate())->toBe([]);
+});
+
+function tauntVoices(): TauntVoices
+{
+    return app(TauntVoices::class);
+}
+
+/**
+ * A frame of MP3, as ffmpeg writes one, for the validator's check of a taunt's clip.
+ */
+function fakeLevelledMp3(): void
+{
+    Process::fake([
+        '*print_format=json*' => Process::result(errorOutput: "[Parsed_loudnorm_0]\n{\n\t\"input_i\" : \"-21.40\",\n\t\"input_tp\" : \"-3.10\"\n}\n"),
+        '*' => Process::result(output: "\xFF\xFBLEVELLED-MP3"),
+    ]);
+}
+
+it('makes a taunt\'s clip from its Azerbaijani phrase and its tag, with the taunts\' context, into content/assets/rooms/taunts', function (): void {
+    fakeElevenLabs();
+    fakeLevelledMp3();
+    $voiceFiles = File::files($this->root.'/assets/voice');
+    $queries = [];
+    DB::listen(static function (QueryExecuted $query) use (&$queries): void {
+        $queries[] = $query->sql;
+    });
+    app()->setLocale('en');
+
+    $this->artisan('content:voice', ['--force' => true, '--only' => 'taunt', '--review' => $this->root.'/../review.html'])
+        ->expectsOutputToContain('Made 7 clip(s)')
+        ->assertSuccessful();
+
+    $taunts = app(ContentRepository::class)->roomTaunts();
+    $frozen = tauntVoices()->line($taunts['frozen']);
+    $lucky = tauntVoices()->line($taunts['lucky']);
+
+    expect($frozen?->text)->toBe('[mischievously] Dondun qaldın, nə oldu?')
+        ->and($lucky?->text)->toBe('[sarcastic] Vay, bəxtin necə gətirdi!')
+        ->and(is_file($this->root.'/assets/'.TauntVoices::path((string) $frozen?->hash)))->toBeTrue()
+        ->and(is_file($this->root.'/assets/'.VoiceClips::path((string) $frozen?->hash)))->toBeFalse()
+        ->and(File::files($this->root.'/assets/voice'))->toHaveCount(count($voiceFiles))
+        ->and(listedClips($this->root, 'taunts'))->toHaveCount(8)->toHaveKey((string) $frozen?->hash, '[mischievously] Dondun qaldın, nə oldu?')
+        ->and(listedClips($this->root))->toHaveCount(6)
+        ->and(file_get_contents($this->root.'/../review.html'))->toContain('<h2>Taunts (8)</h2>')->toContain('Dondun qaldın, nə oldu?')
+        ->and((new ContentValidator($this->root))->validate())->toBe([])
+        // A phrase of the built-in translations, whatever the app's locale; no row.
+        ->and($queries)->toBe([]);
+
+    // The taunts' context before the phrase, nothing after: a game, not the board talking to children.
+    Http::assertSent(static fn (Request $request): bool => $request['text'] === '[mischievously] Dondun qaldın, nə oldu?'
+        && $request['model_id'] === 'eleven_v4'
+        && $request['language_code'] === 'az'
+        && $request['voice_settings'] === ['stability' => 0.13, 'similarity_boost' => 0.75]
+        && $request['previous_text'] === 'Oyun gedir, raund başladı, hamı cavab axtarır.'
+        && ! isset($request['next_text']));
+    Http::assertSentCount(7);
+});
+
+it('makes only the taunts with --only=taunt', function (): void {
+    fakeElevenLabs();
+    fakeLevelledMp3();
+    $missing = array_filter(app(GenerateVoiceClips::class)->missing(), static fn (VoiceLineData $line): bool => $line->isTaunt());
+
+    expect($missing)->toHaveCount(7)
+        ->and(Artisan::call('content:voice', ['--dry-run' => true, '--only' => 'taunt']))->toBe(0)
+        ->and(Artisan::output())
+        ->toMatch('/\| taunt\s+\| 8\s+\| 1\s+\| 7\s+\| '.charactersOf($missing).'\s+\|/')
+        ->toContain('This run: 7 clip(s), '.charactersOf($missing).' characters sent');
+
+    Http::assertNothingSent();
+
+    $this->artisan('content:voice', ['--force' => true, '--only' => 'taunt'])->assertSuccessful();
+
+    $sent = collect(Http::recorded())->map(static fn (array $pair): string => (string) $pair[0]['text']);
+
+    expect($sent->all())->toBe(array_values(array_map(static fn (VoiceLineData $line): string => $line->text, $missing)))
+        ->and($sent->filter(static fn (string $text): bool => ! str_starts_with($text, '[mischievously] ') && ! str_starts_with($text, '[sarcastic] '))->all())->toBe([]);
+});
+
+it('prunes a taunt\'s clip no taunt needs', function (): void {
+    $turtle = tauntVoices()->line(app(ContentRepository::class)->roomTaunts()['turtle']);
+    // The turtle's phrase was said in another tag: its hash changes, and the old clip is no taunt's.
+    $taunts = json_decode((string) file_get_contents($this->root.'/rooms/taunts.json'), true, 16, JSON_THROW_ON_ERROR);
+    $taunts['taunts'][0]['voice'] = 'sarcastic';
+    File::put($this->root.'/rooms/taunts.json', json_encode($taunts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    $this->app->instance(ContentRepository::class, new ContentRepository($this->root));
+
+    // A run that makes clips keeps it: a clip accepted by ear is deleted only by --prune.
+    $this->artisan('content:voice', ['--dry-run' => true, '--only' => 'taunt'])->assertSuccessful();
+    expect(is_file($this->root.'/assets/'.TauntVoices::path((string) $turtle?->hash)))->toBeTrue();
+
+    $this->artisan('content:voice', ['--prune' => true])
+        ->expectsOutputToContain('Deleted 1 clip(s)')
+        ->expectsOutputToContain('assets/rooms/taunts/'.$turtle?->hash.'.mp3')
+        ->assertSuccessful();
+
+    expect(is_file($this->root.'/assets/'.TauntVoices::path((string) $turtle?->hash)))->toBeFalse()
+        ->and(listedClips($this->root, 'taunts'))->toBe([])
+        ->and(listedClips($this->root))->toHaveCount(6)
+        ->and(listedClips($this->root, 'names'))->toHaveCount(1);
+});
+
+it('adds the taunts\' credits entry with the first clip', function (): void {
+    fakeElevenLabs();
+    fakeLevelledMp3();
+    File::deleteDirectory($this->root.'/assets/rooms/taunts');
+    File::put($this->root.'/voice-clips.json', json_encode(['clips' => listedClips($this->root), 'names' => listedClips($this->root, 'names'), 'taunts' => (object) []], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    $credits = json_decode((string) file_get_contents($this->root.'/credits.json'), true, 16, JSON_THROW_ON_ERROR);
+    $credits['credits'] = array_values(array_filter($credits['credits'], static fn (array $credit): bool => $credit['files'] !== ['content/assets/rooms/taunts/*']));
+    File::put($this->root.'/credits.json', json_encode($credits, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n");
+    $this->travelTo(now()->setDate(2026, 11, 19));
+
+    expect(Artisan::call('content:voice', ['--dry-run' => true, '--only' => 'taunt']))->toBe(0)
+        ->and(Artisan::output())->toContain('gets this entry with the first taunt clip')->toContain('"content/assets/rooms/taunts/*"');
+
+    $this->artisan('content:voice', ['--force' => true, '--only' => 'taunt', '--limit' => 1])
+        ->expectsOutputToContain('credits.json got the entry for content/assets/rooms/taunts/*')
+        ->assertSuccessful();
+
+    $taunts = array_values(array_filter((new ContentRepository($this->root))->credits(), static fn ($credit): bool => $credit->files === ['content/assets/rooms/taunts/*']));
+
+    expect($taunts)->toHaveCount(1)
+        ->and($taunts[0]->license->value)->toBe('MIT')
+        ->and($taunts[0]->author)->toBe('Elifba contributors')
+        ->and($taunts[0]->changes)->toContain('November 2026')->not->toContain('{month}')
+        ->and(file_get_contents(dirname($this->root).'/CREDITS.md'))->toContain('content/assets/rooms/taunts/*')
+        ->and(listedClips($this->root, 'taunts'))->toHaveCount(1)
         ->and((new ContentValidator($this->root))->validate())->toBe([]);
 });

@@ -3,6 +3,7 @@
 use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Content\Enums\RoomSequenceRule;
 use App\Domain\Content\Support\ContentRepository;
+use App\Domain\Content\Support\TauntVoices;
 use App\Domain\Content\Support\VoiceClips;
 use App\Domain\Language\Support\Ordinal;
 use App\Domain\Rooms\Data\RoomGameSetupData;
@@ -495,20 +496,25 @@ it('sends the rivalry icons to the room page of an open room and to the screen, 
     $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('rivalry', null));
 });
 
-it('sends the room page and the screen the taunts\' images, and a closed room none', function (): void {
+it('sends the room page and the screen the taunts\' images and clips, and a closed room none', function (): void {
     $room = Rooms::open($this->resad);
     Rooms::join($room, $this->aygun);
-    $keys = ['turtle', 'tick_tock', 'frozen', 'sleepy', 'lucky', 'dice', 'mine', 'catch_me', 'too_easy', 'so_close'];
+    $keys = ['turtle', 'tick_tock', 'frozen', 'sleepy', 'lucky', 'dice', 'mine', 'catch_me', 'too_easy', 'so_close', 'silly', 'what_now'];
     $folder = asset('content/fluent').'/';
+    $clips = asset('content/rooms/taunts').'/';
+    $turtle = app(TauntVoices::class)->line(app(ContentRepository::class)->roomTaunts()['turtle']);
 
-    // The screen and every phone that follows the room: each key with its emoji, never a phrase.
+    // The screen and every phone that follows the room: each key with its emoji and its clip, never a phrase.
     foreach ([[$this->resad, route('rooms.screen', $room)], [$this->resad, route('rooms.show', $room)], [$this->aygun, route('rooms.show', $room)]] as [$account, $url]) {
         $taunts = pagesProps($this->actingAs($account)->get($url))['taunts'];
 
         expect(array_column($taunts, 'key'))->toBe($keys)
-            ->and(array_map(array_keys(...), $taunts))->each->toBe(['key', 'url'])
+            ->and(array_map(array_keys(...), $taunts))->each->toBe(['key', 'url', 'voice'])
             ->and(array_column($taunts, 'url'))->each->toStartWith($folder)
-            ->and(array_column($taunts, 'url')[0])->toBe($folder.'1F422.svg?v=1');
+            ->and(array_column($taunts, 'url')[0])->toBe($folder.'1F422.svg?v=2')
+            ->and(array_column($taunts, 'voice'))->each->toStartWith($clips)->toEndWith('.mp3?v=2')
+            ->and(array_column($taunts, 'voice')[0])->toBe($clips.$turtle?->hash.'.mp3?v=2')
+            ->and(array_unique(array_column($taunts, 'voice')))->toHaveCount(12);
     }
 
     // A player who left follows nothing, and a closed room throws nothing.

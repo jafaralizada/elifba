@@ -3,26 +3,41 @@ import type { StorageLike } from '@/rooms/sound';
 
 /*
  * Taunts on a page (docs/frontend.md rule 15 "Taunts", ADR 029 decisions
- * 17–24), the part that is pure: which taunts a page shows now, which of
- * them it saw arrive, what the tray says, and this device's choice to hide
- * them. Everything else is the server's: whether a throw is open, the
- * balance, the cooldown's end and which taunts a state holds. Nothing here
- * reads a verdict, a solution or anybody's result — only the state's
- * `taunts`, the round's index and phase, and the strip's rival.
+ * 36–43 as amended 2026-11-19, T3), the part that is pure: which taunts a
+ * page draws now as reactions in the middle of the viewport, which of them
+ * it saw arrive and how they pop, what the strip's throw button and its
+ * fan say, and this device's choice to hide them. Everything else is the
+ * server's: whether a throw is open, the balance, the cooldown's end and
+ * which taunts a state holds. Nothing here reads a verdict, a solution or
+ * anybody's result — only the state's `taunts`, the round's index and
+ * phase, and the strip's rival.
  */
 
 /**
- * How long a taunt is shown after its throw, by the server's clock: the
- * server's `elifba.rooms.taunts.show_ms`, for which a state lists it
- * (`RoomTauntsTest` holds the two equal).
+ * How long a state lists a taunt after its throw, by the server's clock:
+ * the server's `elifba.rooms.taunts.show_ms` (`RoomTauntsTest` holds the
+ * two equal).
  */
 export const TAUNT_SHOW_MS = 4_000;
+
+/**
+ * How long a reaction is drawn after its throw, by the server's clock
+ * (ADR 029 decision 41): less than `TAUNT_SHOW_MS`, so a state read a
+ * second late still holds it (`RoomTauntsTest` holds it below `show_ms`).
+ */
+export const TAUNT_REACTION_MS = 3_000;
 
 /** How long «Atıldı · −1 xal» lies over the strip after an accepted throw. */
 export const TAUNT_SENT_MS = 2_000;
 
-/** At most two cards at once; a third waits for a place. */
-export const TAUNT_CARDS = 2;
+/** At most two reactions at once, one above the other; a third waits for a place. */
+export const TAUNT_REACTIONS = 2;
+
+/** Two reactions that arrive together pop this far apart («Partlayış», decision 43). */
+export const TAUNT_POP_STAGGER_MS = 260;
+
+/** The shortest a pop lasts, however late it arrived: its growth and its fade. */
+export const TAUNT_POP_MIN_MS = 600;
 
 /** This device's choice, one key per kind of device, like the mute: never sent. */
 export const TAUNTS_HIDDEN_KEYS = {
@@ -62,10 +77,11 @@ export function writeTauntsHidden(
 }
 
 /**
- * The taunts a page shows at `nowMs` (the server's clock as the page
- * estimates it): the state's, until `sent_ms + TAUNT_SHOW_MS`, the two that
- * came first — a third waits for one of them to go — and none while this
- * device hides them or before the page knows the server's clock.
+ * The reactions a page draws at `nowMs` (the server's clock as the page
+ * estimates it): the state's taunts, each until `sent_ms +
+ * TAUNT_REACTION_MS`, the two that came first, older first — a third waits
+ * for one of them to go — and none while this device hides them or before
+ * the page knows the server's clock.
  */
 export function shownTaunts<T extends { id: string; sent_ms: number }>(
     list: readonly T[] | null | undefined,
@@ -77,12 +93,12 @@ export function shownTaunts<T extends { id: string; sent_ms: number }>(
     }
 
     return list
-        .filter((taunt) => taunt.sent_ms + TAUNT_SHOW_MS > nowMs)
+        .filter((taunt) => taunt.sent_ms + TAUNT_REACTION_MS > nowMs)
         .sort((a, b) => a.sent_ms - b.sent_ms || (a.id < b.id ? -1 : 1))
-        .slice(0, TAUNT_CARDS);
+        .slice(0, TAUNT_REACTIONS);
 }
 
-/** The latest moment any of these taunts is still shown, or null: when the page draws again. */
+/** The latest moment any of these taunts is still drawn as a reaction, or null. */
 export function tauntsEnd(
     list: readonly { sent_ms: number }[] | null | undefined,
 ): number | null {
@@ -90,7 +106,7 @@ export function tauntsEnd(
         return null;
     }
 
-    return Math.max(...list.map((taunt) => taunt.sent_ms + TAUNT_SHOW_MS));
+    return Math.max(...list.map((taunt) => taunt.sent_ms + TAUNT_REACTION_MS));
 }
 
 /** The taunts a page has drawn, by id, and whether it has drawn its first state. */
@@ -99,7 +115,8 @@ export type TauntsSeen = { opened: boolean; ids: ReadonlySet<string> };
 export const TAUNTS_UNSEEN: TauntsSeen = { opened: false, ids: new Set() };
 
 /**
- * Which of a state's taunts the page saw arrive (ADR 029 decision 24): one
+ * Which of a state's taunts the page saw arrive (ADR 029 decisions 24 and
+ * 43): one
  * in the first state the page drew was there before the page — it is drawn
  * still for the time it has left; any other arrives the first time a state
  * holds it; a state fetched again brings nothing new.
@@ -116,6 +133,34 @@ export function tauntMoment(
     return { seen: { opened: true, ids: known }, arrived };
 }
 
+/** How a reaction the page saw arrive pops: its whole motion's length and its delay, in ms. */
+export type TauntPop = { duration: number; delay: number };
+
+/**
+ * «Partlayış» (ADR 029 decision 43) for the reactions the page saw arrive
+ * and draws for the first time now (`fresh`, older first): each grows,
+ * holds and floats away within the time it has left until `sent_ms +
+ * TAUNT_REACTION_MS`, and two drawn together start `TAUNT_POP_STAGGER_MS`
+ * apart. Its length is fixed here, once, so a later read of the clock
+ * never restarts or stretches a motion under way.
+ */
+export function tauntPops(
+    fresh: readonly { id: string; sent_ms: number }[],
+    nowMs: number,
+): Map<string, TauntPop> {
+    return new Map(
+        fresh.map((taunt, index) => {
+            const delay = index * TAUNT_POP_STAGGER_MS;
+            const left = taunt.sent_ms + TAUNT_REACTION_MS - nowMs - delay;
+
+            return [
+                taunt.id,
+                { duration: Math.max(TAUNT_POP_MIN_MS, left), delay },
+            ];
+        }),
+    );
+}
+
 /** Why the tray cannot throw now; null when it can. */
 export type TrayReason = 'first_round' | 'no_points' | 'cooling';
 
@@ -130,7 +175,8 @@ export type TrayView =
       };
 
 /**
- * What the tray beside the strip shows (ADR 029 decisions 4, 17 and 18):
+ * What the strip's throw button and its fan show (ADR 029 decisions 4, 36
+ * and 37; `tray` is T2's name for them):
  * nothing unless the viewer plays, a throw is open (`taunts.open`: the
  * host's switch on, before the last close) and the strip has a rival to
  * throw at; else the viewer's balance, and why a throw would not be taken

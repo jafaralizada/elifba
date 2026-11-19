@@ -41,10 +41,10 @@ use SplFileInfo;
  * `voice.json` with `voice-clips.json`, `credits.json`, `packs/*.json`,
  * `rooms/levels.json`, `rooms/shapes.json`, `rooms/categories.json`,
  * `rooms/words.json`, `rooms/sounds.json`, `rooms/rivalry.json` and
- * `rooms/taunts.json` (§12 "Room content"),
- * `tests/syllables.json` and every file under `assets/`, `voice-names/`
- * and `resources/fonts/` (credits; SVG files are also checked for anything
- * that could run or load). `validate()` lists every problem, one line each;
+ * `rooms/taunts.json` (§12 "Room content", with the taunts' clips of
+ * `assets/rooms/taunts/`), `tests/syllables.json` and every file under
+ * `assets/`, `voice-names/` and `resources/fonts/` (credits; SVG files are
+ * also checked for anything that could run or load). `validate()` lists every problem, one line each;
  * an empty list means the content is valid.
  *
  * The root is a `content` directory: credits name files from the folder
@@ -228,6 +228,13 @@ final class ContentValidator
     public const int MAX_ROOM_TAUNTS = 12;
 
     /**
+     * A taunt's clip holds at most this (ADR 029 decision 50): a phrase of
+     * two or three seconds at the voice's bitrate is about 20 KB, and a
+     * device fetches the twelve once its sound is on.
+     */
+    public const int MAX_TAUNT_VOICE_BYTES = 48 * 1024;
+
+    /**
      * A `next_in_sequence` row shows at most seven terms, and every number
      * of a round is 1–999 — three digits, short enough for seven terms and
      * the «?» to fit one row of a 375px phone (§12 "Room games", B5).
@@ -334,6 +341,15 @@ final class ContentValidator
      * @var array<string, string>
      */
     private array $rivalryIcons = [];
+
+    /**
+     * The taunts' context and each taunt's audio tag by key, as
+     * `rooms/taunts.json` gives them, or null when that file has a problem
+     * (then no taunt's clip is checked against it).
+     *
+     * @var array{context: string, tags: array<string, string>}|null
+     */
+    private ?array $tauntVoices = null;
 
     /**
      * @param  bool  $voiceClipsRequired  false for `content:voice`, which makes what this would require (the praise and retry clips, a deleted clip), lists what is made and prunes the clips of another voice or of a name that left the list
@@ -1575,21 +1591,28 @@ final class ContentValidator
     // ── rooms/taunts.json ───────────────────────────────────────────────
 
     /**
-     * The taunts a player may throw (§12 "Room content", "Taunts (T2)", ADR
-     * 029 decision 28): `version` and `taunts`, a list of
-     * `MIN_ROOM_TAUNTS`–`MAX_ROOM_TAUNTS` entries `{key, image}`. Each key is
-     * unique and matches `RoomTauntData::KEY_PATTERN`; each image is an SVG
-     * under `assets/fluent/` — a Fluent Emoji file of the app's own set —
-     * that exists, no other taunt uses and is none of the rivalry strip's
-     * three (`rooms/rivalry.json`). Like every SVG under `assets/` it must
-     * be a plain drawing (`svgs()`), and like every asset it needs a credits
-     * entry. The phrases are the translations' (`rooms.taunts.say.{key}`),
-     * checked by `RoomTauntsTest`.
+     * The taunts a player may throw (§12 "Room content", "Taunts (T2)",
+     * "Taunts in the middle, said aloud (T3)", ADR 029 decisions 28 and 50):
+     * `version`, `voice` and `taunts`. `voice` is `{context, credit}`: the
+     * Azerbaijani context the clips are made with and the credits entry they
+     * get, its five fields as `voice.json`'s. `taunts` is a list of
+     * `MIN_ROOM_TAUNTS`–`MAX_ROOM_TAUNTS` entries `{key, image, voice}`. Each
+     * key is unique and matches `RoomTauntData::KEY_PATTERN`; each `voice`
+     * is an audio tag matching `RoomTauntData::VOICE_PATTERN`; each image is
+     * an SVG under `assets/fluent/` — a Fluent Emoji file of the app's own
+     * set — that exists, no other taunt uses and is none of the rivalry
+     * strip's three (`rooms/rivalry.json`). Like every SVG under `assets/` it
+     * must be a plain drawing (`svgs()`), and like every asset it needs a
+     * credits entry. The phrases are the translations'
+     * (`rooms.taunts.say.{key}`), checked by `RoomTauntsTest`; the clips are
+     * `voice-clips.json`'s `taunts` (`voice()`).
      */
     private function roomTaunts(): void
     {
+        $this->tauntVoices = null;
         $file = ContentRepository::ROOM_TAUNTS;
-        $data = $this->object($this->read($file), $file, '', ['version', 'taunts']);
+        $before = count($this->problems);
+        $data = $this->object($this->read($file), $file, '', ['version', 'voice', 'taunts']);
 
         if ($data === null) {
             return;
@@ -1597,6 +1620,20 @@ final class ContentValidator
 
         if (! is_int($data['version']) || $data['version'] < 1) {
             $this->problem($file, 'version must be a whole number from 1');
+        }
+
+        $voice = $this->object($data['voice'], $file, 'voice', ['context', 'credit']);
+        $context = null;
+
+        if ($voice !== null) {
+            $context = $voice['context'];
+
+            if (! is_string($context) || trim($context) === '' || ! $this->lettersAndSigns($context) || preg_match('/[«»]/u', $context) === 1) {
+                $this->problem($file, 'voice.context must be Azerbaijani text of alphabet letters, spaces and . , ! ? -');
+                $context = null;
+            }
+
+            $this->voiceCredit($voice['credit'], $file, 'voice.credit');
         }
 
         $taunts = $this->list($data['taunts'], $file, 'taunts');
@@ -1610,13 +1647,15 @@ final class ContentValidator
         }
 
         $keys = [];
+        /** @var array<string, string> $tags key → audio tag */
+        $tags = [];
 
         /** @var array<string, string> $used image path → the entry that has it */
         $used = [];
 
         foreach ($taunts as $index => $taunt) {
             $where = "taunts[{$index}]";
-            $taunt = $this->object($taunt, $file, $where, ['key', 'image']);
+            $taunt = $this->object($taunt, $file, $where, ['key', 'image', 'voice']);
             $key = $taunt === null ? null : $this->string($taunt['key'], $file, "{$where}.key");
 
             if ($taunt === null || $key === null) {
@@ -1628,6 +1667,13 @@ final class ContentValidator
             }
 
             $keys[] = $key;
+
+            if (! is_string($taunt['voice']) || preg_match(RoomTauntData::VOICE_PATTERN, $taunt['voice']) !== 1) {
+                $this->problem($file, "{$where} \"{$key}\".voice must be an audio tag matching ".RoomTauntData::VOICE_PATTERN.', like "mischievously"');
+            } else {
+                $tags[$key] = $taunt['voice'];
+            }
+
             $where = "{$where} \"{$key}\".image";
             $path = $taunt['image'];
 
@@ -1656,6 +1702,10 @@ final class ContentValidator
             }
 
             $used[$path] = "taunts[{$index}] \"{$key}\"";
+        }
+
+        if ($context !== null && count($this->problems) === $before) {
+            $this->tauntVoices = ['context' => $context, 'tags' => $tags];
         }
     }
 
@@ -1969,7 +2019,7 @@ final class ContentValidator
         }
 
         /** @var array{version: int, voice: array{provider: string, model: string, voice_id: string, voice_name: string, language: string, stability: float|int, similarity: float|int}, styles: array<string, string>, spoken: array{letters: array<string, string>, numbers: array<string, string>, respell: array<string, string>}, context: array{previous: string, next: string}, praise: list<array{text: string, style: string}>, retry: list<array{text: string, style: string}>, greeting: array{text: string, style: string}, finish: array{text: string, style: string}, finish_class: array{text: string, style: string}, names: array{style: string, credit: array{title: string, author: string, source: string, license: string, changes: string}}, credit: array{title: string, author: string, source: string, license: string, changes: string}} $data */
-        $voice = new VoiceClips(VoiceData::fromArray([...$data, 'clips' => $clips['clips'], 'name_clips' => $clips['names']]));
+        $voice = new VoiceClips(VoiceData::fromArray([...$data, 'clips' => $clips['clips'], 'name_clips' => $clips['names'], 'taunt_clips' => $clips['taunts']]));
         $file = ContentRepository::VOICE_CLIPS;
 
         foreach ($this->voiceClipsRequired ? $clips['clips'] : [] as $hash => $text) {
@@ -1989,6 +2039,8 @@ final class ContentValidator
                 $this->problem($file, "the {$line->group} phrase \"{$line->phrase}\" has no clip (php artisan content:voice)");
             }
         }
+
+        $this->tauntClips($voice, $clips['taunts']);
 
         // A name clip is the clip of a listed name in this voice; one whose
         // name left the list stays until `content:voice --prune`.
@@ -2039,17 +2091,72 @@ final class ContentValidator
     }
 
     /**
+     * The clips of the room's taunts (`voice-clips.json`'s `taunts`, ADR 029
+     * decision 50): each an MP3 of at most `MAX_TAUNT_VOICE_BYTES`, and each
+     * the clip of a taunt of `rooms/taunts.json` — its Azerbaijani phrase
+     * after its tag, with the taunts' context, in this voice. One that no
+     * taunt needs any more stays until `content:voice --prune`. That each
+     * listed clip has its file and each file there is listed is
+     * `clipList()`'s; that the folder is credited, `coverage()`'s.
+     *
+     * @param  array<string, string>  $clips
+     */
+    private function tauntClips(VoiceClips $voice, array $clips): void
+    {
+        $file = ContentRepository::VOICE_CLIPS;
+
+        foreach ($clips as $hash => $text) {
+            $path = "{$this->root}/assets/".TauntVoices::path((string) $hash);
+
+            if (! is_file($path)) {
+                continue;
+            }
+
+            $head = (string) file_get_contents($path, length: 3);
+            $bytes = (int) filesize($path);
+
+            if (! str_starts_with($head, 'ID3') && (strlen($head) < 2 || ord($head[0]) !== 0xFF || (ord($head[1]) & 0xE0) !== 0xE0)) {
+                $this->problem($file, "taunts.{$hash}: {$this->contentFolder()}/assets/".TauntVoices::path((string) $hash).' is not an MP3');
+            } elseif ($bytes > self::MAX_TAUNT_VOICE_BYTES) {
+                $this->problem($file, "taunts.{$hash}: {$this->contentFolder()}/assets/".TauntVoices::path((string) $hash)." holds {$bytes} bytes; a taunt's clip holds at most ".self::MAX_TAUNT_VOICE_BYTES);
+            }
+        }
+
+        if (! $this->voiceClipsRequired || $this->tauntVoices === null) {
+            return;
+        }
+
+        $listed = [];
+
+        foreach ($this->tauntVoices['tags'] as $key => $tag) {
+            $line = TauntVoices::lineIn($voice, $this->tauntVoices['context'], $key, $tag);
+
+            if ($line !== null) {
+                $listed[$line->hash] = $line->text;
+            }
+        }
+
+        foreach ($clips as $hash => $text) {
+            if (($listed[(string) $hash] ?? null) !== $text) {
+                $this->problem($file, "taunts.{$hash} is not the clip of a taunt of ".ContentRepository::ROOM_TAUNTS." in the voice of voice.json (\"{$text}\"); make it again or remove it (php artisan content:voice --prune)");
+            }
+        }
+    }
+
+    /**
      * `voice-clips.json`: `clips`, hash → text, each hash a file of
      * `assets/voice`, each file there a listed hash; `names` the same for
-     * the name clips of `voice-names` (ADR 016).
+     * the name clips of `voice-names` (ADR 016); `taunts` the same for the
+     * taunts' clips of `assets/rooms/taunts` (ADR 029 decision 50), an empty
+     * list when the file has none yet.
      *
-     * @return array{clips: array<string, string>, names: array<string, string>}|null the clips, or null when the file has a problem
+     * @return array{clips: array<string, string>, names: array<string, string>, taunts: array<string, string>}|null the clips, or null when the file has a problem
      */
     private function voiceClips(): ?array
     {
         $file = ContentRepository::VOICE_CLIPS;
         $before = count($this->problems);
-        $data = $this->object($this->read($file), $file, '', ['clips', 'names']);
+        $data = $this->object($this->read($file), $file, '', ['clips', 'names'], ['taunts']);
 
         if ($data === null) {
             return null;
@@ -2057,8 +2164,9 @@ final class ContentValidator
 
         $clips = $this->clipList($data['clips'], 'clips', 'assets/'.VoiceClips::FOLDER);
         $names = $this->clipList($data['names'], 'names', NameVoices::FOLDER);
+        $taunts = $this->clipList($data['taunts'] ?? [], 'taunts', 'assets/'.TauntVoices::FOLDER);
 
-        return $clips === null || $names === null || count($this->problems) !== $before ? null : ['clips' => $clips, 'names' => $names];
+        return $clips === null || $names === null || $taunts === null || count($this->problems) !== $before ? null : ['clips' => $clips, 'names' => $names, 'taunts' => $taunts];
     }
 
     /**

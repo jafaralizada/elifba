@@ -11,9 +11,10 @@ use Illuminate\Filesystem\Filesystem;
  * per clip with its group, the phrase, the text the provider was given,
  * the hash (to delete a bad clip, which the next run makes again) and a
  * player for the file on disk. The prompts and phrases come first, then
- * the names of the built-in list in a section of their own; in each, the
- * clips made in the last run come first. It is written outside the
- * repository and loads nothing from anywhere.
+ * the names of the built-in list and the room's taunts (ADR 029 decision
+ * 45) in sections of their own; in each, the clips made in the last run
+ * come first. It is written outside the repository and loads nothing from
+ * anywhere.
  */
 final readonly class WriteVoiceReview
 {
@@ -33,8 +34,9 @@ final readonly class WriteVoiceReview
             fn (VoiceLineData $line): bool => $this->files->isFile($this->generate->file($line)),
         );
         $sections = [
-            'Prompts and phrases' => array_filter($lines, static fn (VoiceLineData $line): bool => ! $line->isName()),
+            'Prompts and phrases' => array_filter($lines, static fn (VoiceLineData $line): bool => ! $line->isName() && ! $line->isTaunt()),
             'Names' => array_filter($lines, static fn (VoiceLineData $line): bool => $line->isName()),
+            'Taunts' => array_filter($lines, static fn (VoiceLineData $line): bool => $line->isTaunt()),
         ];
         $body = '';
 
@@ -61,7 +63,7 @@ final readonly class WriteVoiceReview
             .'<style>body{font:15px system-ui,sans-serif;margin:24px}table{border-collapse:collapse}td{border-bottom:1px solid #ddd;padding:6px 10px;vertical-align:middle}'
             .'.fresh{background:#fff8e1}small{color:#666}</style></head><body>'
             .'<h1>Elifba voice clips</h1><p>'.count($lines).' clips; '.count($fresh).' made in the last run, highlighted first. '
-            .'A bad clip: delete <code>content/assets/voice/{hash}.mp3</code> (a name: <code>content/voice-names/{hash}.mp3</code>) and run <code>php artisan content:voice</code> again, '
+            .'A bad clip: delete <code>content/assets/voice/{hash}.mp3</code> (a name: <code>content/voice-names/{hash}.mp3</code>, a taunt: <code>content/assets/rooms/taunts/{hash}.mp3</code>) and run <code>php artisan content:voice</code> again, '
             .'or give the phrase a respelling in <code>voice.json</code>.</p>'
             .$body.'</body></html>'.PHP_EOL);
     }

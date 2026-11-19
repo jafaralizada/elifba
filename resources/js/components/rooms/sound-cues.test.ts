@@ -13,9 +13,11 @@ import {
     roomCues,
     sameMoment,
     STALE_MS,
+    tauntsLive,
 } from './sound-cues';
 import type { RoomCue, RoomEar } from './sound-cues';
 import { standingGroups } from './standing-groups';
+import { TAUNT_REACTION_MS } from './taunts';
 
 /*
  * When a room game sounds (ADR 025 "Sound", ADR 028, docs/frontend.md rule
@@ -28,8 +30,10 @@ import { standingGroups } from './standing-groups';
  * in a room without a screen (`room.screen` false, ADR 028 as amended
  * 2026-11-19), the room's moments as the screen would, but never the
  * winner's cheer. After the final's fanfare the screen alone cheers the
- * first place (ADR 030). The fixtures' rooms have no screen; a phone's own
- * tests put one in (`screened()`).
+ * first place (ADR 030). A taunt is said by the devices that draw its
+ * reaction — the target's phone and the screen — once, as the page saw it
+ * arrive (ADR 029 as amended 2026-11-19). The fixtures' rooms have no
+ * screen; a phone's own tests put one in (`screened()`).
  */
 const fixtures = import.meta.glob<unknown>(
     '../../../../tests/Fixtures/rooms/state.*.json',
@@ -943,5 +947,231 @@ describe('sameMoment', () => {
                 'screen',
             ),
         ).toBe(false);
+    });
+});
+
+describe("roomCues and a taunt's voice (ADR 029 as amended 2026-11-19)", () => {
+    /** The target's phone with one taunt received, and the same moment just before it. */
+    const taunted = live('taunted');
+    const received = taunted.taunts!.received[0];
+    const untaunted = {
+        ...taunted,
+        taunts: { ...taunted.taunts!, received: [] },
+    } as State;
+    /** The screen with two taunts shown, and the same moment just before them. */
+    const screenTaunted = live('screen-taunted');
+    const screenUntaunted = {
+        ...screenTaunted,
+        taunts: { ...screenTaunted.taunts!, shown: [] },
+    } as State;
+    const sent = received.sent_ms;
+
+    const sayings = (played: { step: number; cue: RoomCue }[]) =>
+        played.filter(({ cue }) => cue.sound === 'taunt');
+
+    /** A page's ears as a taunt arrives: before it, as it comes, the same state again, later. */
+    const arriving = (before: State, after: State, at: number): RoomEar[] => [
+        { state: before, now: at - 600 },
+        { state: after, now: at + 300 },
+        { state: after, now: at + 500 },
+        { state: after, now: at + 2000 },
+    ];
+
+    it("says a taunt once, as the page saw it arrive, on the target's phone and the screen", () => {
+        // The target's phone, in a room with its screen and in one without.
+        for (const [before, after] of [
+            [withScreen(untaunted), withScreen(taunted)],
+            [untaunted, taunted],
+        ]) {
+            expect(
+                sayings(heard(arriving(before, after, sent), 'phone')),
+            ).toEqual([
+                {
+                    step: 1,
+                    cue: {
+                        sound: 'taunt',
+                        at: 0,
+                        id: received.id,
+                        key: 'turtle',
+                        until: TAUNT_REACTION_MS - 300,
+                    },
+                },
+            ]);
+        }
+
+        // The screen says the room's: two that came together, the older first.
+        const both = arriving(
+            screenUntaunted,
+            screenTaunted,
+            screenTaunted.taunts!.shown![1].sent_ms,
+        );
+
+        expect(
+            sayings(heard(both, 'screen')).map(({ step, cue }) => [
+                step,
+                cue.sound === 'taunt' ? cue.key : null,
+            ]),
+        ).toEqual([
+            [1, 'turtle'],
+            [1, 'dice'],
+        ]);
+    });
+
+    it('says nothing for a page opened on it, a state fetched again, the thrower, or another phone — in a room with a screen or without', () => {
+        for (const room of [true, false]) {
+            const target = withScreen(taunted, room);
+
+            // Opened on it: the first thing a page hears is silent, and the same state again brings nothing.
+            expect(
+                sayings(
+                    heard(
+                        [
+                            { state: target, now: sent + 200 },
+                            { state: target, now: sent + 400 },
+                            { state: target, now: sent + 1200 },
+                        ],
+                        'phone',
+                    ),
+                ),
+            ).toEqual([]);
+
+            // The thrower and every other phone: their state never lists it, whatever the moment.
+            const other = withScreen(untaunted, room);
+
+            expect(
+                sayings(
+                    heard(
+                        [
+                            { state: other, now: sent - 600 },
+                            { state: other, now: sent + 300 },
+                        ],
+                        'phone',
+                    ),
+                ),
+            ).toEqual([]);
+        }
+
+        // A phone says only its own `received`, never the room's list, even in a room without a screen.
+        const carrying = {
+            ...untaunted,
+            taunts: {
+                ...untaunted.taunts!,
+                shown: screenTaunted.taunts!.shown,
+            },
+        } as State;
+
+        expect(carriesRoom(carrying)).toBe(true);
+        expect(
+            sayings(
+                heard(
+                    [
+                        { state: untaunted, now: sent - 600 },
+                        { state: carrying, now: sent + 300 },
+                    ],
+                    'phone',
+                ),
+            ),
+        ).toEqual([]);
+    });
+
+    it("says nothing while the device hides taunts, the screen's toggle is off or the host switched them off", () => {
+        const phone = roomCues(
+            { state: untaunted, now: sent - 600 },
+            { state: taunted, now: sent + 300 },
+            'phone',
+            { tauntsHidden: true },
+        );
+        const screen = roomCues(
+            { state: screenUntaunted, now: sent - 600 },
+            { state: screenTaunted, now: screenTaunted.server_ms },
+            'screen',
+            { tauntsHidden: true },
+        );
+
+        expect(phone).toEqual([]);
+        expect(screen).toEqual([]);
+
+        // Shown again later, a taunt it hid is not said: the page saw it arrive while hidden.
+        expect(
+            roomCues(
+                { state: taunted, now: sent + 300 },
+                { state: taunted, now: sent + 500 },
+                'phone',
+            ),
+        ).toEqual([]);
+
+        // The host's switch off: nothing is drawn or said.
+        const off = (state: State) =>
+            ({ ...state, room: { ...state.room, taunts: false } }) as State;
+
+        expect(tauntsLive(taunted)).toBe(true);
+        expect(tauntsLive(off(taunted))).toBe(false);
+        expect(
+            roomCues(
+                { state: off(untaunted), now: sent - 600 },
+                { state: off(taunted), now: sent + 300 },
+                'phone',
+            ),
+        ).toEqual([]);
+        // Nor once the game is over or the room closed.
+        expect(tauntsLive(over)).toBe(false);
+        expect(
+            tauntsLive({
+                ...taunted,
+                room: { ...taunted.room, status: 'closed' },
+            } as State),
+        ).toBe(false);
+    });
+
+    it('keeps one taunt at a time and drops one whose reaction is over', () => {
+        // Heard after its reaction ended (a page that slept): not said.
+        expect(
+            roomCues(
+                { state: untaunted, now: sent - 600 },
+                { state: taunted, now: sent + TAUNT_REACTION_MS },
+                'phone',
+            ),
+        ).toEqual([]);
+
+        // The screen heard two at once: the older's reaction is over at server_ms, only the newer is said.
+        const late = roomCues(
+            { state: screenUntaunted, now: screenTaunted.server_ms - 600 },
+            { state: screenTaunted, now: screenTaunted.server_ms },
+            'screen',
+        );
+
+        expect(
+            late.map((cue) => (cue.sound === 'taunt' ? cue.key : null)),
+        ).toEqual(['dice']);
+        // Each cue carries when its reaction ends: a second taunt waits for the first only until then (the player's `taunt()`).
+        expect(late[0]).toMatchObject({
+            until:
+                screenTaunted.taunts!.shown![0].sent_ms +
+                TAUNT_REACTION_MS -
+                screenTaunted.server_ms,
+        });
+    });
+
+    it("belongs to the taunt, not to the round's moment: the round's close never cuts it", () => {
+        // A taunt arriving is no new moment: nothing of the round is cancelled for it.
+        expect(
+            sameMoment(
+                { state: untaunted, now: sent - 600 },
+                { state: taunted, now: sent + 300 },
+                'phone',
+            ),
+        ).toBe(true);
+        // The close comes with the taunt still listed: the reveal's cues, and the taunt is not said again.
+        const closed = {
+            ...reveal,
+            taunts: taunted.taunts,
+        } as State;
+        const cues = roomCues(
+            { state: taunted, now: sent + 300 },
+            { state: closed, now: closes + 100 },
+            'phone',
+        );
+
+        expect(cues.filter((cue) => cue.sound === 'taunt')).toEqual([]);
     });
 });

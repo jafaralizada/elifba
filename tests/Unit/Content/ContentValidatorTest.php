@@ -244,3 +244,39 @@ it('keeps the clip of a name that left the list until --prune, for content:voice
             'voice-clips.json: names.f66bf3c65feb9853 is not the clip of a name of names.json in the voice of voice.json ("[excited] Nihat!"); make it again or remove it (php artisan content:voice --prune)',
         ]);
 });
+
+it('keeps a taunt\'s clip small enough to fetch with the eleven others once sound is on', function (): void {
+    $limit = ContentValidator::MAX_TAUNT_VOICE_BYTES;
+    $root = ContentFixture::make(['write' => ['assets/rooms/taunts/61f456c92efd186b.mp3' => "\xFF\xFB".str_repeat('x', $limit - 1)]]);
+
+    expect($limit)->toBe(48 * 1024)
+        ->and((new ContentValidator($root))->validate())
+        ->toBe(['voice-clips.json: taunts.61f456c92efd186b: content/assets/rooms/taunts/61f456c92efd186b.mp3 holds '.($limit + 1).' bytes; a taunt\'s clip holds at most '.$limit]);
+
+    foreach (glob(base_path('content/assets/rooms/taunts/*.mp3')) ?: [] as $clip) {
+        expect(filesize($clip))->toBeLessThanOrEqual($limit, basename($clip));
+    }
+});
+
+it('keeps the clip of a taunt whose phrase changed until --prune, for content:voice', function (): void {
+    // The clip says the old phrase: a lang change makes a new hash, and the old file stays until --prune.
+    $root = ContentFixture::make(['file' => 'rooms/taunts.json', 'set' => ['taunts.0.voice' => 'sarcastic']]);
+
+    expect((new ContentValidator($root, voiceClipsRequired: false))->validate())->toBe([])
+        ->and((new ContentValidator($root))->validate())->toBe([
+            'voice-clips.json: taunts.61f456c92efd186b is not the clip of a taunt of rooms/taunts.json in the voice of voice.json ("[mischievously] Tısbağa da səndən tezdir!"); make it again or remove it (php artisan content:voice --prune)',
+        ]);
+});
+
+it('lets a taunt whose clip is not made yet play silent, and its folder go uncredited until the first', function (): void {
+    $root = ContentFixture::make([
+        'file' => 'voice-clips.json',
+        'unset' => ['taunts.61f456c92efd186b'],
+        'delete' => ['assets/rooms/taunts/61f456c92efd186b.mp3'],
+    ]);
+    $credits = json_decode((string) file_get_contents("{$root}/credits.json"), true, 16, JSON_THROW_ON_ERROR);
+    $credits['credits'] = array_values(array_filter($credits['credits'], static fn (array $credit): bool => $credit['files'] !== ['content/assets/rooms/taunts/*']));
+    file_put_contents("{$root}/credits.json", json_encode($credits, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+    expect((new ContentValidator($root))->validate())->toBe([]);
+});

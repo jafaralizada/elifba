@@ -7,6 +7,7 @@ use App\Domain\Content\Data\VoiceLineData;
 use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Content\Support\ElevenLabs;
 use App\Domain\Content\Support\NameVoices;
+use App\Domain\Content\Support\TauntVoices;
 use App\Domain\Content\Support\VoiceClips;
 use App\Domain\Content\Support\VoiceLeveler;
 use Carbon\CarbonImmutable;
@@ -19,16 +20,19 @@ use RuntimeException;
  * them levelled (`VoiceLeveler`): a prompt or phrase to
  * `content/assets/voice/{hash}.mp3`, a first name of the built-in name list
  * (ADR 016) to `content/voice-names/{hash}.mp3`, outside `content/assets`,
- * so no name clip is ever a public file. Run by `php artisan content:voice`
- * on the machine that commits the files, never during a request; the lines
- * come from content files only (`VoiceClips::needed()`,
- * `NameVoices::needed()`), never from a row. Whatever happens, the clip
- * list is written for the files made so far, so a run stopped half way
- * loses nothing: the next one makes only the rest.
+ * so no name clip is ever a public file, and from T4 a room's taunt (ADR 029
+ * decision 45) to `content/assets/rooms/taunts/{hash}.mp3`, made with the
+ * taunts' own context. Run by `php artisan content:voice` on the machine
+ * that commits the files, never during a request; the lines come from
+ * content files and the built-in translations only (`VoiceClips::needed()`,
+ * `NameVoices::needed()`, `TauntVoices::needed()`), never from a row.
+ * Whatever happens, the clip list is written for the files made so far, so
+ * a run stopped half way loses nothing: the next one makes only the rest.
  *
  * The first clip of a folder also gets the folder its credits entry, from
- * `voice.json`'s `credit` (or `names.credit`) with the month of
- * generation, and `CREDITS.md` is written again.
+ * `voice.json`'s `credit` (or `names.credit`, or `taunts.json`'s
+ * `voice.credit`) with the month of generation, and `CREDITS.md` is
+ * written again.
  */
 final readonly class GenerateVoiceClips
 {
@@ -36,6 +40,7 @@ final readonly class GenerateVoiceClips
         private ContentRepository $content,
         private VoiceClips $clips,
         private NameVoices $names,
+        private TauntVoices $taunts,
         private VoiceLeveler $leveler,
         private WriteVoiceClipList $list,
         private WriteCredits $credits,
@@ -43,16 +48,17 @@ final readonly class GenerateVoiceClips
     ) {}
 
     /**
-     * Every clip content needs: the prompts and phrases, then the names of
-     * the list. A list, not a map by hash: a name may say what a phrase
-     * says («Afərin!» is a praise phrase and a girl's name), and then each
-     * has its own file in its own folder, the name's never public.
+     * Every clip content needs: the prompts and phrases, the names of the
+     * list, then the room's taunts. A list, not a map by hash: a name may
+     * say what a phrase says («Afərin!» is a praise phrase and a girl's
+     * name), and then each has its own file in its own folder, the name's
+     * never public.
      *
      * @return list<VoiceLineData>
      */
     public function needed(): array
     {
-        return [...array_values($this->clips->needed($this->content)), ...array_values($this->names->needed())];
+        return [...array_values($this->clips->needed($this->content)), ...array_values($this->names->needed()), ...array_values($this->taunts->needed())];
     }
 
     /**
@@ -69,8 +75,9 @@ final readonly class GenerateVoiceClips
     }
 
     /**
-     * Where a clip's file lives: a name's under `content/voice-names`, every
-     * other under `content/assets/voice`.
+     * Where a clip's file lives: a name's under `content/voice-names`, a
+     * taunt's under `content/assets/rooms/taunts`, every other under
+     * `content/assets/voice`.
      */
     public function file(VoiceLineData $line): string
     {
@@ -82,7 +89,23 @@ final readonly class GenerateVoiceClips
      */
     public static function relative(VoiceLineData $line): string
     {
-        return $line->isName() ? NameVoices::path($line->hash) : 'assets/'.VoiceClips::path($line->hash);
+        return match (true) {
+            $line->isName() => NameVoices::path($line->hash),
+            $line->isTaunt() => 'assets/'.TauntVoices::path($line->hash),
+            default => 'assets/'.VoiceClips::path($line->hash),
+        };
+    }
+
+    /**
+     * The folder of a group's clips, relative to the content root.
+     */
+    public static function folder(string $group): string
+    {
+        return match ($group) {
+            VoiceLineData::NAME => NameVoices::FOLDER,
+            VoiceLineData::TAUNT => 'assets/'.TauntVoices::FOLDER,
+            default => 'assets/'.VoiceClips::FOLDER,
+        };
     }
 
     /**
@@ -95,16 +118,15 @@ final readonly class GenerateVoiceClips
     public function handle(ElevenLabs $provider, array $lines, ?callable $made = null): array
     {
         $settings = $this->clips->voice()->settings;
-        $madeNames = false;
-        $madeOthers = false;
+        /** @var array<string, true> $madeIn the folders a clip was written to */
+        $madeIn = [];
 
         try {
             foreach ($lines as $line) {
-                $audio = $this->leveler->level($provider->speak($settings, $line->text));
+                $audio = $this->leveler->level($provider->speak($line->isTaunt() ? $this->taunts->settings() : $settings, $line->text));
                 $this->files->ensureDirectoryExists(dirname($this->file($line)));
                 $this->files->put($this->file($line), $audio);
-                $madeNames = $madeNames || $line->isName();
-                $madeOthers = $madeOthers || ! $line->isName();
+                $madeIn[self::folder($line->group)] = true;
 
                 if ($made !== null) {
                     $made($line, strlen($audio));
@@ -112,22 +134,41 @@ final readonly class GenerateVoiceClips
             }
         } finally {
             $this->list->handle();
-            $credited = array_values(array_filter([
-                $madeOthers ? $this->credit(self::pattern($this->content, false), $this->clips->voice()->credit) : null,
-                $madeNames ? $this->credit(self::pattern($this->content, true), $this->clips->voice()->nameCredit) : null,
-            ]));
+            $credited = [];
+
+            foreach ($this->folderCredits() as $folder => $credit) {
+                if (isset($madeIn[$folder]) && ($pattern = $this->credit(self::pattern($this->content, $folder), $credit)) !== null) {
+                    $credited[] = $pattern;
+                }
+            }
         }
 
         return $credited;
     }
 
     /**
-     * The credits pattern of the folder of the clips or of the name clips:
-     * `content/assets/voice/*`, `content/voice-names/*`.
+     * The credits pattern of a folder of clips (`folder()`):
+     * `content/assets/voice/*`, `content/voice-names/*`,
+     * `content/assets/rooms/taunts/*`.
      */
-    public static function pattern(ContentRepository $content, bool $names): string
+    public static function pattern(ContentRepository $content, string $folder): string
     {
-        return basename($content->root()).'/'.($names ? NameVoices::FOLDER : 'assets/'.VoiceClips::FOLDER).'/*';
+        return basename($content->root()).'/'.$folder.'/*';
+    }
+
+    /**
+     * The credits entry each folder of clips gets with its first clip, by
+     * folder (`folder()`), in that order.
+     *
+     * @return array<string, array{title: string, author: string, source: string, license: string, changes: string}>
+     */
+    public function folderCredits(): array
+    {
+        return [
+            self::folder(VoiceLineData::PRAISE) => $this->clips->voice()->credit,
+            self::folder(VoiceLineData::NAME) => $this->clips->voice()->nameCredit,
+            self::folder(VoiceLineData::TAUNT) => $this->content->roomTauntVoice()->credit,
+        ];
     }
 
     /**

@@ -192,6 +192,14 @@
             "source": "https://elevenlabs.io/docs/overview/capabilities/text-to-speech/eleven-v4",
             "license": "MIT",
             "changes": "A synthetic voice, not a person's recording: made with ElevenLabs Eleven v4 (eleven_v4, language az) in the Voice Library voice «Nigar – Ad Read» under a paid plan, in November 2026, one clip per name of content/names.json (our own list, seeded from Wikidata, CC0); trimmed and levelled with ffmpeg"
+        },
+        {
+            "files": ["content/assets/rooms/taunts/*"],
+            "title": "The rooms' taunts in the board's voice, in Azerbaijani",
+            "author": "Elifba contributors",
+            "source": "https://elevenlabs.io/docs/overview/capabilities/text-to-speech/eleven-v4",
+            "license": "MIT",
+            "changes": "A synthetic voice, not a person's recording: made with ElevenLabs Eleven v4 (eleven_v4, language az) in the Voice Library voice «Nigar – Ad Read» under a paid plan, in November 2026, one clip per taunt of content/rooms/taunts.json (our own phrases); trimmed and levelled with ffmpeg"
         }
     ]
 }

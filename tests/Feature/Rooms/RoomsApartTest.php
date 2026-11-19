@@ -3,6 +3,7 @@
 use App\Domain\Classroom\Models\SchoolClass;
 use App\Domain\Classroom\Models\Student;
 use App\Domain\Content\Support\ContentRepository;
+use App\Domain\Content\Support\TauntVoices;
 use App\Domain\Family\Models\Child;
 use App\Domain\Rooms\Enums\RoomPhase;
 use App\Domain\Rooms\Models\RoomAnswer;
@@ -365,18 +366,23 @@ it('takes the taunts\' images from the room\'s own list, never from the children
         }
     }
 
-    // A room page gets every emoji by the URL of its prop, never by a path of its own.
+    // A room page gets every emoji, and from T4 every taunt's clip (ADR 029 decision 54), by the URL of
+    // its prop, never by a path of its own.
     foreach (['rooms', 'pages/rooms', 'components/rooms'] as $folder) {
         foreach (File::allFiles(resource_path("js/{$folder}")) as $file) {
-            if (str_contains($file->getContents(), 'fluent/')) {
-                $wrong[str_replace(base_path().'/', '', $file->getPathname())][] = 'fluent/';
+            // A test's URL is a fixture, not a path the page builds.
+            foreach (str_ends_with($file->getFilename(), '.test.ts') ? ['fluent/'] : ['fluent/', 'rooms/taunts/'] as $path) {
+                if (str_contains($file->getContents(), $path)) {
+                    $wrong[str_replace(base_path().'/', '', $file->getPathname())][] = $path;
+                }
             }
         }
     }
 
-    // And the list names only the Fluent set.
+    // And the list names only the Fluent set, its clips only the taunts' own folder.
     foreach (app(ContentRepository::class)->roomTaunts() as $taunt) {
-        expect($taunt->image)->toStartWith('fluent/');
+        expect($taunt->image)->toStartWith('fluent/')
+            ->and(app(TauntVoices::class)->url($taunt))->toStartWith(asset('content/rooms/taunts').'/');
     }
 
     expect($wrong)->toBe([]);

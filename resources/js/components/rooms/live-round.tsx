@@ -15,9 +15,8 @@ import { RivalryStrip, useRivalry } from '@/components/rooms/rivalry-strip';
 import type { RivalryIcons } from '@/components/rooms/rivalry-strip';
 import {
     SpentLine,
-    TauntCover,
-    TauntTray,
-    useTauntsHidden,
+    TauntReaction,
+    TauntThrow,
 } from '@/components/rooms/taunt-parts';
 import type { TauntList } from '@/components/rooms/taunt-parts';
 import { seconds } from '@/components/rooms/seconds';
@@ -89,12 +88,14 @@ type Sent = {
  * screen's pair for a host who does not play. It moves only in a reveal
  * the page saw begin.
  *
- * Beside the strip stands the tray (rule 15 "Taunts", ADR 029): a player
- * throws the strip's rival a taunt from the list (`taunts`), for a point of
- * their own, and a taunt aimed at the viewer lies over the strip for 4 s
- * without covering the round. The reveal says the cost counted at its
- * close: «Atmaca: −:count xal» under the thrower's verdict and «−:count»
- * in «Sıralama».
+ * The strip's rival side is the throw (rule 15 "Taunts", ADR 029 as
+ * amended 2026-11-19): a player taps it and throws the strip's rival a
+ * taunt from the fan (`taunts`), for a point of their own; a taunt aimed at
+ * the viewer is a reaction in the middle of the viewport for 3 s, which
+ * takes no tap and moves nothing of the round, unless this device hides
+ * them (`tauntsHidden`, the page's). The reveal says the cost counted at
+ * its close: «Atmaca: −:count xal» under the thrower's verdict and
+ * «−:count» in «Sıralama».
  */
 export function LiveRound({
     roomId,
@@ -110,6 +111,8 @@ export function LiveRound({
     sound = null,
     icons = null,
     taunts = null,
+    tauntsHidden = false,
+    onTauntsHiddenChange = () => {},
 }: {
     roomId: string;
     state: RoomState;
@@ -129,13 +132,15 @@ export function LiveRound({
     icons?: RivalryIcons | null;
     /** The taunts a player may throw (the prop `taunts`, T2). */
     taunts?: TauntList | null;
+    /** This device hides the taunts aimed at it («Mənə atılanları gizlət», the page's choice). */
+    tauntsHidden?: boolean;
+    onTauntsHiddenChange?: (hidden: boolean) => void;
 }) {
     const { t } = useTranslation();
     const now = useServerNow(clock, true);
     const view = MECHANIC_VIEWS[game.mechanic];
     const previous = usePreviousReveal(game, round, state.ranking);
     const rivalry = useRivalry(state, game, round, state.me.player_id);
-    const [tauntsHidden, setTauntsHidden] = useTauntsHidden('phone');
     const spent = round.reveal?.spent ?? [];
     const rival =
         rivalry.pair !== null &&
@@ -250,42 +255,42 @@ export function LiveRound({
             className="flex flex-col gap-4"
         >
             {rivalry.pair !== null && (
-                <div className="relative flex items-center gap-2">
-                    <div className="relative min-w-0 flex-1">
-                        <RivalryStrip
-                            key={`strip:${round.index}:${round.phase === 'reveal' ? 'reveal' : 'open'}`}
-                            pair={rivalry.pair}
-                            previous={rivalry.previous}
-                            overtake={rivalry.overtake}
-                            ranking={state.ranking}
-                            results={round.reveal?.results ?? null}
-                            spent={spent}
-                            players={state.players}
-                            placeLabels={placeLabels}
-                            icons={icons}
-                            moves={motion.strip}
-                        />
-                        <TauntCover
-                            received={state.taunts?.received}
-                            players={state.players}
-                            list={taunts}
-                            now={now}
-                            hidden={tauntsHidden}
-                        />
-                    </div>
-                    <TauntTray
+                <div className="relative">
+                    <RivalryStrip
+                        key={`strip:${round.index}:${round.phase === 'reveal' ? 'reveal' : 'open'}`}
+                        pair={rivalry.pair}
+                        previous={rivalry.previous}
+                        overtake={rivalry.overtake}
+                        ranking={state.ranking}
+                        results={round.reveal?.results ?? null}
+                        spent={spent}
+                        players={state.players}
+                        placeLabels={placeLabels}
+                        icons={icons}
+                        moves={motion.strip}
+                    />
+                    <TauntThrow
                         roomId={roomId}
                         state={state}
                         rival={rival}
                         list={taunts}
                         clock={clock}
                         now={now}
+                        phase={`${round.index}:${round.phase}`}
                         hidden={tauntsHidden}
-                        onHiddenChange={setTauntsHidden}
+                        onHiddenChange={onTauntsHiddenChange}
                         onThrown={refresh}
                     />
                 </div>
             )}
+
+            <TauntReaction
+                received={state.taunts?.received}
+                players={state.players}
+                list={taunts}
+                now={now}
+                hidden={tauntsHidden}
+            />
 
             <RoundHead
                 game={game}

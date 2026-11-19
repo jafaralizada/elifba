@@ -14,7 +14,7 @@ import {
     UserMinus,
     UserPlus,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import InputError from '@/components/input-error';
 import { withGame } from '@/components/rooms/catalog';
@@ -33,6 +33,7 @@ import { CodeChip, CodeDialog, InviteCard } from '@/components/rooms/room-code';
 import type { JoinLink } from '@/components/rooms/room-code';
 import { RoomConfirm } from '@/components/rooms/room-confirm';
 import type { RivalryIcons } from '@/components/rooms/rivalry-strip';
+import { tauntVoices, useTauntsHidden } from '@/components/rooms/taunt-parts';
 import type { TauntList } from '@/components/rooms/taunt-parts';
 import { RoomTools } from '@/components/rooms/room-tools';
 import { SoundToggle } from '@/components/rooms/sound-toggle';
@@ -95,7 +96,7 @@ type Props = {
     sounds: RoomSoundUrls | null;
     /** The rivalry strip's emoji (ADR 027); null when it follows no open room. */
     rivalry: RivalryIcons | null;
-    /** The taunts a player may throw, each key with its emoji (T2, ADR 029); null when it follows no open room. */
+    /** The taunts a player may throw, each key with its emoji and its clip in the board's voice (ADR 029 as amended, T3); null when it follows no open room. */
     taunts: TauntList | null;
     can: Can;
 };
@@ -118,7 +119,9 @@ type Props = {
  * posts and the page waits for the state (`useRoomChoice()`). A moment
  * moves only when the page saw it begin (`useRoomMotion()`, ADR 025). Its
  * sound is the viewer's own and quiet, and in a room without a screen the
- * room's too (`useRoomSound()`, ADR 028 as amended 2026-11-19).
+ * room's too (`useRoomSound()`, ADR 028 as amended 2026-11-19); a taunt
+ * aimed at the viewer is said in the board's voice as its reaction pops in,
+ * unless this device hides taunts (ADR 029 as amended 2026-11-19).
  *
  * While the host has the live voice on, its round button stands in the
  * page's head on every moment — the room's header outside a round, the
@@ -144,7 +147,19 @@ export default function RoomsShow({
     const { t } = useTranslation();
     const { state, clock, refresh } = useLiveRoom({ room, initial });
     const motion = useRoomMotion(state);
-    const sound = useRoomSound({ speaker: 'phone', sounds, state, clock });
+    // This device's «Mənə atılanları gizlət»: it hides a taunt's reaction and silences its voice.
+    const [tauntsHidden, setTauntsHidden] = useTauntsHidden('phone');
+    const tauntSound = useMemo(
+        () => ({ voices: tauntVoices(taunts), hidden: tauntsHidden }),
+        [taunts, tauntsHidden],
+    );
+    const sound = useRoomSound({
+        speaker: 'phone',
+        sounds,
+        state,
+        clock,
+        taunts: tauntSound,
+    });
     const voice = useRoomVoice({ roomId: room.id, state, onChanged: refresh });
     const voiceButton = <VoiceButton voice={voice} />;
     // A game opens at its top, where the rivalry strip stands (ADR 027).
@@ -201,6 +216,8 @@ export default function RoomsShow({
                         sound={sound}
                         icons={rivalry}
                         taunts={taunts}
+                        tauntsHidden={tauntsHidden}
+                        onTauntsHiddenChange={setTauntsHidden}
                         aside={
                             <>
                                 {sounds !== null && (

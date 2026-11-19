@@ -3,8 +3,12 @@ import type { RoomState } from '@/rooms/contract';
 import {
     readTauntsHidden,
     shownTaunts,
+    TAUNT_POP_MIN_MS,
+    TAUNT_POP_STAGGER_MS,
+    TAUNT_REACTION_MS,
     TAUNT_SHOW_MS,
     tauntMoment,
+    tauntPops,
     tauntsEnd,
     TAUNTS_HIDDEN_KEYS,
     TAUNTS_UNSEEN,
@@ -14,9 +18,10 @@ import {
 
 /*
  * Taunts on a page (docs/frontend.md rule 15 "Taunts", ADR 029 decisions
- * 17–24): what a page shows of the state's taunts, when a card pops in,
- * what the tray says, and the device's own choice to hide them. The
- * numbers are the server's; these only read them.
+ * 36–43 as amended 2026-11-19): which reactions a page draws of the
+ * state's taunts and for how long, when one pops in and how, what the
+ * strip's throw button and its fan say, and the device's own choice to
+ * hide them. The numbers are the server's; these only read them.
  */
 
 const fixtures = import.meta.glob<unknown>(
@@ -85,22 +90,24 @@ describe('tauntMoment', () => {
 });
 
 describe('shownTaunts', () => {
-    it("drops a taunt at sent_ms + show_ms by the server's clock", () => {
+    it("draws a reaction until sent_ms + TAUNT_REACTION_MS by the server's clock", () => {
         const list = [taunt('a', 10_000)];
 
-        expect(TAUNT_SHOW_MS).toBe(4_000);
+        expect(TAUNT_REACTION_MS).toBe(3_000);
+        // A state still lists it a second longer: a late read draws what is left.
+        expect(TAUNT_REACTION_MS).toBeLessThan(TAUNT_SHOW_MS);
         expect(shownTaunts(list, 10_000, false)).toEqual(list);
-        expect(shownTaunts(list, 13_999, false)).toEqual(list);
-        expect(shownTaunts(list, 14_000, false)).toEqual([]);
-        // An estimate a little behind the server still shows what the state holds.
+        expect(shownTaunts(list, 12_999, false)).toEqual(list);
+        expect(shownTaunts(list, 13_000, false)).toEqual([]);
+        // An estimate a little behind the server still draws what the state holds.
         expect(shownTaunts(list, 9_900, false)).toEqual(list);
         // Before the page knows the server's clock, nothing.
         expect(shownTaunts(list, null, false)).toEqual([]);
-        expect(tauntsEnd(list)).toBe(14_000);
+        expect(tauntsEnd(list)).toBe(13_000);
         expect(tauntsEnd([])).toBeNull();
     });
 
-    it('shows the two that came first, and a third once a place is free', () => {
+    it('puts two reactions one above the other, the older first, and a third once a place is free', () => {
         // Newest first, as the state lists them.
         const list = [
             taunt('c', 12_000),
@@ -112,10 +119,12 @@ describe('shownTaunts', () => {
             'a',
             'b',
         ]);
-        expect(shownTaunts(list, 14_000, false).map((t) => t.id)).toEqual([
+        // At 13 s the first is over: the third takes its place, below the second.
+        expect(shownTaunts(list, 13_000, false).map((t) => t.id)).toEqual([
             'b',
             'c',
         ]);
+        expect(shownTaunts(list, 15_000, false)).toEqual([]);
     });
 
     it('shows nothing while this device hides taunts', () => {
@@ -150,6 +159,29 @@ describe('shownTaunts', () => {
         expect(readTauntsHidden(refusing, 'phone')).toBe(false);
         expect(() => writeTauntsHidden(refusing, 'phone', true)).not.toThrow();
         expect(readTauntsHidden(null, 'screen')).toBe(false);
+    });
+});
+
+describe('tauntPops', () => {
+    it('pops a reaction the page saw arrive within the time it has left, two drawn together 0.26 s apart', () => {
+        const pops = tauntPops(
+            [taunt('a', 10_000), taunt('b', 10_100)],
+            10_400,
+        );
+
+        expect(TAUNT_POP_STAGGER_MS).toBe(260);
+        // It ends where its reaction ends: sent_ms + 3 s.
+        expect(pops.get('a')).toEqual({ duration: 2_600, delay: 0 });
+        expect(pops.get('b')).toEqual({
+            duration: 13_100 - 10_400 - 260,
+            delay: 260,
+        });
+        // Drawn first late, it still grows and fades, if quicker.
+        expect(tauntPops([taunt('c', 10_000)], 12_900).get('c')).toEqual({
+            duration: TAUNT_POP_MIN_MS,
+            delay: 0,
+        });
+        expect(tauntPops([], 10_000).size).toBe(0);
     });
 });
 

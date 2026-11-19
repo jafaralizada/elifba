@@ -179,8 +179,26 @@ it('says what a taunt is, what it costs, who sees it and how it is hidden', func
                     && ! str_contains(mb_strtolower($translations['roles.agreement.player']), 'taunt');
             }));
 })->with([
-    'az' => [null, ['mesaj, çat və ya dəvət göndərilmir', 'yalnız hazır siyahıdan atmaca', 'hər atmaca atana 1 xal başa gəlir', '4 saniyə yalnız hədəf olan oyunçu və aparıcının böyük ekranı görür', 'öz cihazında gizlədə', 'otaqda bağlaya bilər'], 'kimə atıldığı bir gündən sonra silinir'],
-    'en' => ['en', ['no message, chat or invitation is sent', 'only a taunt from a ready-made list', 'each costs the thrower 1 point', "only the player it is aimed at and the host's big screen see it, for 4 seconds", 'hide taunts on their own device', 'switch them off for the room'], 'whom it was aimed at is erased after a day'],
+    'az' => [null, ['mesaj, çat və ya dəvət göndərilmir', 'yalnız hazır siyahıdan atmaca', 'hər atmaca atana 1 xal başa gəlir', 'öz cihazında gizlədə', 'otaqda bağlaya bilər'], 'kimə atıldığı bir gündən sonra silinir'],
+    'en' => ['en', ['no message, chat or invitation is sent', 'only a taunt from a ready-made list', 'each costs the thrower 1 point', 'hide taunts on their own device', 'switch them off for the room'], 'whom it was aimed at is erased after a day'],
+]);
+
+it('says a taunt is seen and heard only by its target and the big screen', function (?string $locale, string $clause): void {
+    Rooms::on();
+    $request = $locale === null ? $this : $this->withSession(['locale' => $locale]);
+
+    // ADR 029 decision 52: one clause of the notice changes, in both languages; nothing new is stored.
+    $request->get(route('privacy'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('privacy')
+            ->where('translations', static fn ($translations): bool => str_contains($translations['privacy.rooms.contact'], $clause)
+                && ! str_contains($translations['privacy.rooms.contact'], '4 sec')
+                && ! str_contains($translations['privacy.rooms.contact'], '4 san')
+                && substr_count($translations['privacy.rooms.stored'], "\n") === 3));
+})->with([
+    'az' => [null, 'hər atmaca atana 1 xal başa gəlir; onu bir neçə saniyə yalnız hədəf olan oyunçu və aparıcının böyük ekranı görür və əvvəlcədən yazılmış səslə eşidir.'],
+    'en' => ['en', "each costs the thrower 1 point, and only the player it is aimed at and the host's big screen see it, and hear it in a prerecorded voice, for a few seconds."],
 ]);
 
 it('says that the screen may say the winner\'s name from the list, and sends it nowhere', function (?string $locale, string $winner, string $list, string $nowhere): void {

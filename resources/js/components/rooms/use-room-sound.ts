@@ -3,6 +3,7 @@ import {
     carriesRoom,
     roomCues,
     sameMoment,
+    tauntsLive,
 } from '@/components/rooms/sound-cues';
 import type { RoomEar } from '@/components/rooms/sound-cues';
 import type { ServerClock } from '@/rooms/clock';
@@ -14,6 +15,7 @@ import type {
     RoomSoundState,
     RoomSoundUrls,
     RoomSpeaker,
+    TauntVoiceUrls,
 } from '@/rooms/sound';
 
 /** How often the page listens for a beat of the clock (a countdown's second, a last second). */
@@ -27,6 +29,14 @@ export type RoomCheer = {
     nameUrl: (playerId: string) => string;
     finish: RoomFinishVoice;
 };
+
+/**
+ * What a page says of taunts (ADR 029 decisions 44–48): the clips of its
+ * prop `taunts`, by key, and whether this device hides taunts — its
+ * «Mənə atılanları gizlət», the screen's «Atmacalar» — which silences them
+ * with their reactions.
+ */
+export type RoomTauntVoices = { voices: TauntVoiceUrls; hidden: boolean };
 
 /** What a page's sound controls offer: its state, the toggle and the phone's own taps. */
 export type RoomSound = RoomSoundState & {
@@ -85,6 +95,13 @@ function allowedWithoutGesture(): boolean {
  * first-name clip, by ids, and the URLs of the end phrases, for what it
  * says after the final's fanfare. A page without it — a phone — says
  * nothing.
+ *
+ * `taunts` (ADR 029 as amended 2026-11-19): the taunts' clips and the
+ * device's choice to hide them. The page says each taunt it draws and saw
+ * arrive — the target's phone, the screen — fetching the clips only while
+ * the room's taunts are on and this device draws them, and a taunt being
+ * said stops when they no longer are: the game over, the room closed, the
+ * host's switch off, the taunts hidden. A page without it says none.
  */
 export function useRoomSound({
     speaker,
@@ -92,12 +109,14 @@ export function useRoomSound({
     state,
     clock,
     cheer,
+    taunts,
 }: {
     speaker: RoomSpeaker;
     sounds: RoomSoundUrls | null;
     state: RoomState | null;
     clock: ServerClock;
     cheer?: RoomCheer;
+    taunts?: RoomTauntVoices;
 }): RoomSound {
     const [player] = useState(() =>
         sounds === null ? null : roomSoundPlayer({ speaker, urls: sounds }),
@@ -109,12 +128,19 @@ export function useRoomSound({
     );
     const stateRef = useRef(state);
     const cheerRef = useRef(cheer);
+    const tauntsRef = useRef(taunts);
     const heard = useRef<RoomEar | null>(null);
     const listenRef = useRef<() => void>(() => {});
 
     useEffect(() => {
         cheerRef.current = cheer;
     }, [cheer]);
+
+    // A taunt hidden now is silenced at once, with its reaction.
+    useEffect(() => {
+        tauntsRef.current = taunts;
+        listenRef.current();
+    }, [taunts]);
 
     // A new state is heard at once, not at the next beat of the clock.
     useEffect(() => {
@@ -136,14 +162,32 @@ export function useRoomSound({
                 player.carry();
             }
 
+            // The taunts' clips while this device draws taunts; a taunt being said stops when it no longer does.
+            const taunting = tauntsRef.current;
+            const draws =
+                taunting !== undefined &&
+                !taunting.hidden &&
+                tauntsLive(ear.state) &&
+                (speaker === 'screen' || ear.state?.me.player_id != null);
+
+            if (draws) {
+                player.voices(taunting.voices);
+            } else {
+                player.hush();
+            }
+
             if (previous !== null && !sameMoment(previous, ear, speaker)) {
                 player.cancel();
             }
 
-            for (const cue of roomCues(previous, ear, speaker)) {
+            for (const cue of roomCues(previous, ear, speaker, {
+                tauntsHidden: !draws,
+            })) {
                 const voice = cheerRef.current;
 
-                if (cue.sound !== 'cheer') {
+                if (cue.sound === 'taunt') {
+                    player.taunt(cue.key, cue.until);
+                } else if (cue.sound !== 'cheer') {
                     player.play(cue.sound, cue);
                 } else if (voice !== undefined) {
                     player.say(

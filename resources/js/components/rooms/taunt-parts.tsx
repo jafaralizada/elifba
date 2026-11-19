@@ -1,16 +1,22 @@
 import { ArrowRight, Laugh } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import {
     readTauntsHidden,
     shownTaunts,
     TAUNT_SENT_MS,
     tauntMoment,
+    tauntPops,
     TAUNTS_UNSEEN,
     trayView,
     writeTauntsHidden,
 } from '@/components/rooms/taunts';
-import type { TauntDevice, TauntsSeen } from '@/components/rooms/taunts';
+import type {
+    TauntDevice,
+    TauntPop,
+    TauntsSeen,
+} from '@/components/rooms/taunts';
 import { reducedMotion } from '@/components/rooms/motion-dom';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
@@ -25,21 +31,33 @@ import type {
 } from '@/rooms/contract';
 import { roomRequest } from '@/rooms/http';
 import { deviceStorage } from '@/rooms/sound';
+import type { TauntVoiceUrls } from '@/rooms/sound';
 import { sendTaunt } from '@/rooms/taunt';
 
 /*
- * Taunts on the pages (docs/frontend.md rule 15 "Taunts", ADR 029
- * decisions 17–26, variant A «Zolaqda»): the tray beside the rivalry strip
- * and its popover, «Atıldı · −1 xal», the card over the target's strip,
- * the screen's cards over its own strip, the reveal's «−:count» and the
+ * Taunts on the pages (docs/frontend.md rule 15 "Taunts", ADR 029 as
+ * amended 2026-11-19, T3: C «Rəqibə toxun», 1 «Partlayış», 85 %): the
+ * strip's rival side as the throw button with its badge, the fan of
+ * twelve under the strip, «Atıldı · −1 xal», the reaction in the middle of
+ * the target's viewport and of the screen, the reveal's «−:count» and the
  * devices' own choice to hide them. They read the state's `taunts`,
  * `players`, the strip's rival and the prop `taunts` — never a verdict, a
  * solution or anyone's result before the reveal. Violet (`--taunt*`),
- * always with the emoji, the words and the icon; no sound.
+ * always with the emoji, the words and the icon. A taunt's voice is the
+ * page's sound (`useRoomSound()`, `roomCues()`), not these parts'.
  */
 
-/** The prop `taunts` of `rooms/show` and `rooms/screen`: each key with its emoji's URL, in the tray's order. */
-export type TauntList = { key: string; url: string }[];
+/** The prop `taunts` of `rooms/show` and `rooms/screen`: each key with its emoji's URL and its clip's (or null), in the fan's order. */
+export type TauntList = { key: string; url: string; voice: string | null }[];
+
+/** The clips of a list, by key, for the page's sound: the taunts with a clip only. */
+export function tauntVoices(list: TauntList | null): TauntVoiceUrls {
+    return Object.fromEntries(
+        (list ?? []).flatMap((taunt) =>
+            taunt.voice === null ? [] : [[taunt.key, taunt.voice]],
+        ),
+    );
+}
 
 function emojiOf(list: TauntList | null, key: string): string | null {
     return list?.find((taunt) => taunt.key === key)?.url ?? null;
@@ -93,55 +111,109 @@ export function useTauntsHidden(
 }
 
 /**
- * The ids of the taunts the page saw arrive (`tauntMoment()`): a card pops
- * in for them; one the page opened on, or one of a state fetched again, is
- * drawn still.
+ * The reactions a page draws now and how each moves: the state's list at
+ * the server's clock as the page reads it every 200 ms (`useServerNow()`,
+ * the page's `now`), and for each reaction drawn, a pop when the page saw
+ * it arrive (`tauntMoment()`) or null — one it opened on, or one of a
+ * state fetched again — to draw it still. A pop's length is fixed the
+ * first time it is drawn (`tauntPops()`), before the browser paints it.
  */
-function useTauntArrivals(ids: string[]): ReadonlySet<string> {
-    const seen = useRef<TauntsSeen>(TAUNTS_UNSEEN);
-    const [arrived, setArrived] = useState<ReadonlySet<string>>(new Set());
-    const key = ids.join(',');
-
-    useEffect(() => {
-        const moment = tauntMoment(
-            seen.current,
-            key === '' ? [] : key.split(','),
-        );
-
-        seen.current = moment.seen;
-
-        if (moment.arrived.length > 0) {
-            setArrived((before) => new Set([...before, ...moment.arrived]));
-        }
-    }, [key]);
-
-    return arrived;
-}
-
-/**
- * The taunts a page shows now and which of them pop in: the state's list
- * at the server's clock as the page reads it every 200 ms
- * (`useServerNow()`, the page's `now`) and the page's arrivals.
- */
-function useShownTaunts<T extends { id: string; sent_ms: number }>(
+function useReactions<T extends { id: string; sent_ms: number }>(
     list: T[] | null | undefined,
     now: number | null,
     hidden: boolean,
-): { shown: T[]; arrived: ReadonlySet<string> } {
-    const arrived = useTauntArrivals((list ?? []).map((taunt) => taunt.id));
+): { shown: T[]; pops: ReadonlyMap<string, TauntPop | null> } {
+    const seen = useRef<TauntsSeen>(TAUNTS_UNSEEN);
+    const arrived = useRef<Set<string>>(new Set());
+    const [pops, setPops] = useState<ReadonlyMap<string, TauntPop | null>>(
+        () => new Map(),
+    );
+    const ids = (list ?? []).map((taunt) => taunt.id).join(',');
+    const shown = shownTaunts(list, now, hidden);
 
-    return { shown: shownTaunts(list, now, hidden), arrived };
+    useLayoutEffect(() => {
+        const moment = tauntMoment(
+            seen.current,
+            ids === '' ? [] : ids.split(','),
+        );
+
+        seen.current = moment.seen;
+        moment.arrived.forEach((id) => arrived.current.add(id));
+    }, [ids]);
+
+    useLayoutEffect(() => {
+        const fresh = shown.filter((taunt) => !pops.has(taunt.id));
+
+        if (fresh.length === 0 || now === null) {
+            return;
+        }
+
+        const moving = tauntPops(
+            fresh.filter((taunt) => arrived.current.has(taunt.id)),
+            now,
+        );
+
+        setPops((before) => {
+            const next = new Map(before);
+
+            fresh.forEach((taunt) =>
+                next.set(taunt.id, moving.get(taunt.id) ?? null),
+            );
+
+            return next;
+        });
+    }, [shown, pops, now]);
+
+    return { shown, pops };
+}
+
+/** A reaction's motion («Partlayış»): its length and delay, or nothing for one drawn still. */
+function popStyle(pop: TauntPop | null | undefined): CSSProperties | undefined {
+    return pop === null || pop === undefined
+        ? undefined
+        : {
+              animationDuration: `${pop.duration}ms`,
+              animationDelay: `${pop.delay}ms`,
+          };
+}
+
+/** The layer over the whole viewport a reaction is drawn in: above everything, taking no tap. */
+function ReactionLayer({
+    className,
+    children,
+}: {
+    className: string;
+    children: ReactNode;
+}) {
+    if (typeof document === 'undefined') {
+        return null;
+    }
+
+    return createPortal(
+        <div
+            role="status"
+            className={cn(
+                'pointer-events-none fixed inset-0 z-[70] flex items-center justify-center select-none',
+                className,
+            )}
+        >
+            {children}
+        </div>,
+        document.body,
+    );
 }
 
 /**
- * A received taunt over the strip on the target's phone (ADR 029 decision
- * 20): the strip's own height and width, never the tray, the round's head,
- * the time bar or the question; one card, or two as two rows, until
- * `sent_ms + show_ms` by the estimated server clock — then the strip
- * under it, which never moved, is back. Drawn inside the strip's own
- * `relative` box.
+ * A received taunt on the target's phone (ADR 029 decisions 39–41, 43): a
+ * reaction in the middle of the whole viewport, over the header, the round
+ * and the tab bar, with no card — the emoji, the thrower's name and the
+ * phrase in the page's locale, at `--taunt-reaction-opacity`, the words
+ * haloed in the page's background. It takes no tap (`pointer-events:
+ * none`), moves nothing, and stays until `sent_ms + TAUNT_REACTION_MS` by
+ * the estimated server clock; two stand one above the other, the older
+ * first, each smaller. A live region that is always there announces it.
  */
-export function TauntCover({
+export function TauntReaction({
     received,
     players,
     list,
@@ -157,69 +229,59 @@ export function TauntCover({
 }) {
     const { t } = useTranslation();
     const nameOf = useNameOf(players);
-    const { shown, arrived } = useShownTaunts(received, now, hidden);
+    const { shown, pops } = useReactions(received, now, hidden);
     const two = shown.length > 1;
 
     return (
-        <div
-            role="status"
-            className={cn(
-                'absolute inset-0 z-10 flex flex-col gap-1',
-                shown.length > 0 ? 'bg-background' : 'pointer-events-none',
-            )}
+        <ReactionLayer
+            className={cn('flex-col px-4.5', two ? 'gap-4.5' : 'gap-6.5')}
         >
             {shown.map((taunt) => (
                 <div
                     key={taunt.id}
-                    className={cn(
-                        'flex min-h-0 flex-1 items-center gap-2.5 rounded-[14px] border-[1.5px] border-(--taunt) bg-[linear-gradient(var(--taunt-tint-strong),var(--taunt-tint)),var(--card)] shadow-lg',
-                        two ? 'py-0.5 pr-2.5 pl-2' : 'py-1.5 pr-3 pl-2',
-                        arrived.has(taunt.id) &&
-                            'motion-safe:animate-room-taunt-in',
-                    )}
+                    className="flex max-w-full flex-col items-center opacity-(--taunt-reaction-opacity)"
                 >
-                    <TauntEmoji
-                        url={emojiOf(list, taunt.taunt)}
-                        className={two ? 'size-7.5' : 'size-10'}
-                    />
-                    <span
+                    <div
                         className={cn(
-                            'flex min-w-0 leading-tight',
-                            two
-                                ? 'flex-row items-baseline gap-1.5'
-                                : 'flex-col',
+                            'flex max-w-full flex-col items-center gap-0.5 text-center',
+                            pops.get(taunt.id) &&
+                                'motion-safe:animate-room-taunt-pop',
                         )}
+                        style={popStyle(pops.get(taunt.id))}
                     >
-                        <span
+                        <TauntEmoji
+                            url={emojiOf(list, taunt.taunt)}
                             className={cn(
-                                'truncate font-semibold text-(--taunt-text)',
-                                two ? 'max-w-28 text-[0.71875rem]' : 'text-xs',
+                                'mb-1.5 drop-shadow-[0_6px_14px_rgb(0_0_0/0.18)]',
+                                two ? 'size-23' : 'size-34',
                             )}
-                        >
+                        />
+                        <span className="max-w-75 truncate text-[0.9375rem] font-bold text-(--taunt-text) taunt-halo">
                             {nameOf(taunt.from)}
                         </span>
                         <span
                             className={cn(
-                                'font-bold',
-                                two ? 'truncate text-sm' : 'text-base',
+                                'max-w-80 leading-[1.12] font-extrabold tracking-[-0.01em] text-balance text-foreground taunt-halo',
+                                two ? 'text-[1.4375rem]' : 'text-[1.875rem]',
                             )}
                         >
                             {t(`rooms.taunts.say.${taunt.taunt}`)}
                         </span>
-                    </span>
+                    </div>
                 </div>
             ))}
-        </div>
+        </ReactionLayer>
     );
 }
 
 /**
- * The screen's taunts over its own strip (ADR 029 decision 21): each of
- * the state's `shown` for the same 4 s, one or two cards side by side —
- * the emoji, «:from → :to» and the phrase in the screen's locale. Drawn
- * inside the strip's own `relative` box; nothing on it writes or sounds.
+ * The screen's taunts (ADR 029 decision 42): each of the state's `shown`
+ * drawn the same way over the whole screen, centred — the emoji,
+ * «:from → :to» and the phrase in the screen's locale, at
+ * `--taunt-reaction-opacity` with the halo, for the same time; two side by
+ * side, the older on the left. It takes no tap and writes nothing.
  */
-export function ScreenTauntCover({
+export function ScreenTauntReaction({
     shown: list,
     players,
     taunts,
@@ -235,47 +297,55 @@ export function ScreenTauntCover({
 }) {
     const { t } = useTranslation();
     const nameOf = useNameOf(players);
-    const { shown, arrived } = useShownTaunts(list, now, hidden);
+    const { shown, pops } = useReactions(list, now, hidden);
+    const two = shown.length > 1;
 
     return (
-        <div
-            role="status"
-            className={cn(
-                'absolute inset-0 z-10 flex gap-[1.2vh]',
-                shown.length > 0 ? 'bg-background' : 'pointer-events-none',
-            )}
-        >
+        <ReactionLayer className="flex-row gap-[8vh] p-[6vh]">
             {shown.map((taunt) => (
                 <div
                     key={taunt.id}
-                    className={cn(
-                        'flex min-w-0 flex-1 items-center gap-[1.4vh] rounded-[2vh] border-2 border-(--taunt) bg-[linear-gradient(var(--taunt-tint-strong),var(--taunt-tint)),var(--card)] py-[0.8vh] pr-[2vh] pl-[1.2vh] shadow-lg',
-                        arrived.has(taunt.id) &&
-                            'motion-safe:animate-room-taunt-in',
-                    )}
+                    className="flex min-w-0 flex-col items-center opacity-(--taunt-reaction-opacity)"
                 >
-                    <TauntEmoji
-                        url={emojiOf(taunts, taunt.taunt)}
-                        className="size-[6vh]"
-                    />
-                    <span className="flex min-w-0 flex-col leading-tight">
-                        <span className="flex min-w-0 items-center gap-[0.6vh] text-[max(0.75rem,2.1vh)] font-semibold text-(--taunt-text)">
+                    <div
+                        className={cn(
+                            'flex min-w-0 flex-col items-center gap-[0.4vh] text-center',
+                            pops.get(taunt.id) &&
+                                'motion-safe:animate-room-taunt-pop',
+                        )}
+                        style={popStyle(pops.get(taunt.id))}
+                    >
+                        <TauntEmoji
+                            url={emojiOf(taunts, taunt.taunt)}
+                            className={cn(
+                                'mb-[1vh] drop-shadow-[0_1vh_2vh_rgb(0_0_0/0.18)]',
+                                two ? 'size-[19vh]' : 'size-[26vh]',
+                            )}
+                        />
+                        <span className="flex max-w-full min-w-0 items-center gap-[0.6vh] text-[max(0.9375rem,3.2vh)] font-bold text-(--taunt-text) taunt-halo">
                             <span className="truncate">
                                 {nameOf(taunt.from)}
                             </span>
                             <ArrowRight
                                 aria-label="→"
-                                className="size-[1em] shrink-0"
+                                className="size-[0.9em] shrink-0"
                             />
                             <span className="truncate">{nameOf(taunt.to)}</span>
                         </span>
-                        <span className="truncate text-[max(1rem,3vh)] font-bold">
+                        <span
+                            className={cn(
+                                'leading-[1.12] font-extrabold tracking-[-0.01em] text-balance text-foreground taunt-halo',
+                                two
+                                    ? 'max-w-[58vh] text-[max(1.4375rem,5vh)]'
+                                    : 'max-w-[80vh] text-[max(1.875rem,6.4vh)]',
+                            )}
+                        >
                             {t(`rooms.taunts.say.${taunt.taunt}`)}
                         </span>
-                    </span>
+                    </div>
                 </div>
             ))}
-        </div>
+        </ReactionLayer>
     );
 }
 
@@ -366,48 +436,59 @@ export function spentOf(state: RoomState): Map<string, number> {
 type Refusal = 'late' | 'off' | 'cooling' | 'no_points';
 
 /**
- * The tray (ADR 029 decisions 17–19): a 44px round button at the right
- * end of the strip's row and, open, a popover under the strip, the strip's
- * width, over the thrower's own round head and question — «Kimə: :name»,
- * the price, the balance or the reason, the ten taunts in two columns and
- * «Mənə atılanları gizlət». A tap throws at the strip's rival; on
- * `accepted` «Atıldı · −1 xal» lies over the strip's gap row for 2 s and
- * «−1» rises once from the button (not under reduced motion), and the page
- * asks for the state; a refusal says why in one line. Drawn inside the
- * strip's row, which is `relative`.
+ * The throw (ADR 029 decisions 36–38): the strip's rival side — its right
+ * half, the rival's name, number and bar end — is one button laid over the
+ * strip, with a 28px badge on the strip's bottom-right corner; it opens
+ * the fan under the strip, the strip's width, over the thrower's own round
+ * head and question — «Kimə: :name», the price, the balance or the
+ * reason, the twelve taunts as a 4 × 3 grid and «Mənə atılanları gizlət».
+ * The badge is muted with no points or before the first close (a tap still
+ * opens the fan and says why) and is the cooldown's ring while it runs. A
+ * tap throws at the strip's rival; the fan stays open until the receipt
+ * and says a refusal in itself; on `accepted` «Atıldı · −1 xal» lies over
+ * the strip's gap row for 2 s and «−1» rises once from the badge (not
+ * under reduced motion), and the page asks for the state. The button
+ * again, a tap outside, Escape or a new phase of the round closes the fan.
+ * Drawn inside the strip's own `relative` box; the strip under it never
+ * moves.
  */
-export function TauntTray({
+export function TauntThrow({
     roomId,
     state,
     rival,
     list,
     clock,
     now,
+    phase,
     hidden,
     onHiddenChange,
     onThrown,
 }: {
     roomId: string;
     state: RoomState;
-    /** The strip's rival on the right: whom the tray throws at. */
+    /** The strip's rival on the right: whom the button throws at. */
     rival: { id: string; name: string | null } | null;
     list: TauntList | null;
     /** The page's estimate of the server's clock: a taunt's event id. */
     clock: ServerClock;
     /** The server's clock as the page reads it every 200 ms (`useServerNow()`). */
     now: number | null;
+    /** The round's index and phase: a new one closes the fan. */
+    phase: string;
     hidden: boolean;
     onHiddenChange: (hidden: boolean) => void;
     /** After a receipt: the page asks for the state now. */
     onThrown: () => void;
 }) {
     const { t } = useTranslation();
-    const [open, setOpen] = useState(false);
+    // The fan is open in the phase it was opened in only.
+    const [openIn, setOpenIn] = useState<string | null>(null);
+    const open = openIn === phase;
     const [sending, setSending] = useState(false);
     const [refusal, setRefusal] = useState<Refusal | null>(null);
     const [sent, setSent] = useState<{ key: string; at: number } | null>(null);
     const button = useRef<HTMLButtonElement>(null);
-    const popover = useRef<HTMLDivElement>(null);
+    const fan = useRef<HTMLDivElement>(null);
     const view = trayView(state, rival?.id ?? null, now);
     const cooling = view.kind === 'tray' ? view.cooling : null;
     const readyMs = state.taunts?.ready_ms ?? null;
@@ -443,15 +524,15 @@ export function TauntTray({
 
             if (
                 target !== null &&
-                !popover.current?.contains(target) &&
+                !fan.current?.contains(target) &&
                 !button.current?.contains(target)
             ) {
-                setOpen(false);
+                setOpenIn(null);
             }
         };
         const escape = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
-                setOpen(false);
+                setOpenIn(null);
                 button.current?.focus();
             }
         };
@@ -469,6 +550,7 @@ export function TauntTray({
         return null;
     }
 
+    const name = rival.name ?? t('rooms.show.nameless');
     const left =
         readyMs === null || now === null ? 0 : Math.max(0, readyMs - now);
     const fraction =
@@ -513,7 +595,7 @@ export function TauntTray({
                 const status = outcome.receipt.status;
 
                 if (status === 'accepted' || status === 'duplicate') {
-                    setOpen(false);
+                    setOpenIn(null);
                     setSent({ key, at: Date.now() });
                 } else {
                     setRefusal(status);
@@ -530,48 +612,47 @@ export function TauntTray({
             <button
                 ref={button}
                 type="button"
-                aria-label={t('rooms.taunts.tray')}
+                aria-label={t('rooms.taunts.at', { name })}
                 aria-expanded={open}
                 onClick={() => {
                     setRefusal(null);
-                    setOpen((was) => !was);
+                    setOpenIn(open ? null : phase);
                 }}
-                className={cn(
-                    'relative grid size-11 shrink-0 place-items-center rounded-full border-[1.5px] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                    cooling !== null
-                        ? 'border-transparent bg-transparent'
-                        : muted
-                          ? 'border-border bg-muted text-muted-foreground'
-                          : open
-                            ? 'border-(--taunt) bg-(--taunt) text-white'
-                            : 'border-(--taunt) bg-(--taunt-tint) text-(--taunt-text)',
-                )}
+                className="absolute inset-y-0 right-0 z-[5] min-h-11 w-1/2 rounded-r-[14px] outline-0 -outline-offset-2 outline-(--taunt) outline-dashed hover:outline-2 focus-visible:outline-2 aria-expanded:outline-2"
             >
-                {cooling !== null ? (
-                    <span
-                        aria-hidden
-                        className="grid size-10 place-items-center rounded-full text-sm font-bold text-(--taunt-text) tabular-nums"
-                        style={{
-                            background: `radial-gradient(circle, var(--card) 0 15px, transparent 15.5px), conic-gradient(var(--taunt) ${(1 - fraction) * 360}deg, var(--border) 0)`,
-                        }}
-                    >
-                        {cooling}
-                    </span>
-                ) : (
-                    <Laugh aria-hidden className="size-5.5" />
-                )}
-                {sent !== null && !reducedMotion() && (
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute -top-1 right-0 text-[0.9375rem] font-extrabold text-(--taunt-text) opacity-0 motion-safe:animate-room-taunt-rise"
-                    >
-                        −1
-                    </span>
-                )}
+                <span
+                    aria-hidden
+                    className={cn(
+                        'absolute -right-1.5 -bottom-2 grid size-7 place-items-center rounded-full ring-[3px] ring-background',
+                        cooling !== null
+                            ? 'bg-card'
+                            : muted
+                              ? 'bg-muted text-muted-foreground'
+                              : 'bg-(--taunt) text-white',
+                    )}
+                >
+                    {cooling !== null ? (
+                        <span
+                            className="grid size-7 place-items-center rounded-full text-xs font-extrabold text-(--taunt-text) tabular-nums"
+                            style={{
+                                background: `radial-gradient(circle, var(--card) 0 9.5px, transparent 10px), conic-gradient(var(--taunt) ${(1 - fraction) * 360}deg, var(--border) 0)`,
+                            }}
+                        >
+                            {cooling}
+                        </span>
+                    ) : (
+                        <Laugh className="size-4" />
+                    )}
+                    {sent !== null && !reducedMotion() && (
+                        <span className="pointer-events-none absolute right-0 bottom-full text-[0.9375rem] font-extrabold text-(--taunt-text) opacity-0 motion-safe:animate-room-taunt-rise">
+                            −1
+                        </span>
+                    )}
+                </span>
             </button>
 
             {sent !== null && (
-                <span className="pointer-events-none absolute right-13 bottom-1.5 left-0 z-20 flex justify-center">
+                <span className="pointer-events-none absolute inset-x-0 bottom-1.5 z-20 flex justify-center">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-(--taunt) py-0.5 pr-2.5 pl-1 text-[0.78125rem] font-bold text-white ring-2 ring-card">
                         <TauntEmoji
                             url={emojiOf(list, sent.key)}
@@ -584,14 +665,12 @@ export function TauntTray({
 
             {open && (
                 <div
-                    ref={popover}
-                    className="absolute top-[calc(100%+6px)] right-0 left-0 z-30 flex flex-col gap-2 rounded-2xl border bg-card p-2.5 shadow-2xl"
+                    ref={fan}
+                    className="absolute top-[calc(100%+6px)] right-0 left-0 z-30 flex flex-col gap-2 rounded-[20px] rounded-tr-lg border bg-card px-2.5 pt-2.5 pb-1 shadow-[0_16px_40px_rgb(0_0_0/0.24)] dark:shadow-[0_16px_40px_rgb(0_0_0/0.65)]"
                 >
                     <div className="flex items-center justify-between gap-2 text-[0.84375rem]">
                         <span className="truncate">
-                            {t('rooms.taunts.to', {
-                                name: rival.name ?? t('rooms.show.nameless'),
-                            })}
+                            {t('rooms.taunts.to', { name })}
                         </span>
                         <span className="inline-flex shrink-0 items-center gap-1 text-[0.78125rem] font-bold text-(--taunt-text)">
                             <Laugh aria-hidden className="size-3.5" />
@@ -618,18 +697,18 @@ export function TauntTray({
                             )}
                         </p>
                     )}
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="grid grid-cols-4 gap-1">
                         {(list ?? []).map((taunt) => (
                             <button
                                 key={taunt.key}
                                 type="button"
                                 disabled={!canThrow}
                                 onClick={() => send(taunt.key)}
-                                className="flex min-h-12 items-center gap-2 rounded-xl border bg-card py-1.5 pr-2.5 pl-2 text-left text-[0.8125rem] leading-tight font-semibold outline-none hover:border-(--taunt) hover:bg-(--taunt-tint) focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:opacity-45 disabled:grayscale-[0.6] disabled:hover:border-border disabled:hover:bg-card"
+                                className="flex min-h-16 flex-col items-center justify-start gap-0.75 rounded-[14px] bg-(--taunt-tint) px-0.75 pt-1.5 pb-1.25 text-center text-[0.6875rem] leading-[1.15] font-semibold wrap-anywhere outline-none hover:bg-(--taunt-tint-strong) hover:outline-[1.5px] hover:outline-(--taunt) focus-visible:bg-(--taunt-tint-strong) focus-visible:outline-[1.5px] focus-visible:outline-(--taunt) disabled:cursor-default disabled:opacity-45 disabled:grayscale-[0.7] disabled:hover:bg-(--taunt-tint) disabled:hover:outline-0"
                             >
                                 <TauntEmoji
                                     url={taunt.url}
-                                    className="size-7"
+                                    className="size-8.5"
                                 />
                                 {t(`rooms.taunts.say.${taunt.key}`)}
                             </button>

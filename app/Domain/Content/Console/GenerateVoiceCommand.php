@@ -10,7 +10,6 @@ use App\Domain\Content\Data\VoiceLineData;
 use App\Domain\Content\Support\ContentRepository;
 use App\Domain\Content\Support\ContentValidator;
 use App\Domain\Content\Support\ElevenLabs;
-use App\Domain\Content\Support\VoiceClips;
 use App\Domain\Content\Support\VoiceLeveler;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
@@ -21,31 +20,35 @@ use RuntimeException;
  * clip built-in content can ask for that has no file yet, from ElevenLabs,
  * levelled by ffmpeg, into `content/assets/voice`, and every first name of
  * the built-in name list (`content/names.json`, ADR 016; the group `name`,
- * `--only=name`) into `content/voice-names`, with the clip list and, the
- * first time, each folder's credits entry. Nothing already made is made
- * again. `--dry-run` says what a run would make and how many characters it
- * sends, and calls nothing; a real run asks first (or `--force`) and writes
- * a page to listen to the clips on, outside the repository.
+ * `--only=name`) into `content/voice-names`, and every taunt of the rooms
+ * (`content/rooms/taunts.json`, ADR 029 decision 45; the group `taunt`,
+ * `--only=taunt`) into `content/assets/rooms/taunts`, with the clip list
+ * and, the first time, each folder's credits entry. Nothing already made
+ * is made again. `--dry-run` says what a run would make and how many
+ * characters it sends, and calls nothing; a real run asks first (or
+ * `--force`) and writes a page to listen to the clips on, outside the
+ * repository.
  *
  * The key is `ELEVENLABS_API_KEY` (`config('elifba.voice.api_key')`), in the
  * shell or the gitignored `.env` of the machine that makes the clips; this
- * command never prints it. Only content files are voiced: nothing is read
- * from the database, so no student's or child's name and no teacher word
- * can reach the provider; the names it sends are the list's.
+ * command never prints it. Only content files and the built-in taunts'
+ * phrases are voiced: nothing is read from the database, so no student's
+ * or child's name and no teacher word can reach the provider; the names it
+ * sends are the list's.
  */
 final class GenerateVoiceCommand extends Command
 {
     protected $signature = 'content:voice
         {--dry-run : Say what a run would make and how many characters it sends; call nothing}
         {--limit= : Make at most this many clips (a sample to listen to first)}
-        {--only= : Make only these groups, comma separated (find.picture,praise,retry,greeting,finish,finish_class,name)}
-        {--prune : Delete the clips no prompt, phrase or listed name needs any more, and make none}
+        {--only= : Make only these groups, comma separated (find.picture,praise,retry,greeting,finish,finish_class,name,taunt)}
+        {--prune : Delete the clips no prompt, phrase, listed name or taunt needs any more, and make none}
         {--review= : Where to write the page to listen to the clips on (default: the system temp folder)}
         {--force : Do not ask before calling the paid API}';
 
-    protected $description = 'Make the clips of the board\'s voice and of the built-in name list that have no file yet (ElevenLabs, a paid plan; ADR 015, ADR 016)';
+    protected $description = 'Make the clips of the board\'s voice, of the built-in name list and of the rooms\' taunts that have no file yet (ElevenLabs, a paid plan; ADR 015, ADR 016, ADR 029)';
 
-    public function handle(ContentRepository $content, VoiceClips $clips, GenerateVoiceClips $generate, PruneVoiceClips $prune, WriteVoiceReview $review, VoiceLeveler $leveler): int
+    public function handle(ContentRepository $content, GenerateVoiceClips $generate, PruneVoiceClips $prune, WriteVoiceReview $review, VoiceLeveler $leveler): int
     {
         $problems = (new ContentValidator($content->root(), voiceClipsRequired: false))->validate();
 
@@ -59,7 +62,7 @@ final class GenerateVoiceCommand extends Command
 
         if ($this->option('prune') === true) {
             $deleted = $prune->handle();
-            $this->components->info(count($deleted) === 0 ? 'Every clip is still needed.' : 'Deleted '.count($deleted).' clip(s) no prompt, phrase or listed name needs.');
+            $this->components->info(count($deleted) === 0 ? 'Every clip is still needed.' : 'Deleted '.count($deleted).' clip(s) no prompt, phrase, listed name or taunt needs.');
             $this->components->bulletList($deleted);
 
             return self::SUCCESS;
@@ -70,7 +73,7 @@ final class GenerateVoiceCommand extends Command
         $lines = $this->chosen($missing);
 
         $this->report($needed, $missing, $lines);
-        $this->expectedCredit($content, $clips);
+        $this->expectedCredit($content, $generate);
 
         if ($this->option('dry-run') === true) {
             $this->components->info('Dry run: nothing was sent.');
@@ -199,12 +202,19 @@ final class GenerateVoiceCommand extends Command
 
     /**
      * The credits entry each folder gets with its first clip, when it has
-     * none: the clips' (`credit`) and the name clips' (`names.credit`).
+     * none: the clips' (`credit`), the name clips' (`names.credit`) and the
+     * taunts' (`taunts.json`'s `voice.credit`).
      */
-    private function expectedCredit(ContentRepository $content, VoiceClips $clips): void
+    private function expectedCredit(ContentRepository $content, GenerateVoiceClips $generate): void
     {
-        foreach ([[false, $clips->voice()->credit], [true, $clips->voice()->nameCredit]] as [$names, $credit]) {
-            $pattern = GenerateVoiceClips::pattern($content, $names);
+        $first = [
+            GenerateVoiceClips::folder(VoiceLineData::PRAISE) => 'clip',
+            GenerateVoiceClips::folder(VoiceLineData::NAME) => 'name clip',
+            GenerateVoiceClips::folder(VoiceLineData::TAUNT) => 'taunt clip',
+        ];
+
+        foreach ($generate->folderCredits() as $folder => $credit) {
+            $pattern = GenerateVoiceClips::pattern($content, $folder);
 
             if (array_filter($content->credits(), static fn (CreditData $entry): bool => in_array($pattern, $entry->files, true)) !== []) {
                 $this->components->twoColumnDetail('credits.json', "has the entry for {$pattern}");
@@ -214,7 +224,7 @@ final class GenerateVoiceCommand extends Command
 
             $credit['changes'] = str_replace('{month}', CarbonImmutable::now(config('elifba.timezone'))->format('F Y'), $credit['changes']);
 
-            $this->components->twoColumnDetail('credits.json', 'gets this entry with the first '.($names ? 'name clip' : 'clip').', and CREDITS.md is written again:');
+            $this->components->twoColumnDetail('credits.json', 'gets this entry with the first '.$first[$folder].', and CREDITS.md is written again:');
             $this->line(json_encode(['files' => [$pattern], ...$credit], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         }
     }

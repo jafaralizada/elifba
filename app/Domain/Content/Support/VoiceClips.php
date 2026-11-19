@@ -8,6 +8,7 @@ use App\Domain\Content\Data\PromptTemplateData;
 use App\Domain\Content\Data\VoiceData;
 use App\Domain\Content\Data\VoiceLineData;
 use App\Domain\Content\Data\VoicePhraseData;
+use App\Domain\Content\Data\VoiceSettingsData;
 use App\Domain\Content\Enums\Mechanic;
 use App\Domain\Content\Enums\Unit;
 use App\Domain\Content\Models\CustomWord;
@@ -164,7 +165,15 @@ final readonly class VoiceClips
      */
     public function hash(string $text): string
     {
-        $settings = $this->voice->settings;
+        return self::hashWith($this->voice->settings, $text);
+    }
+
+    /**
+     * The hash that names a clip of `$text` in these settings: a taunt's
+     * clip is made with the taunts' own context (`TauntVoices`).
+     */
+    public static function hashWith(VoiceSettingsData $settings, string $text): string
+    {
         $key = json_encode([
             $settings->provider,
             $settings->model,
@@ -238,13 +247,14 @@ final readonly class VoiceClips
 
     /**
      * A clip of `$phrase` in this voice: the tag, then the phrase or its
-     * respelling, hashed.
+     * respelling, hashed — with the voice's own settings, or with
+     * `$settings` where a group has a context of its own (a taunt's).
      */
-    public function line(string $group, string $phrase, string $style): VoiceLineData
+    public function line(string $group, string $phrase, string $style, ?VoiceSettingsData $settings = null): VoiceLineData
     {
         $text = "[{$style}] ".($this->voice->respell[$phrase] ?? $phrase);
 
-        return new VoiceLineData($group, $phrase, $text, $this->hash($text));
+        return new VoiceLineData($group, $phrase, $text, self::hashWith($settings ?? $this->voice->settings, $text));
     }
 
     /**

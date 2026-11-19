@@ -11,8 +11,10 @@ namespace App\Domain\Content\Data;
  * praise and retry phrases, the greeting and the two end phrases, the tag
  * and credits entry of the name clips and the credits entry the other
  * clips get. The second is written by `php artisan content:voice`: every
- * clip under `content/assets/voice` (`clips`) and every name clip under
- * `content/voice-names` (`names`), by hash, with the text it was made from.
+ * clip under `content/assets/voice` (`clips`), every name clip under
+ * `content/voice-names` (`names`) and, from T4, every taunt's clip under
+ * `content/assets/rooms/taunts` (`taunts`, ADR 029 decision 45), by hash,
+ * with the text it was made from.
  *
  * @phpstan-type CreditArray array{title: string, author: string, source: string, license: string, changes: string}
  * @phpstan-type PhraseArray array{text: string, style: string}
@@ -31,6 +33,7 @@ namespace App\Domain\Content\Data;
  *     credit: CreditArray,
  *     clips: array<string, string>,
  *     name_clips: array<string, string>,
+ *     taunt_clips: array<string, string>,
  * }
  */
 final readonly class VoiceData
@@ -50,6 +53,7 @@ final readonly class VoiceData
      * @param  string  $nameStyle  the audio tag of every name clip (`excited` → `[excited] Nihat!`)
      * @param  CreditArray  $nameCredit  the credits entry of `content/voice-names/*`
      * @param  array<string, string>  $names  hash → the text a name clip was made from
+     * @param  array<string, string>  $taunts  hash → the text a taunt's clip was made from (ADR 029 decision 45)
      */
     public function __construct(
         public int $version,
@@ -68,6 +72,7 @@ final readonly class VoiceData
         public string $nameStyle,
         public array $nameCredit,
         public array $names,
+        public array $taunts = [],
     ) {}
 
     /**
@@ -98,6 +103,7 @@ final readonly class VoiceData
             nameStyle: $data['names']['style'],
             nameCredit: $data['names']['credit'],
             names: $data['name_clips'],
+            taunts: $data['taunt_clips'],
         );
     }
 }

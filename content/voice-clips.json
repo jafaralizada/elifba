@@ -2632,5 +2632,19 @@
         "1783eab2f220c1e5": "[excited] Zülfü!",
         "5d80975c6d92b096": "[excited] Zülfüqar!",
         "c04ee11c03f2ce39": "[excited] Zümrüd!"
+    },
+    "taunts": {
+        "07018dbca37f70f5": "[mischievously] Tısbağa da səndən tezdir!",
+        "22239a13cfd7738b": "[mischievously] Tik-tak, vaxt gedir ha!",
+        "9e171fe565a61635": "[mischievously] Dondun qaldın, nə oldu?",
+        "cf398e24031d3c2d": "[mischievously] Oyan, oyan! Oyun gedir!",
+        "eca7589d9de3cec1": "[sarcastic] Vay, bəxtin necə gətirdi!",
+        "2b8b0640f083950f": "[mischievously] Zər atırsan, nədir?",
+        "19d8b2d0054fa25f": "[mischievously] Bu raund mənimdir, ha-ha!",
+        "7087823cf95cc868": "[mischievously] Yetiş görüm, yetişə bilsən!",
+        "3ba7e4f9f3e9f3c5": "[dismissive] Pəh! Nə asan idi!",
+        "12532756e8475d5a": "[mischievously] Vay-vay, az qaldı! Heyif!",
+        "00a4ba5b2638bc87": "[mischievously] Ay lölüy!",
+        "e371bbbc78afc77f": "[mischievously] Noldu, Paşinyan?!"
     }
 }

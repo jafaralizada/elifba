@@ -31,8 +31,9 @@ import { RaceLanes } from '@/components/rooms/race-lanes';
 import { RivalryStrip, useRivalry } from '@/components/rooms/rivalry-strip';
 import type { RivalryIcons } from '@/components/rooms/rivalry-strip';
 import {
-    ScreenTauntCover,
+    ScreenTauntReaction,
     ScreenTauntsToggle,
+    tauntVoices,
     useTauntsHidden,
 } from '@/components/rooms/taunt-parts';
 import type { TauntList } from '@/components/rooms/taunt-parts';
@@ -82,7 +83,7 @@ type Props = {
     sounds: RoomSoundUrls;
     /** The rivalry strip's emoji (ADR 027). */
     rivalry: RivalryIcons;
-    /** The taunts' list, each key with its emoji (T2, ADR 029). */
+    /** The taunts' list, each key with its emoji and its clip in the board's voice (ADR 029 as amended, T3). */
     taunts: TauntList;
     /** «Əla oynadın!» and «Əla oynadınız!», said after the final's fanfare (ADR 030). */
     finish: RoomFinishVoice;
@@ -101,9 +102,10 @@ type Props = {
  * question with the count of answers — then the reveal with the ranking
  * and each player's result, under the rivalry strip of the first two
  * (ADR 027), the ranking as race lanes with three players or more; a
- * taunt thrown now over that strip for 4 s, «:from → :to» and the phrase,
- * which its top bar's «Atmacalar» hides on this screen (T2, ADR 029
- * decision 21); after a game its final beside «Yenidən oyna»
+ * taunt thrown now in the middle of the screen for 3 s, «:from → :to» and
+ * the phrase, said in the board's voice, which its top bar's «Atmacalar»
+ * hides and silences on this screen (ADR 029 as amended 2026-11-19,
+ * decisions 42 and 47); after a game its final beside «Yenidən oyna»
  * and the five other games. Before and after a game it sends the host's
  * own requests for the choice and the start (`useRoomChoice()`,
  * `useRoomStart()`), which the server lets through for the host; it holds
@@ -157,12 +159,18 @@ export default function RoomsScreen({
         }),
         [room.id, finish],
     );
+    // The screen says each taunt it draws, unless its «Atmacalar» hides them (ADR 029 decision 47).
+    const tauntSound = useMemo(
+        () => ({ voices: tauntVoices(taunts), hidden: tauntsHidden }),
+        [taunts, tauntsHidden],
+    );
     const sound = useRoomSound({
         speaker: 'screen',
         sounds,
         state,
         clock,
         cheer,
+        taunts: tauntSound,
     });
     const game = state?.game ?? null;
     const round = state?.round ?? null;
@@ -748,30 +756,29 @@ function ScreenRound({
             )}
         >
             {rivalry.pair !== null && (
-                <div className="relative">
-                    <RivalryStrip
-                        key={`strip:${round.index}:${round.phase === 'reveal' ? 'reveal' : 'open'}`}
-                        pair={rivalry.pair}
-                        previous={rivalry.previous}
-                        overtake={rivalry.overtake}
-                        ranking={state.ranking}
-                        results={round.reveal?.results ?? null}
-                        spent={round.reveal?.spent ?? []}
-                        players={state.players}
-                        placeLabels={placeLabels}
-                        icons={icons}
-                        moves={motion.strip}
-                        big
-                    />
-                    <ScreenTauntCover
-                        shown={state.taunts?.shown}
-                        players={state.players}
-                        taunts={taunts}
-                        now={now}
-                        hidden={tauntsHidden}
-                    />
-                </div>
+                <RivalryStrip
+                    key={`strip:${round.index}:${round.phase === 'reveal' ? 'reveal' : 'open'}`}
+                    pair={rivalry.pair}
+                    previous={rivalry.previous}
+                    overtake={rivalry.overtake}
+                    ranking={state.ranking}
+                    results={round.reveal?.results ?? null}
+                    spent={round.reveal?.spent ?? []}
+                    players={state.players}
+                    placeLabels={placeLabels}
+                    icons={icons}
+                    moves={motion.strip}
+                    big
+                />
             )}
+
+            <ScreenTauntReaction
+                shown={state.taunts?.shown}
+                players={state.players}
+                taunts={taunts}
+                now={now}
+                hidden={tauntsHidden}
+            />
 
             <RoundHead
                 game={game}

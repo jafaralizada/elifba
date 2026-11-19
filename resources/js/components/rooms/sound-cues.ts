@@ -1,6 +1,7 @@
 import { finalTier, finalTimeline } from '@/components/rooms/final';
 import { momentKey, REVEAL_MS, roomMoment } from '@/components/rooms/motion';
 import { standingGroups } from '@/components/rooms/standing-groups';
+import { TAUNT_REACTION_MS } from '@/components/rooms/taunts';
 import type { RoomState } from '@/rooms/contract';
 import type { RoomSoundName, RoomSpeaker } from '@/rooms/sound';
 
@@ -28,6 +29,16 @@ import type { RoomSoundName, RoomSpeaker } from '@/rooms/sound';
  * (`LiveRound`), not here. In a room without a screen (`room.screen`
  * false, ADR 028 as amended 2026-11-19) a phone carries the room: it
  * plays the screen's cues as well as its own (`carriesRoom()`).
+ *
+ * A taunt is said (ADR 029 as amended 2026-11-19, decisions 47 and 48) by
+ * the devices that draw its reaction: the target's phone, for a taunt of
+ * its `received`, and the screen, for one of its `shown` — once, as the
+ * page saw it arrive, and never for a page opened on it, a state fetched
+ * again or a reaction already over. No other phone has the taunt, the
+ * thrower's included, and a phone that carries the room carries its
+ * moments, never another player's taunt. A device that hides taunts says
+ * none. A taunt's cue is the taunt's own, not its moment's: the round's
+ * close never cuts it (`sameMoment()` reads no taunt).
  */
 
 /** What a page heard at one moment: the latest state and the server's clock as estimated. */
@@ -43,7 +54,12 @@ export type RoomEar = { state: RoomState | null; now: number | null };
  */
 export type RoomCue =
     | { sound: RoomSoundName; at: number; ends?: boolean }
-    | { sound: 'cheer'; at: number; players: string[]; many: boolean };
+    | { sound: 'cheer'; at: number; players: string[]; many: boolean }
+    /** A taunt's voice: its id and key, said now; `until`, ms from now, is when its reaction ends. */
+    | { sound: 'taunt'; at: number; id: string; key: string; until: number };
+
+/** What the page itself decided: whether this device hides taunts (its «Mənə atılanları gizlət», the screen's «Atmacalar»). */
+export type CueOptions = { tauntsHidden?: boolean };
 
 /**
  * A moment heard later than this after it began is not announced: a page
@@ -306,21 +322,94 @@ function beatCues(heard: Heard, before: Heard | null): RoomCue[] {
 }
 
 /**
+ * Whether a state's taunts are drawn at all: an open room whose host has
+ * taunts on, during a live game. Outside it a taunt's voice stops.
+ */
+export function tauntsLive(state: RoomState | null): boolean {
+    return (
+        state !== null &&
+        state.room.status === 'open' &&
+        state.room.taunts &&
+        state.game !== null &&
+        state.game.phase === 'live' &&
+        state.taunts !== null
+    );
+}
+
+/** The taunts `speaker` draws as reactions: the target's own on a phone, the room's on the screen. */
+function tauntsDrawn(
+    state: RoomState | null,
+    speaker: RoomSpeaker,
+): { id: string; taunt: string; sent_ms: number }[] {
+    if (state === null || !tauntsLive(state) || state.taunts === null) {
+        return [];
+    }
+
+    return speaker === 'screen'
+        ? (state.taunts.shown ?? [])
+        : state.taunts.received;
+}
+
+/**
+ * A taunt's voice for each taunt the page saw arrive between two ears —
+ * older first, and none whose reaction is already over by the server's
+ * clock — or none while this device hides taunts.
+ */
+function tauntCues(
+    previous: RoomEar,
+    current: RoomEar,
+    speaker: RoomSpeaker,
+    hidden: boolean,
+): RoomCue[] {
+    const now = current.now;
+
+    if (hidden || now === null) {
+        return [];
+    }
+
+    const known = new Set(
+        tauntsDrawn(previous.state, speaker).map(({ id }) => id),
+    );
+
+    return tauntsDrawn(current.state, speaker)
+        .filter(
+            (taunt) =>
+                !known.has(taunt.id) && taunt.sent_ms + TAUNT_REACTION_MS > now,
+        )
+        .sort((a, b) => a.sent_ms - b.sent_ms || (a.id < b.id ? -1 : 1))
+        .map((taunt): RoomCue => ({
+            sound: 'taunt',
+            at: 0,
+            id: taunt.id,
+            key: taunt.taunt,
+            until: taunt.sent_ms + TAUNT_REACTION_MS - now,
+        }));
+}
+
+/**
  * The cues to play now, from what the page heard before (`previous`, null
  * for the first thing it heard) and what it hears now: a moment's cues —
  * with the beats it began on, if any — when a new moment began recently; a
  * beat's when a new beat came within the same moment; `join` when a player
- * appeared between games; and nothing when nothing began.
+ * appeared between games; a taunt's voice for each taunt the page saw
+ * arrive (unless `options.tauntsHidden`); and nothing when nothing began.
  */
 export function roomCues(
     previous: RoomEar | null,
     current: RoomEar,
     speaker: RoomSpeaker,
+    options: CueOptions = {},
 ): RoomCue[] {
     if (previous === null) {
         return [];
     }
 
+    const taunts = tauntCues(
+        previous,
+        current,
+        speaker,
+        options.tauntsHidden ?? false,
+    );
     const before = hear(previous, speaker);
     const heard = hear(current, speaker);
 
@@ -330,7 +419,9 @@ export function roomCues(
             current.now !== null &&
             current.now - heard.began > STALE_MS;
 
-        return late ? [] : [...heard.cues, ...beatCues(heard, null)];
+        return late
+            ? taunts
+            : [...heard.cues, ...beatCues(heard, null), ...taunts];
     }
 
     const cues = beatCues(heard, before);
@@ -343,7 +434,7 @@ export function roomCues(
         }
     }
 
-    return cues;
+    return [...cues, ...taunts];
 }
 
 /** Whether two ears are one moment for `speaker`: every cue of a moment stops when it ends. */

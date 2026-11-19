@@ -13,6 +13,7 @@ use App\Domain\Content\Data\RoomRivalryData;
 use App\Domain\Content\Data\RoomShapeData;
 use App\Domain\Content\Data\RoomSoundsData;
 use App\Domain\Content\Data\RoomTauntData;
+use App\Domain\Content\Data\RoomTauntVoiceData;
 use App\Domain\Content\Data\RoomWordData;
 use App\Domain\Content\Data\VoiceData;
 use App\Domain\Content\Enums\Mechanic;
@@ -34,7 +35,8 @@ use RuntimeException;
  * adults' word list (`rooms/words.json`), the sounds of a room game
  * (`rooms/sounds.json`, ADR 025), the rivalry strip's emoji
  * (`rooms/rivalry.json`, ADR 027) and, from T2, the taunts' list
- * (`rooms/taunts.json`, ADR 029).
+ * (`rooms/taunts.json`, ADR 029; from T4 with each taunt's audio tag and
+ * the context and credit of their clips).
  *
  * With a compiled file (`php artisan content:cache` writes
  * `bootstrap/cache/content.php`, which OPcache keeps in memory) it reads
@@ -50,6 +52,7 @@ use RuntimeException;
  * @phpstan-import-type RoomLevelArray from RoomLevelData
  * @phpstan-import-type RoomWordArray from RoomWordData
  * @phpstan-import-type RoomTauntArray from RoomTauntData
+ * @phpstan-import-type RoomTauntVoiceArray from RoomTauntVoiceData
  */
 final class ContentRepository
 {
@@ -146,6 +149,8 @@ final class ContentRepository
      * @var array<string, RoomTauntData>|null
      */
     private ?array $roomTaunts = null;
+
+    private ?RoomTauntVoiceData $roomTauntVoice = null;
 
     /**
      * @var list<RoomCategoryData>|null
@@ -396,14 +401,14 @@ final class ContentRepository
     }
 
     /**
-     * The taunts' list, by key in the tray's order (ADR 029 decision 27).
+     * The taunts' list, by key in the fan's order (ADR 029 decisions 27, 49).
      *
      * @return array<string, RoomTauntData>
      */
     public function roomTaunts(): array
     {
         if ($this->roomTaunts === null) {
-            /** @var array{version: int, taunts: list<RoomTauntArray>} $data checked by `ContentValidator` */
+            /** @var array{version: int, voice: RoomTauntVoiceArray, taunts: list<RoomTauntArray>} $data checked by `ContentValidator` */
             $data = $this->data()['rooms']['taunts'];
             $this->roomTaunts = [];
 
@@ -413,6 +418,21 @@ final class ContentRepository
         }
 
         return $this->roomTaunts;
+    }
+
+    /**
+     * The taunts' voice block: the context their clips are made with and
+     * the credits entry those clips get (ADR 029 decisions 45–46, 50).
+     */
+    public function roomTauntVoice(): RoomTauntVoiceData
+    {
+        if ($this->roomTauntVoice === null) {
+            /** @var array{version: int, voice: RoomTauntVoiceArray, taunts: list<RoomTauntArray>} $data checked by `ContentValidator` */
+            $data = $this->data()['rooms']['taunts'];
+            $this->roomTauntVoice = RoomTauntVoiceData::fromArray($data['voice']);
+        }
+
+        return $this->roomTauntVoice;
     }
 
     /**
@@ -520,8 +540,9 @@ final class ContentRepository
     }
 
     /**
-     * `voice.json` with `clips` and `name_clips`, the clip lists
-     * `content:voice` writes to `voice-clips.json` (`clips`, `names`).
+     * `voice.json` with `clips`, `name_clips` and `taunt_clips`, the clip
+     * lists `content:voice` writes to `voice-clips.json` (`clips`, `names`,
+     * `taunts`).
      *
      * @return array<string, mixed>
      *
@@ -532,11 +553,11 @@ final class ContentRepository
         $voice = self::decode($root.'/voice.json');
         $clips = self::decode($root.'/'.self::VOICE_CLIPS);
 
-        if (! is_array($voice) || ! is_array($clips) || ! is_array($clips['clips'] ?? null) || ! is_array($clips['names'] ?? [])) {
-            throw new RuntimeException('voice.json and '.self::VOICE_CLIPS.' must be objects, the second with `clips` and `names`.');
+        if (! is_array($voice) || ! is_array($clips) || ! is_array($clips['clips'] ?? null) || ! is_array($clips['names'] ?? []) || ! is_array($clips['taunts'] ?? [])) {
+            throw new RuntimeException('voice.json and '.self::VOICE_CLIPS.' must be objects, the second with `clips`, `names` and `taunts`.');
         }
 
-        return [...$voice, 'clips' => $clips['clips'], 'name_clips' => $clips['names'] ?? []];
+        return [...$voice, 'clips' => $clips['clips'], 'name_clips' => $clips['names'] ?? [], 'taunt_clips' => $clips['taunts'] ?? []];
     }
 
     /**

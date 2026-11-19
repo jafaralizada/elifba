@@ -28,7 +28,10 @@ import type {
  * too little is left — every cue stopped when its moment ends, and never a
  * throw where audio is missing, refused or a file fails. The screen's one
  * voice, the winner's name (ADR 030): said after its time from the clips
- * that arrived, never on a phone, never muted, hidden or locked.
+ * that arrived, never on a phone, never muted, hidden or locked. A taunt's
+ * voice (ADR 029 as amended 2026-11-19): fetched once sound is on, said one
+ * at a time and while its reaction lasts, untouched by the round's close,
+ * silent while muted, hidden or locked.
  */
 
 function memoryStorage(): StorageLike & { items: Map<string, string> } {
@@ -76,6 +79,8 @@ const DURATIONS: Record<string, number> = {
 function fakeAudio({ allowed = true }: { allowed?: boolean } = {}) {
     const started: Started[] = [];
     const made: FakeContext[] = [];
+    /** Each started source's `onended`, as the browser would call it when the file ends. */
+    const endings = new Map<Started, () => void>();
 
     type FakeContext = AudioContextLike & { closed: boolean };
 
@@ -151,6 +156,9 @@ function fakeAudio({ allowed = true }: { allowed?: boolean } = {}) {
                                 ramp,
                             };
                             started.push(source.record);
+                            endings.set(source.record, () =>
+                                source.onended?.(),
+                            );
                         }
                     },
                     stop: (when?: number) => {
@@ -180,7 +188,13 @@ function fakeAudio({ allowed = true }: { allowed?: boolean } = {}) {
         return context;
     };
 
-    return { started, made, create };
+    return {
+        started,
+        made,
+        create,
+        /** The file of `record` ends. */
+        end: (record: Started) => endings.get(record)?.(),
+    };
 }
 
 const urls = {
@@ -843,5 +857,163 @@ describe("roomSoundPlayer and the winner's cheer (ADR 030)", () => {
             { sound: 'name:m1', stopped: true },
             { sound: 'finish', stopped: true },
         ]);
+    });
+});
+
+describe("roomSoundPlayer and a taunt's voice (ADR 029 as amended 2026-11-19)", () => {
+    /** The taunts' clips as the prop gives them: the fake loader names each `taunt-<key>`. */
+    const VOICES = {
+        turtle: '/content/taunt-turtle.mp3',
+        dice: '/content/taunt-dice.mp3',
+        silly: '/content/taunt-silly.mp3',
+    };
+
+    function taunting(
+        speaker: 'screen' | 'phone',
+        {
+            missing = [],
+            storage = memoryStorage,
+        }: { missing?: string[]; storage?: () => StorageLike | null } = {},
+    ) {
+        const audio = fakeAudio();
+        const files = loader(missing);
+        const player = roomSoundPlayer({
+            speaker,
+            urls: urls[speaker],
+            storage,
+            createContext: audio.create,
+            load: files.load,
+        });
+
+        return { audio, files, player };
+    }
+
+    it('fetches the clips once sound is unlocked and on, and says a taunt at the speaker’s level times VOICE_GAIN', async () => {
+        const { audio, files, player } = taunting('phone');
+
+        // Before a gesture: nothing fetched, nothing said.
+        player.voices(VOICES);
+        player.taunt('turtle', 3000);
+        expect(files.asked).toEqual([]);
+
+        player.unlock();
+        await settle();
+        expect(files.asked).toEqual(
+            expect.arrayContaining(Object.values(VOICES)),
+        );
+        // The same list again asks for nothing more.
+        const asked = files.asked.length;
+        player.voices(VOICES);
+        player.voices({ ...VOICES });
+        expect(files.asked).toHaveLength(asked);
+
+        player.taunt('turtle', 3000);
+        expect(audio.started).toEqual([
+            {
+                sound: 'taunt-turtle',
+                when: 10,
+                offset: 0,
+                gain: SPEAKER_GAIN.phone * VOICE_GAIN,
+                stopped: false,
+                ramp: [],
+            },
+        ]);
+
+        // The screen says it at its own, louder level.
+        const screen = taunting('screen');
+        screen.player.voices(VOICES);
+        screen.player.unlock();
+        await settle();
+        screen.player.taunt('dice', 3000);
+        expect(screen.audio.started.map(({ gain }) => gain)).toEqual([
+            SPEAKER_GAIN.screen * VOICE_GAIN,
+        ]);
+    });
+
+    it('keeps one taunt at a time and drops one whose reaction is over', async () => {
+        const { audio, player } = taunting('screen');
+
+        player.voices(VOICES);
+        player.unlock();
+        await settle();
+        player.taunt('turtle', 3000);
+        // Two more arrive while it is said: they wait.
+        player.taunt('dice', 2500);
+        player.taunt('silly', 500);
+        expect(audio.started.map(({ sound }) => sound)).toEqual([
+            'taunt-turtle',
+        ]);
+
+        // 1.2 s later the first ends: the second follows; the third's reaction is over by then and is dropped.
+        audio.made[0].currentTime = 11.2;
+        audio.end(audio.started[0]);
+        expect(audio.started.map(({ sound, when }) => [sound, when])).toEqual([
+            ['taunt-turtle', 10],
+            ['taunt-dice', 11.2],
+        ]);
+        audio.end(audio.started[1]);
+        expect(audio.started).toHaveLength(2);
+    });
+
+    it("is not cut by the round's close, and stops when the game ends, the page is hidden or the device muted", async () => {
+        const { audio, player } = taunting('phone');
+
+        player.voices(VOICES);
+        player.unlock();
+        await settle();
+
+        // The round closes while it is said: its moment's cues stop, the taunt goes on.
+        player.taunt('turtle', 3000);
+        player.cancel();
+        expect(audio.started[0]).toMatchObject({ stopped: false });
+
+        // The game ends: it fades out within STOP_MS, and one waiting is dropped.
+        player.taunt('dice', 3000);
+        player.hush();
+        expect(audio.started[0]).toMatchObject({
+            stopped: true,
+            stopAt: 10 + STOP_MS / 1000,
+        });
+        audio.end(audio.started[0]);
+        expect(audio.started).toHaveLength(1);
+
+        // Hidden: stopped; nothing said until shown again.
+        player.taunt('silly', 3000);
+        player.hide();
+        expect(audio.started[1]).toMatchObject({ stopped: true });
+        player.taunt('turtle', 3000);
+        expect(audio.started).toHaveLength(2);
+        player.resume();
+
+        // Muted: stopped, and nothing said while muted.
+        player.taunt('dice', 3000);
+        player.setMuted(true);
+        expect(audio.started[2]).toMatchObject({ stopped: true });
+        player.taunt('turtle', 3000);
+        expect(audio.started).toHaveLength(3);
+    });
+
+    it('says none that has not arrived, fetches nothing while muted, and never throws for a clip that fails', async () => {
+        const storage = memoryStorage();
+        writeMuted(storage, 'phone', true);
+
+        // Muted from the start: no audio, nothing fetched.
+        const muted = taunting('phone', { storage: () => storage });
+        muted.player.voices(VOICES);
+        muted.player.unlock();
+        await settle();
+        expect(muted.files.asked).toEqual([]);
+
+        // A clip that fails stays silent; one not in the list is never said.
+        const failing = taunting('phone', { missing: ['taunt-dice'] });
+        failing.player.voices(VOICES);
+        failing.player.unlock();
+        await settle();
+        expect(() => failing.player.taunt('dice', 3000)).not.toThrow();
+        failing.player.taunt('what_now', 3000);
+        expect(failing.audio.started).toEqual([]);
+        // Said nothing when its reaction is already over.
+        failing.player.taunt('turtle', 0);
+        expect(failing.audio.started).toEqual([]);
     });
 });

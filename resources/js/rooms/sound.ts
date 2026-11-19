@@ -30,6 +30,17 @@
  * final begin and its sound is on, kept decoded in memory only, and said
  * one after another after the fanfare — those that arrived in time; a
  * phone says none.
+ *
+ * A taunt's voice (ADR 029 as amended 2026-11-19, decisions 44–48): the
+ * board's voice saying a taunt's phrase, one clip per taunt (the prop
+ * `taunts[].voice`), on the devices that draw its reaction — the target's
+ * phone and the screen. Its clips are fetched once sound is unlocked and
+ * on and the room's taunts are on (`voices()`), kept decoded in memory, and
+ * said one at a time (`taunt()`): a second waits for the first and is
+ * dropped if its reaction is over by then. A taunt belongs to itself, not
+ * to the round's moment: `cancel()` leaves it, and only `hush()` — the
+ * game over, the room closed, the taunts hidden or switched off — the
+ * mute, a hidden page or the page's end stop it, fading within `STOP_MS`.
  */
 
 /** Each speaker's sounds, as `content/rooms/sounds.json` and `RoomSound` name them. */
@@ -60,6 +71,9 @@ export type RoomFinishVoice = { one: string | null; many: string | null };
 
 /** A page's `sounds` prop: its speaker's files by name, from the server. */
 export type RoomSoundUrls = Partial<Record<RoomSoundName, string>>;
+
+/** The taunts' clips a page may say, by taunt key: the URLs of its prop `taunts[].voice`. */
+export type TauntVoiceUrls = Readonly<Record<string, string>>;
 
 /** The device's own choice, one key per speaker: muting the screen leaves a phone page alone. */
 export const MUTE_STORAGE_KEYS: Record<RoomSpeaker, string> = {
@@ -217,6 +231,20 @@ export type RoomSoundPlayer = {
      * muted, hidden or locked. They stop with the moment.
      */
     say: (names: string[], phrase: string | null, at: number) => void;
+    /**
+     * The taunts' clips this page may say (ADR 029 decision 48): fetched
+     * once its sound is unlocked and on, and kept decoded in memory.
+     */
+    voices: (urls: TauntVoiceUrls) => void;
+    /**
+     * Says the taunt `key`'s clip now — or after the taunt being said, if
+     * its reaction still lasts then (`until` ms from now) — at the
+     * speaker's level times `VOICE_GAIN`; nothing while muted, hidden or
+     * locked, or for a clip that has not arrived. `cancel()` leaves it.
+     */
+    taunt: (key: string, until: number) => void;
+    /** A taunt being said fades out within STOP_MS, and those waiting are dropped. */
+    hush: () => void;
 };
 
 /** Runs `run` in `ms`; the function it gives cancels it. */
@@ -256,6 +284,14 @@ export function roomSoundPlayer({
     const sayings = new Set<() => void>();
     // A file asked for once is not asked again: decoded, or silent if it failed.
     const requested = new Set<RoomSoundName>();
+    /** The taunts' clips by key: their URLs, the decoded ones, and those asked for. */
+    const voiceUrls = new Map<string, string>();
+    const voiceClips = new Map<string, AudioBufferLike>();
+    const voicesRequested = new Set<string>();
+    let lastVoices: TauntVoiceUrls | null = null;
+    /** The taunt being said, and those waiting for it, each with when its reaction ends on the context's clock. */
+    let saying: Scheduled | null = null;
+    let waiting: { key: string; dropAt: number }[] = [];
     let context: AudioContextLike | null = null;
     let carrying = false;
     let hidden = false;
@@ -304,6 +340,93 @@ export function roomSoundPlayer({
                     // That cue stays silent.
                 });
         }
+
+        fetchVoices();
+    };
+
+    /** The taunts' clips, once there is audio and the device is not muted: each asked for once. */
+    const fetchVoices = () => {
+        if (context === null || muted) {
+            return;
+        }
+
+        const decoder = context;
+
+        for (const [key, url] of voiceUrls) {
+            if (voiceClips.has(key) || voicesRequested.has(key)) {
+                continue;
+            }
+
+            voicesRequested.add(key);
+
+            void load(url)
+                .then((bytes) => decoder.decodeAudioData(bytes))
+                .then((clip) => {
+                    voiceClips.set(key, clip);
+                })
+                .catch(() => {
+                    // That taunt stays silent.
+                });
+        }
+    };
+
+    /** The taunt being said fades out within STOP_MS; those waiting are dropped. */
+    const hush = () => {
+        waiting = [];
+
+        if (saying === null) {
+            return;
+        }
+
+        const cue = saying;
+        const now = context?.currentTime ?? 0;
+        const end = now + STOP_MS / 1000;
+        saying = null;
+
+        try {
+            cue.gain.gain.setValueAtTime(cue.level, now);
+            cue.gain.gain.linearRampToValueAtTime(0, end);
+            cue.source.stop(end);
+        } catch {
+            // Already stopped.
+        }
+    };
+
+    /** Says the next waiting taunt whose reaction still lasts, once nothing is being said. */
+    const sayNext = () => {
+        const audio = context;
+
+        while (saying === null && audio !== null && waiting.length > 0) {
+            const next = waiting.shift();
+            const clip =
+                next === undefined ? undefined : voiceClips.get(next.key);
+
+            if (
+                next === undefined ||
+                clip === undefined ||
+                next.dropAt <= audio.currentTime ||
+                muted ||
+                hidden ||
+                !running()
+            ) {
+                continue;
+            }
+
+            try {
+                const cue = source(audio, clip, audio.currentTime, VOICE_GAIN);
+                saying = cue;
+                cue.source.onended = () => {
+                    if (saying === cue) {
+                        saying = null;
+                        sayNext();
+                    }
+                };
+                cue.source.start(cue.startsAt, 0);
+            } catch {
+                // A clip that cannot play is skipped.
+                saying = null;
+            }
+        }
     };
 
     /** Every cue stops: one not yet started never plays, one sounding fades out within STOP_MS. */
@@ -332,7 +455,25 @@ export function roomSoundPlayer({
         }
     };
 
-    /** Starts `buffer` at `startsAt` on the context's clock, from `offset`, at the speaker's level times `factor`. */
+    /** `buffer` wired to the speakers at the speaker's level times `factor`, to start at `startsAt`. */
+    const source = (
+        audio: AudioContextLike,
+        buffer: AudioBufferLike,
+        startsAt: number,
+        factor: number,
+    ): Scheduled => {
+        const node = audio.createBufferSource();
+        const gain = audio.createGain();
+        const level = SPEAKER_GAIN[speaker] * factor;
+        node.buffer = buffer;
+        gain.gain.value = level;
+        node.connect(gain);
+        gain.connect(audio.destination);
+
+        return { source: node, gain, level, startsAt };
+    };
+
+    /** Starts `buffer` at `startsAt` on the context's clock, from `offset`, at the speaker's level times `factor`: a cue of its moment. */
     const start = (
         audio: AudioContextLike,
         buffer: AudioBufferLike,
@@ -340,18 +481,10 @@ export function roomSoundPlayer({
         offset: number,
         factor: number,
     ) => {
-        const source = audio.createBufferSource();
-        const gain = audio.createGain();
-        const level = SPEAKER_GAIN[speaker] * factor;
-        source.buffer = buffer;
-        gain.gain.value = level;
-        source.connect(gain);
-        gain.connect(audio.destination);
-
-        const cue = { source, gain, level, startsAt };
+        const cue = source(audio, buffer, startsAt, factor);
         scheduled.add(cue);
-        source.onended = () => scheduled.delete(cue);
-        source.start(startsAt, offset);
+        cue.source.onended = () => scheduled.delete(cue);
+        cue.source.start(startsAt, offset);
     };
 
     const unlock = () => {
@@ -416,6 +549,7 @@ export function roomSoundPlayer({
 
             if (next) {
                 stopAll();
+                hush();
             } else {
                 unlock();
             }
@@ -457,6 +591,7 @@ export function roomSoundPlayer({
         hide: () => {
             hidden = true;
             stopAll();
+            hush();
         },
         resume: () => {
             hidden = false;
@@ -550,13 +685,46 @@ export function roomSoundPlayer({
                 Math.max(0, at - NAME_LEAD_MS),
             );
         },
+        voices: (urls) => {
+            if (urls === lastVoices) {
+                return;
+            }
+
+            lastVoices = urls;
+            Object.entries(urls).forEach(([key, url]) => {
+                if (voiceUrls.get(key) !== url) {
+                    voiceUrls.set(key, url);
+                    voiceClips.delete(key);
+                    voicesRequested.delete(key);
+                }
+            });
+            fetchVoices();
+        },
+        taunt: (key, until) => {
+            if (
+                muted ||
+                hidden ||
+                !running() ||
+                context === null ||
+                !voiceClips.has(key) ||
+                until <= 0
+            ) {
+                return;
+            }
+
+            waiting.push({ key, dropAt: context.currentTime + until / 1000 });
+            sayNext();
+        },
+        hush,
         release: () => {
             stopAll();
+            hush();
 
             if (context !== null) {
                 const audio = context;
                 context = null;
                 requested.clear();
+                voicesRequested.clear();
                 audio.onstatechange = null;
                 void audio.close().catch(() => null);
             }

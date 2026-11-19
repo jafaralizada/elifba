@@ -73,6 +73,13 @@
             "author": "Elifba",
             "source": "https://github.com/nijataliyev7/elifba",
             "license": "CC0-1.0"
+        },
+        {
+            "files": ["content/assets/rooms/taunts/*"],
+            "title": "Sample taunts in the board's voice",
+            "author": "Elifba",
+            "source": "https://github.com/nijataliyev7/elifba",
+            "license": "MIT"
         }
     ]
 }

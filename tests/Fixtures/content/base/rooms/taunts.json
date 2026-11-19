@@ -1,13 +1,51 @@
 {
     "version": 1,
+    "voice": {
+        "context": "Oyun gedir, raund başladı, hamı cavab axtarır.",
+        "credit": {
+            "title": "The rooms' taunts in the board's voice, in Azerbaijani",
+            "author": "Elifba contributors",
+            "source": "https://elevenlabs.io/docs/overview/capabilities/text-to-speech/eleven-v4",
+            "license": "MIT",
+            "changes": "A synthetic voice, not a person's recording, made with Eleven v4 in {month}; trimmed and levelled with ffmpeg"
+        }
+    },
     "taunts": [
-        { "key": "turtle", "image": "fluent/1F422.svg" },
-        { "key": "tick_tock", "image": "fluent/23F0.svg" },
-        { "key": "frozen", "image": "fluent/1F976.svg" },
-        { "key": "sleepy", "image": "fluent/1F634.svg" },
-        { "key": "lucky", "image": "fluent/1F340.svg" },
-        { "key": "dice", "image": "fluent/1F3B2.svg" },
-        { "key": "mine", "image": "fluent/1F60E.svg" },
-        { "key": "catch_me", "image": "fluent/1F680.svg" }
+        {
+            "key": "turtle",
+            "image": "fluent/1F422.svg",
+            "voice": "mischievously"
+        },
+        {
+            "key": "tick_tock",
+            "image": "fluent/23F0.svg",
+            "voice": "mischievously"
+        },
+        {
+            "key": "frozen",
+            "image": "fluent/1F976.svg",
+            "voice": "mischievously"
+        },
+        {
+            "key": "sleepy",
+            "image": "fluent/1F634.svg",
+            "voice": "mischievously"
+        },
+        { "key": "lucky", "image": "fluent/1F340.svg", "voice": "sarcastic" },
+        {
+            "key": "dice",
+            "image": "fluent/1F3B2.svg",
+            "voice": "mischievously"
+        },
+        {
+            "key": "mine",
+            "image": "fluent/1F60E.svg",
+            "voice": "mischievously"
+        },
+        {
+            "key": "catch_me",
+            "image": "fluent/1F680.svg",
+            "voice": "mischievously"
+        }
     ]
 }

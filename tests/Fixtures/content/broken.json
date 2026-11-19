@@ -1832,11 +1832,31 @@
     "rooms taunts: more than twelve": {
         "file": "rooms/taunts.json",
         "set": {
-            "taunts.8": { "key": "too_easy", "image": "fluent/1F971.svg" },
-            "taunts.9": { "key": "so_close", "image": "fluent/1F605.svg" },
-            "taunts.10": { "key": "taunt_k", "image": "fluent/1F6A0.svg" },
-            "taunts.11": { "key": "taunt_l", "image": "fluent/1F6A1.svg" },
-            "taunts.12": { "key": "taunt_m", "image": "fluent/1F6A2.svg" }
+            "taunts.8": {
+                "key": "too_easy",
+                "image": "fluent/1F971.svg",
+                "voice": "mischievously"
+            },
+            "taunts.9": {
+                "key": "so_close",
+                "image": "fluent/1F605.svg",
+                "voice": "mischievously"
+            },
+            "taunts.10": {
+                "key": "taunt_k",
+                "image": "fluent/1F6A0.svg",
+                "voice": "mischievously"
+            },
+            "taunts.11": {
+                "key": "taunt_l",
+                "image": "fluent/1F6A1.svg",
+                "voice": "mischievously"
+            },
+            "taunts.12": {
+                "key": "taunt_m",
+                "image": "fluent/1F6A2.svg",
+                "voice": "mischievously"
+            }
         },
         "write": {
             "assets/fluent/1F971.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\"><circle cx=\"16\" cy=\"16\" r=\"12\"/></svg>",
@@ -1892,5 +1912,102 @@
         "file": "rooms/taunts.json",
         "set": { "taunts.3.image": "fluent/1F451.svg" },
         "problem": "rooms/taunts.json: taunts[3] \"sleepy\".image \"fluent/1F451.svg\" is the rivalry strip's icons.leader"
+    },
+    "rooms taunts: a taunt without its voice": {
+        "file": "rooms/taunts.json",
+        "unset": ["taunts.0.voice"],
+        "problem": "rooms/taunts.json: taunts[0] needs `voice`"
+    },
+    "rooms taunts: a voice that is no audio tag": {
+        "file": "rooms/taunts.json",
+        "set": { "taunts.4.voice": "[Sarcastic]" },
+        "problem": "rooms/taunts.json: taunts[4] \"lucky\".voice must be an audio tag matching /^[a-z]{3,24}$/, like \"mischievously\""
+    },
+    "rooms taunts: a voice of two words": {
+        "file": "rooms/taunts.json",
+        "set": { "taunts.4.voice": "soft chuckle" },
+        "problem": "rooms/taunts.json: taunts[4] \"lucky\".voice must be an audio tag matching /^[a-z]{3,24}$/, like \"mischievously\""
+    },
+    "rooms taunts: no voice block": {
+        "file": "rooms/taunts.json",
+        "unset": ["voice"],
+        "problem": "rooms/taunts.json: the file needs `voice`"
+    },
+    "rooms taunts: a voice block without a context": {
+        "file": "rooms/taunts.json",
+        "unset": ["voice.context"],
+        "problem": "rooms/taunts.json: voice needs `context`"
+    },
+    "rooms taunts: a context in quotes": {
+        "file": "rooms/taunts.json",
+        "set": { "voice.context": "«Oyun gedir»" },
+        "problem": "rooms/taunts.json: voice.context must be Azerbaijani text of alphabet letters, spaces and . , ! ? -"
+    },
+    "rooms taunts: a voice block without a credit": {
+        "file": "rooms/taunts.json",
+        "unset": ["voice.credit"],
+        "problem": "rooms/taunts.json: voice needs `credit`"
+    },
+    "rooms taunts: a credit without its licence": {
+        "file": "rooms/taunts.json",
+        "unset": ["voice.credit.license"],
+        "problem": "rooms/taunts.json: voice.credit needs `license`"
+    },
+    "rooms taunts: a credit that does not say the month": {
+        "file": "rooms/taunts.json",
+        "set": {
+            "voice.credit.changes": "Made with Eleven v4; levelled with ffmpeg"
+        },
+        "problem": "rooms/taunts.json: voice.credit.changes must say when the clips were made with {month}"
+    },
+    "rooms taunts: a voice block with another key": {
+        "file": "rooms/taunts.json",
+        "set": { "voice.voice_id": "fixturevoice02" },
+        "problem": "rooms/taunts.json: voice has an unknown key `voice_id`"
+    },
+    "taunt clips: a listed clip that is missing": {
+        "file": "voice-clips.json",
+        "set": {
+            "taunts.0123456789abcdef": "[mischievously] Tısbağa da səndən tezdir!"
+        },
+        "problem": "voice-clips.json: taunts.0123456789abcdef: content/assets/rooms/taunts/0123456789abcdef.mp3 does not exist"
+    },
+    "taunt clips: a clip that is no MP3": {
+        "file": "voice-clips.json",
+        "write": { "assets/rooms/taunts/61f456c92efd186b.mp3": "RIFF" },
+        "problem": "voice-clips.json: taunts.61f456c92efd186b: content/assets/rooms/taunts/61f456c92efd186b.mp3 is not an MP3"
+    },
+    "taunt clips: a clip that is no taunt's": {
+        "file": "voice-clips.json",
+        "set": { "taunts.aaaaaaaaaaaaaaaa": "[mischievously] Salam!" },
+        "write": { "assets/rooms/taunts/aaaaaaaaaaaaaaaa.mp3": "ID3" },
+        "problem": "voice-clips.json: taunts.aaaaaaaaaaaaaaaa is not the clip of a taunt of rooms/taunts.json in the voice of voice.json (\"[mischievously] Salam!\")"
+    },
+    "taunt clips: a clip with another tag": {
+        "file": "voice-clips.json",
+        "set": {
+            "taunts.61f456c92efd186b": "[sarcastic] Tısbağa da səndən tezdir!"
+        },
+        "problem": "voice-clips.json: taunts.61f456c92efd186b is not the clip of a taunt of rooms/taunts.json in the voice of voice.json (\"[sarcastic] Tısbağa da səndən tezdir!\")"
+    },
+    "taunt clips: a file of the folder outside the list": {
+        "file": "voice-clips.json",
+        "write": { "assets/rooms/taunts/bbbbbbbbbbbbbbbb.mp3": "ID3" },
+        "problem": "voice-clips.json: content/assets/rooms/taunts/bbbbbbbbbbbbbbbb.mp3 is no clip of taunts"
+    },
+    "taunt clips: a clip under the board's clips": {
+        "file": "voice-clips.json",
+        "write": { "assets/voice/61f456c92efd186b.mp3": "" },
+        "problem": "voice-clips.json: content/assets/voice/61f456c92efd186b.mp3 is no clip of clips"
+    },
+    "taunt clips: a list that is no object": {
+        "file": "voice-clips.json",
+        "set": { "taunts": ["61f456c92efd186b"] },
+        "problem": "voice-clips.json: taunts must be an object"
+    },
+    "taunt clips: the folder without its credits entry": {
+        "file": "credits.json",
+        "set": { "credits.10.files": ["content/assets/sample/alma.svg"] },
+        "problem": "credits.json: content/assets/rooms/taunts/61f456c92efd186b.mp3 has no entry"
     }
 }

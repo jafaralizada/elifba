@@ -1,15 +1,71 @@
 {
-    "version": 1,
+    "version": 2,
+    "voice": {
+        "context": "Oyun gedir, raund başladı, hamı cavab axtarır.",
+        "credit": {
+            "title": "The rooms' taunts in the board's voice, in Azerbaijani",
+            "author": "Elifba contributors",
+            "source": "https://elevenlabs.io/docs/overview/capabilities/text-to-speech/eleven-v4",
+            "license": "MIT",
+            "changes": "A synthetic voice, not a person's recording: made with ElevenLabs Eleven v4 (eleven_v4, language az) in the Voice Library voice «Nigar – Ad Read» under a paid plan, in {month}, one clip per taunt of content/rooms/taunts.json (our own phrases); trimmed and levelled with ffmpeg"
+        }
+    },
     "taunts": [
-        { "key": "turtle", "image": "fluent/1F422.svg" },
-        { "key": "tick_tock", "image": "fluent/23F0.svg" },
-        { "key": "frozen", "image": "fluent/1F976.svg" },
-        { "key": "sleepy", "image": "fluent/1F634.svg" },
-        { "key": "lucky", "image": "fluent/1F340.svg" },
-        { "key": "dice", "image": "fluent/1F3B2.svg" },
-        { "key": "mine", "image": "fluent/1F60E.svg" },
-        { "key": "catch_me", "image": "fluent/1F680.svg" },
-        { "key": "too_easy", "image": "fluent/1F971.svg" },
-        { "key": "so_close", "image": "fluent/1F605.svg" }
+        {
+            "key": "turtle",
+            "image": "fluent/1F422.svg",
+            "voice": "mischievously"
+        },
+        {
+            "key": "tick_tock",
+            "image": "fluent/23F0.svg",
+            "voice": "mischievously"
+        },
+        {
+            "key": "frozen",
+            "image": "fluent/1F976.svg",
+            "voice": "mischievously"
+        },
+        {
+            "key": "sleepy",
+            "image": "fluent/1F634.svg",
+            "voice": "mischievously"
+        },
+        { "key": "lucky", "image": "fluent/1F340.svg", "voice": "sarcastic" },
+        {
+            "key": "dice",
+            "image": "fluent/1F3B2.svg",
+            "voice": "mischievously"
+        },
+        {
+            "key": "mine",
+            "image": "fluent/1F60E.svg",
+            "voice": "mischievously"
+        },
+        {
+            "key": "catch_me",
+            "image": "fluent/1F680.svg",
+            "voice": "mischievously"
+        },
+        {
+            "key": "too_easy",
+            "image": "fluent/1F971.svg",
+            "voice": "dismissive"
+        },
+        {
+            "key": "so_close",
+            "image": "fluent/1F605.svg",
+            "voice": "mischievously"
+        },
+        {
+            "key": "silly",
+            "image": "fluent/1F92A.svg",
+            "voice": "mischievously"
+        },
+        {
+            "key": "what_now",
+            "image": "fluent/1F602.svg",
+            "voice": "mischievously"
+        }
     ]
 }

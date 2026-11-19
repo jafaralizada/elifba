@@ -1,6 +1,8 @@
 <?php
 
+use App\Domain\Content\Data\RoomTauntData;
 use App\Domain\Content\Support\ContentRepository;
+use App\Domain\Content\Support\TauntVoices;
 use App\Domain\Rooms\Actions\DeleteRoom;
 use App\Domain\Rooms\Actions\ForgetRoomPlayer;
 use App\Domain\Rooms\Actions\PruneOldRooms;
@@ -531,11 +533,21 @@ it('forgets the target after a day, and goes with the room', function (): void {
 it('holds exactly the approved list', function (): void {
     $taunts = app(ContentRepository::class)->roomTaunts();
 
-    expect(array_keys($taunts))->toBe(['turtle', 'tick_tock', 'frozen', 'sleepy', 'lucky', 'dice', 'mine', 'catch_me', 'too_easy', 'so_close'])
-        ->and(array_map(static fn ($taunt): string => $taunt->image, array_values($taunts)))->toBe([
-            'fluent/1F422.svg', 'fluent/23F0.svg', 'fluent/1F976.svg', 'fluent/1F634.svg', 'fluent/1F340.svg',
-            'fluent/1F3B2.svg', 'fluent/1F60E.svg', 'fluent/1F680.svg', 'fluent/1F971.svg', 'fluent/1F605.svg',
-        ]);
+    // ADR 029 decision 49: the twelve, in the fan's order, each with its emoji and its tag.
+    expect(array_map(static fn (RoomTauntData $taunt): array => [$taunt->key, $taunt->image, $taunt->voice], array_values($taunts)))->toBe([
+        ['turtle', 'fluent/1F422.svg', 'mischievously'],
+        ['tick_tock', 'fluent/23F0.svg', 'mischievously'],
+        ['frozen', 'fluent/1F976.svg', 'mischievously'],
+        ['sleepy', 'fluent/1F634.svg', 'mischievously'],
+        ['lucky', 'fluent/1F340.svg', 'sarcastic'],
+        ['dice', 'fluent/1F3B2.svg', 'mischievously'],
+        ['mine', 'fluent/1F60E.svg', 'mischievously'],
+        ['catch_me', 'fluent/1F680.svg', 'mischievously'],
+        ['too_easy', 'fluent/1F971.svg', 'dismissive'],
+        ['so_close', 'fluent/1F605.svg', 'mischievously'],
+        ['silly', 'fluent/1F92A.svg', 'mischievously'],
+        ['what_now', 'fluent/1F602.svg', 'mischievously'],
+    ])->and(app(ContentRepository::class)->roomTauntVoice()->context)->toBe('Oyun gedir, raund başladı, hamı cavab axtarır.');
 });
 
 it('names a phrase for every taunt in both languages and no other', function (): void {
@@ -552,14 +564,75 @@ it('names a phrase for every taunt in both languages and no other', function ():
         }
     }
 
-    // The approved wording, pinned (ADR 029 decision 27).
-    expect(__('rooms.taunts.say.turtle', [], 'az'))->toBe('Bir az tez ol!')
-        ->and(__('rooms.taunts.say.so_close', [], 'az'))->toBe('Az qaldı, hə?')
-        ->and(__('rooms.taunts.say.catch_me', [], 'en'))->toBe('Catch me if you can!');
+    // The approved wording, pinned (ADR 029 decision 49).
+    $az = array_map(static fn (string $key): string => __("rooms.taunts.say.{$key}", [], 'az'), $keys);
+    $en = array_map(static fn (string $key): string => __("rooms.taunts.say.{$key}", [], 'en'), $keys);
+
+    expect(array_combine($keys, $az))->toBe([
+        'turtle' => 'Tısbağa da səndən tezdir!',
+        'tick_tock' => 'Tik-tak, vaxt gedir ha!',
+        'frozen' => 'Dondun qaldın, nə oldu?',
+        'sleepy' => 'Oyan, oyan! Oyun gedir!',
+        'lucky' => 'Vay, bəxtin necə gətirdi!',
+        'dice' => 'Zər atırsan, nədir?',
+        'mine' => 'Bu raund mənimdir, ha-ha!',
+        'catch_me' => 'Yetiş görüm, yetişə bilsən!',
+        'too_easy' => 'Pəh! Nə asan idi!',
+        'so_close' => 'Vay-vay, az qaldı! Heyif!',
+        'silly' => 'Ay lölüy!',
+        'what_now' => 'Noldu, Paşinyan?!',
+    ])->and(array_combine($keys, $en))->toBe([
+        'turtle' => 'Even a turtle beats you!',
+        'tick_tock' => "Tick-tock, time's running!",
+        'frozen' => 'Frozen solid, huh?',
+        'sleepy' => "Wakey wakey, game's on!",
+        'lucky' => 'Wow, lucky much?',
+        'dice' => 'Rolling dice, are we?',
+        'mine' => "This round's mine, ha-ha!",
+        'catch_me' => 'Catch me if you can!',
+        'too_easy' => 'Pfft! Too easy!',
+        'so_close' => 'Ooh, so close! Too bad!',
+        'silly' => 'Oh, you silly!',
+        'what_now' => 'What happened, Pashinyan?!',
+    ])->and(__('rooms.taunts.at', ['name' => 'Aygün'], 'az'))->toBe('Atmaca at: Aygün')
+        ->and(__('rooms.taunts.at', ['name' => 'Aygün'], 'en'))->toBe('Throw a taunt at Aygün');
 });
 
-it('shows a taunt on a page for as long as the server lists it', function (): void {
-    preg_match('/export const TAUNT_SHOW_MS = ([\d_]+);/', (string) file_get_contents(resource_path('js/components/rooms/taunts.ts')), $match);
+it('gives every approved taunt its clip in the board\'s voice', function (): void {
+    $content = app(ContentRepository::class);
+    $voices = app(TauntVoices::class);
+    $listed = json_decode((string) file_get_contents(base_path('content/voice-clips.json')), true, 4, JSON_THROW_ON_ERROR)['taunts'] ?? [];
+    $texts = [];
 
-    expect((int) str_replace('_', '', $match[1] ?? ''))->toBe(Config::integer('elifba.rooms.taunts.show_ms'));
+    foreach ($content->roomTaunts() as $key => $taunt) {
+        $line = $voices->line($taunt);
+        // Nigar says the Azerbaijani phrase after the taunt's own tag, in every locale.
+        $text = "[{$taunt->voice}] ".__("rooms.taunts.say.{$key}", [], 'az');
+
+        expect($line?->text)->toBe($text, $key)
+            ->and($listed[$line?->hash] ?? null)->toBe($text, $key)
+            ->and(base_path('content/assets/'.TauntVoices::path((string) $line?->hash)))->toBeFile()
+            ->and($voices->url($taunt))->toBe(asset('content/rooms/taunts/'.$line?->hash.'.mp3').'?v='.$taunt->version);
+        $texts[] = $text;
+    }
+
+    // Exactly one clip per taunt; and the credits name the folder as our own, made with ElevenLabs.
+    $credit = array_values(array_filter($content->credits(), static fn ($credit): bool => $credit->files === ['content/assets/rooms/taunts/*']));
+
+    expect(array_values($listed))->toEqualCanonicalizing($texts)
+        ->and(glob(base_path('content/assets/rooms/taunts/*.mp3')) ?: [])->toHaveCount(12)
+        ->and($credit)->toHaveCount(1)
+        ->and($credit[0]->license->value)->toBe('MIT')
+        ->and($credit[0]->changes)->toContain('eleven_v4')->toContain('Nigar')->not->toContain('{month}');
+});
+
+it('shows a taunt on a page for as long as the server lists it, and its reaction for less', function (): void {
+    $source = (string) file_get_contents(resource_path('js/components/rooms/taunts.ts'));
+    preg_match('/export const TAUNT_SHOW_MS = ([\d_]+);/', $source, $show);
+    preg_match('/export const TAUNT_REACTION_MS = ([\d_]+);/', $source, $reaction);
+    $showMs = Config::integer('elifba.rooms.taunts.show_ms');
+
+    expect((int) str_replace('_', '', $show[1] ?? ''))->toBe($showMs)
+        // ADR 029 decision 41: drawn 3 s; the state's second more covers a late read.
+        ->and((int) str_replace('_', '', $reaction[1] ?? ''))->toBe(3_000)->toBeLessThan($showMs);
 });

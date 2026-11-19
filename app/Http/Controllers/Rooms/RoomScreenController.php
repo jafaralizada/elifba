@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Rooms;
 use App\Domain\Content\Data\RoomTauntData;
 use App\Domain\Content\Enums\RoomSpeaker;
 use App\Domain\Content\Support\ContentRepository;
+use App\Domain\Content\Support\TauntVoices;
 use App\Domain\Rooms\Actions\RecordScreenRead;
 use App\Domain\Rooms\Data\RoomGameSetupData;
 use App\Domain\Rooms\Models\Room;
@@ -33,8 +34,9 @@ use Inertia\Response;
  * options()`); `sounds`, the URLs of the room's moments it plays as the
  * room's speaker (ADR 025 "Sound"), never a phone's own cues;
  * `rivalry`, the URLs of the rivalry strip's three emoji (ADR 027); and
- * `taunts`, the list's keys with their emoji's URLs, for the taunts its
- * state shows (T2, ADR 029 decisions 21 and 28); `finish`, the URLs of
+ * `taunts`, the list's keys with their emoji's URLs and, from T4, their
+ * clips' (`TauntVoices`, null until made), for the taunts its state shows
+ * (T2, ADR 029 decisions 21, 28 and 50); `finish`, the URLs of
  * «Əla oynadın!» and «Əla oynadınız!» it says after the final's fanfare,
  * after the winner's name (`RoomFinishVoice`, ADR 030); and `beat_ms`, how
  * often it reads the state at least while shown, which tells every phone
@@ -56,7 +58,7 @@ use Inertia\Response;
  */
 final class RoomScreenController extends Controller
 {
-    public function __invoke(Room $room, #[CurrentUser] User $account, ContentRepository $content, RoomFinishVoice $finish, RecordScreenRead $recordScreen): Response
+    public function __invoke(Room $room, #[CurrentUser] User $account, ContentRepository $content, TauntVoices $tauntVoices, RoomFinishVoice $finish, RecordScreenRead $recordScreen): Response
     {
         $recordScreen->handle($room);
 
@@ -68,7 +70,7 @@ final class RoomScreenController extends Controller
             'catalog' => RoomGameSetupData::options(),
             'sounds' => $content->roomSounds()->urls(RoomSpeaker::Screen),
             'rivalry' => $content->roomRivalry()->urls(),
-            'taunts' => RoomTauntData::props($content->roomTaunts()),
+            'taunts' => RoomTauntData::props($content->roomTaunts(), $tauntVoices),
             'finish' => $finish->urls(),
             'beat_ms' => RoomScreen::beatMs(),
         ]);

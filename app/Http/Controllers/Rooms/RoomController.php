@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Rooms;
 use App\Domain\Content\Data\RoomTauntData;
 use App\Domain\Content\Enums\RoomSpeaker;
 use App\Domain\Content\Support\ContentRepository;
+use App\Domain\Content\Support\TauntVoices;
 use App\Domain\Rooms\Actions\DeleteRoom;
 use App\Domain\Rooms\Actions\LockRoom;
 use App\Domain\Rooms\Actions\OpenRoom;
@@ -68,8 +69,10 @@ use Inertia\Response;
  * cues (ADR 025 "Sound": its taps, its answer sent and its verdict; never
  * the room's moments, which are the screen's), `rivalry`, the URLs of
  * the rivalry strip's three emoji (ADR 027), and `taunts`, the list a
- * player may throw from — each key with its emoji's URL; the phrase is the
- * page's own translation (T2, ADR 029 decision 28). No other account's id or
+ * player may throw from — each key with its emoji's URL and, from T4, its
+ * clip's in the board's voice (`TauntVoices`, null until made), which the
+ * page says only for a taunt aimed at its viewer; the phrase is the page's
+ * own translation (T2, ADR 029 decisions 28 and 50). No other account's id or
  * address reaches a room page — the shared `auth.user` is the viewer's own
  * — and no name goes into a URL or a flash.
  */
@@ -105,7 +108,7 @@ final class RoomController extends Controller
         return to_route('rooms.show', $room);
     }
 
-    public function show(Room $room, #[CurrentUser] User $account, ContentRepository $content, RecordRoomRead $recordRead): Response
+    public function show(Room $room, #[CurrentUser] User $account, ContentRepository $content, TauntVoices $tauntVoices, RecordRoomRead $recordRead): Response
     {
         $gate = Gate::forUser($account);
         $open = $room->isOpen();
@@ -124,7 +127,7 @@ final class RoomController extends Controller
             'games' => $open ? null : RoomResults::games($room, RoomClock::nowMs()),
             'sounds' => $open && $watches ? $content->roomSounds()->urls(RoomSpeaker::Phone, RoomSpeaker::Screen) : null,
             'rivalry' => $open && $watches ? $content->roomRivalry()->urls() : null,
-            'taunts' => $open && $watches ? RoomTauntData::props($content->roomTaunts()) : null,
+            'taunts' => $open && $watches ? RoomTauntData::props($content->roomTaunts(), $tauntVoices) : null,
             'can' => [
                 'host' => $gate->allows('host', $room),
                 'leave' => $gate->allows('play', $room),
