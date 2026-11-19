@@ -169,7 +169,7 @@ ELIFBA_ROOMS_VOICE_IP=203.0.113.10
 ELIFBA_ROOMS_VOICE=true
 ```
 
-and `docker compose up -d --wait`. `scripts/docker-env.sh` has written `ELIFBA_ROOMS_VOICE_KEY` and `ELIFBA_ROOMS_VOICE_SECRET`; an `.env` from before them needs both (`openssl rand -hex 8` and `openssl rand -hex 32`), or the voice server refuses to start and says which line is empty (`docker compose logs voice`). To turn voice off, set `ELIFBA_ROOMS_VOICE=false` and run `docker compose up -d --wait`; to stop the voice server as well, empty `COMPOSE_PROFILES` and `ELIFBA_ROOMS_VOICE_IP` and run `docker compose up -d --wait --remove-orphans`.
+and `docker compose up -d --wait`. `scripts/docker-env.sh` has written `ELIFBA_ROOMS_VOICE_KEY` and `ELIFBA_ROOMS_VOICE_SECRET`; an `.env` from before them needs both (`openssl rand -hex 8` and `openssl rand -hex 32`), or the voice server refuses to start and says which line is empty (`docker compose logs voice`). To turn voice off, set `ELIFBA_ROOMS_VOICE=false` and run `docker compose up -d --wait`; to stop the voice server as well, empty `COMPOSE_PROFILES` and `ELIFBA_ROOMS_VOICE_IP` and run `docker compose up -d --wait --remove-orphans`. Before turning it on for people, go through the release checklist in [`docs/live-voice-checklists.md`](docs/live-voice-checklists.md); the same file has the checklist for real phones on the try-out below.
 
 **Backups.** The `backup` service dumps the database every night at 03:00 Baku time into the `backups` volume and keeps 14 days (`BACKUP_AT`, `BACKUP_KEEP_DAYS` in `.env`). Make a dump now, list the dumps, and copy them off the server's Docker volume:
 
