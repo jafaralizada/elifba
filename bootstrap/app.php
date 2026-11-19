@@ -5,8 +5,10 @@ use App\Http\Middleware\EnsureRoomsAreEnabled;
 use App\Http\Middleware\EnsureRoomVoiceIsEnabled;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RememberRoomInvitation;
 use App\Http\Middleware\SetLocale;
 use App\Support\RoomsArea;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -37,6 +39,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // where login does, by role: there is no dashboard.
         $middleware->redirectUsersTo(fn (): string => route('start'));
 
+        // A visitor goes to the login, the address kept as the intended one;
+        // a visitor who opened a room's link by hand goes to the
+        // invitation's door instead (§12 "The invitation link (I2)", ADR 033
+        // decision 11).
+        $middleware->redirectGuestsTo(fn (Request $request): string => RoomsArea::door($request) ?? route('login'));
+
         // The areas of docs/architecture.md §1 "Accounts and roles" (ADR 010):
         // `role` is the package's, with an App\Enums\Role name or two;
         // `rooms.enabled` closes the player area while it is switched off
@@ -46,6 +54,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role.chosen' => EnsureRoleChosen::class,
             'rooms.enabled' => EnsureRoomsAreEnabled::class,
             'rooms.voice' => EnsureRoomVoiceIsEnabled::class,
+            'rooms.invitation' => RememberRoomInvitation::class,
         ]);
 
         // A switched-off rooms area answers as an unknown address does: the
@@ -55,6 +64,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // The voice's switch right after it, for the voice routes (§12 "Live
         // voice"): each is put before the cookies in turn, so the area's first.
         $middleware->prependToPriorityList(before: EncryptCookies::class, prepend: EnsureRoomVoiceIsEnabled::class);
+        // A room's link opened by hand is kept before `auth` can send a
+        // visitor away, after the session has started (ADR 033 decision 8).
+        $middleware->prependToPriorityList(before: AuthenticatesRequests::class, prepend: RememberRoomInvitation::class);
 
         $middleware->web(append: [
             SetLocale::class,

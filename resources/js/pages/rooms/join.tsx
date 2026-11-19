@@ -27,7 +27,9 @@ type Props = {
  * decisions 6 and 15): at `/oyun` the code field with its camera, focused,
  * and «Davam et»; at `/oyun/{code}` the code, the account's own name as the
  * game will show it, and «Qoşul» at the bottom of the screen. A locked or
- * a full room is said here and nothing else about it.
+ * a full room is said here and nothing else about it. From I2 (ADR 033) a
+ * player who opened a room's link by hand never sees this page: the link
+ * joins at once.
  */
 export default function RoomsJoin({ code, name, entrance }: Props) {
     const { t } = useTranslation();
@@ -129,7 +131,8 @@ export default function RoomsJoin({ code, name, entrance }: Props) {
                             </span>
                         </section>
 
-                        <InputError message={errors.code} />
+                        {/* A locked or full room met by a link opened by hand arrives in the page's errors (ADR 033 decision 7). */}
+                        <InputError message={errors.code ?? arrived.code} />
                     </div>
 
                     <RoomActionBar>

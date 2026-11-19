@@ -21,10 +21,16 @@ describe('pageShell', () => {
         expect(pageShell('rooms/join')).toBe('app');
     });
 
+    it("draws the invitation's door in the auth card (ADR 033)", () => {
+        expect(pageShell('rooms/invited')).toBe('auth');
+        expect(shellDecided('rooms/invited')).toBe(true);
+    });
+
     it('decides the shell of every room page by name', () => {
         const rooms = pages.filter((page) => page.startsWith('rooms/'));
 
         expect(rooms).toContain('rooms/show');
+        expect(rooms).toContain('rooms/invited');
         expect(rooms.filter((page) => !shellDecided(page))).toEqual([]);
     });
 

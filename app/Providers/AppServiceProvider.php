@@ -153,5 +153,10 @@ class AppServiceProvider extends ServiceProvider
 
         // The live voice's tickets (C3, ADR 031 decision 19): a join, a rejoin after a new epoch, a retry.
         RateLimiter::for('room-voice', static fn (Request $request): Limit => Limit::perMinute(12)->by($account($request)));
+
+        // The invitation's door (I2, ADR 033 decision 12): no account exists
+        // yet, so per address — 30 a minute, so that a room's twenty players
+        // registering at once behind one Wi-Fi stay inside it.
+        RateLimiter::for('room-invited', static fn (Request $request): Limit => Limit::perMinute(30)->by('room-invited|'.$request->ip()));
     }
 }

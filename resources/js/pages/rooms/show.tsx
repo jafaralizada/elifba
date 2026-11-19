@@ -61,6 +61,7 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
+import { edit as editProfile } from '@/routes/profile';
 import { close, destroy, entrance, leave } from '@/routes/rooms';
 import { destroy as endGame } from '@/routes/rooms/game';
 import { voice as memberVoice } from '@/routes/rooms/members';
@@ -680,10 +681,23 @@ function PlayerRoom({
                                 {t('rooms.start.joined')}
                             </span>
                             {me?.name != null && (
-                                <span className="max-w-full truncate text-sm text-muted-foreground">
-                                    {t('rooms.start.joined_as', {
-                                        name: me.name,
-                                    })}
+                                // The name one joined under, and «Dəyiş» into Settings → Profil
+                                // (ADR 033 decision 9): a link may have skipped the join page.
+                                <span className="flex max-w-full items-center gap-1">
+                                    <span className="min-w-0 truncate text-sm text-muted-foreground">
+                                        {t('rooms.start.joined_as', {
+                                            name: me.name,
+                                        })}
+                                    </span>
+                                    <Button
+                                        asChild
+                                        variant="ghost"
+                                        className="h-11 shrink-0 px-3 text-muted-foreground"
+                                    >
+                                        <Link href={editProfile()}>
+                                            {t('rooms.join.change_name')}
+                                        </Link>
+                                    </Button>
                                 </span>
                             )}
                         </div>

@@ -10,6 +10,7 @@ use App\Domain\Rooms\Support\RoomJoinLink;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\CodeEntrance;
+use App\Support\RoomInvitation;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\RedirectResponse;
@@ -36,6 +37,13 @@ use Inertia\Response;
  * before still arrives; they try no code themselves. `/oyun` also gets
  * `entrance`, its own address, whose origin the code field's camera
  * accepts (ADR 026 decision 15).
+ *
+ * From I2 (§12 "The invitation link (I2)", ADR 033 decisions 5–8) a link
+ * carries the room's tag, and a link a person opened by hand
+ * (`RoomInvitation::openedByHand`), or the end of a way in such an open
+ * began (the session's invitation, used once), joins at once through
+ * `JoinRoom`; the code field, the camera and every other request still get
+ * the join page and «Qoşul».
  */
 final class RoomJoinController extends Controller
 {
@@ -63,16 +71,45 @@ final class RoomJoinController extends Controller
         return redirect()->to(route('rooms.join', [...$request->query(), 'code' => $code]), 301);
     }
 
-    public function show(string $code, #[CurrentUser] User $account): Response|RedirectResponse
+    /**
+     * The join page — or, for a link opened by hand or at the end of a way
+     * in such an open began, the join itself (§12 "The invitation link
+     * (I2)", ADR 033 decision 7). A `t` that is not the room's tag is the
+     * one refusal; the host goes to the room as they are, a present player
+     * too; a locked or a full room is said on the join page, as after «Qoşul».
+     */
+    public function show(Request $request, string $code, #[CurrentUser] User $account, JoinRoom $joinRoom): Response|RedirectResponse
     {
+        $tag = RoomInvitation::tagOf($request);
+        // Taken first, so that it is used once whatever the answer.
+        $invited = RoomInvitation::pull($request, $code, $tag);
         $room = $this->roomFor($code, $account);
+
+        if (! RoomJoinLink::tagMatches($room, $tag)) {
+            throw self::unknown();
+        }
+
         $row = $room->rowOf($account);
 
-        if ($row !== null && $row->isPresent()) {
+        // A link never changes whether the host plays: that is «Mən də oynayıram» alone.
+        if ($room->isHostedBy($account) || ($row !== null && $row->isPresent())) {
             return to_route('rooms.show', $room);
         }
 
-        return Inertia::render('rooms/join', ['code' => $room->code, 'name' => $account->name, 'entrance' => null]);
+        if ($invited || RoomInvitation::openedByHand($request)) {
+            try {
+                $joinRoom->handle($room, $account);
+            } catch (ModelNotFoundException) {
+                throw self::unknown();
+            } catch (ValidationException $refused) {
+                // Locked or full: the join page with the reason, as after «Qoşul».
+                return $this->joinPage($room, $account, $refused->errors());
+            }
+
+            return to_route('rooms.show', $room);
+        }
+
+        return $this->joinPage($room, $account);
     }
 
     public function store(string $code, #[CurrentUser] User $account, JoinRoom $joinRoom): RedirectResponse
@@ -87,6 +124,23 @@ final class RoomJoinController extends Controller
         }
 
         return to_route('rooms.show', $room);
+    }
+
+    /**
+     * Page `rooms/join` with the room's code and the account's own name, and
+     * nothing else of the room; `$errors` puts a refusal on its `code`.
+     *
+     * @param  array<string, array<int, string>>  $errors
+     */
+    private function joinPage(Room $room, User $account, array $errors = []): Response
+    {
+        $props = ['code' => $room->code, 'name' => $account->name, 'entrance' => null];
+
+        if ($errors !== []) {
+            $props['errors'] = array_map(static fn (array $messages): string => $messages[0] ?? '', $errors);
+        }
+
+        return Inertia::render('rooms/join', $props);
     }
 
     /**

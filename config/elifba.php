@@ -70,6 +70,13 @@ return [
         // Present players in one room at most (§12 "Rooms and joining").
         'max_players' => 20,
 
+        // How long a link opened by hand is kept in the browser's session to
+        // join at the end of a login, a registration or a confirmation
+        // (§12 "The invitation link (I2)", ADR 033 decision 8): long enough
+        // to read the mail, short enough that a forgotten tab joins no game
+        // an evening later.
+        'invitation_minutes' => 60,
+
         // A room with no join, game or answer for this long is closed: it
         // counts as closed at once (`Room::isOpen()`), and `rooms:close-idle`
         // writes it within the hour.

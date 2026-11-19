@@ -76,6 +76,27 @@ final class RoomsArea
     }
 
     /**
+     * Where `auth` sends a visitor of a room's link (§12 "The invitation link
+     * (I2)", ADR 033 decision 11): the invitation's door, `rooms.invited`,
+     * when the visitor opened this very link by hand — the session holds the
+     * invitation for its code — and the switch is on; null for every other
+     * request, which goes to the login as before. The address stays the
+     * intended one either way.
+     */
+    public static function door(Request $request): ?string
+    {
+        $route = $request->route();
+
+        if (! $route instanceof Route || $route->getName() !== 'rooms.join' || ! self::enabled()) {
+            return null;
+        }
+
+        $invitation = RoomInvitation::pending($request);
+
+        return $invitation !== null && $invitation['code'] === $route->parameter('code') ? route('rooms.invited') : null;
+    }
+
+    /**
      * The intended address, taken out of the session, when it is a page of
      * the player area on this app's own address; otherwise null, and the
      * session keeps what it had. Never an address elsewhere.

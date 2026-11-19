@@ -4,12 +4,19 @@ use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomPlayer;
 use App\Enums\Role;
 use App\Http\Middleware\EnsureRoomsAreEnabled;
+use App\Http\Middleware\RememberRoomInvitation;
 use App\Models\User;
+use App\Support\GoogleProfile;
+use App\Support\GoogleSignIn;
+use App\Support\RoomInvitation;
+use App\Support\RoomsArea;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\FakeGoogle;
 use Tests\Support\Rooms;
 
 /*
@@ -75,7 +82,9 @@ it('answers 404 on every room route while the switch is off', function (): void 
     $before = roomsSwitchSnapshot();
     $checked = 0;
 
-    expect($routes)->not->toBeEmpty();
+    // The invitation's door (I2, ADR 033) among them: a guest route behind the same switch.
+    expect($routes)->not->toBeEmpty()
+        ->and(array_keys($routes))->toContain('rooms.invited', 'rooms.invited.store');
 
     foreach ($routes as $key => $route) {
         $uri = Rooms::uri($route, $values);
@@ -106,6 +115,53 @@ it('answers 404 on every room route while the switch is off', function (): void 
     $this->actingAs($accounts['a player'])->get(route('rooms.index'))->assertOk();
     $this->get(route('rooms.show', $values['room']))->assertOk();
     $this->getJson(route('rooms.state', $values['room']))->assertOk();
+});
+
+it('writes no invitation and sends a visitor to the login while the switch is off', function (): void {
+    // ADR 033 decision 17: a link opened by hand finds no room route; the door is never named.
+    $room = Room::factory()->for(User::factory()->player()->create(), 'host')->create();
+    $byHand = ['Sec-Fetch-Site' => 'none', 'Sec-Fetch-Mode' => 'navigate', 'Sec-Fetch-Dest' => 'document'];
+
+    $this->get('/oyun/'.$room->code.'?t=abcdef', $byHand)->assertNotFound();
+    expect(session(RoomInvitation::KEY))->toBeNull()
+        ->and(session('url.intended'))->toBeNull();
+
+    // An invitation left in a session from before is read as none, and never names the door.
+    $this->withSession([RoomInvitation::KEY => ['code' => (string) $room->code, 'tag' => null, 'until' => now()->addHour()->unix()]]);
+    $this->get(route('play-settings.edit'))->assertRedirect(route('login'));
+
+    $request = Request::create('/oyun/'.$room->code, 'GET', server: $this->transformHeadersToServerVars($byHand));
+    $request->setLaravelSession(app('session.store'));
+    $request->setRouteResolver(static fn () => app('router')->getRoutes()->getByName('rooms.join')?->bind($request));
+
+    expect(RoomInvitation::pending($request))->toBeNull()
+        ->and(RoomsArea::door($request))->toBeNull();
+
+    // The middleware itself writes nothing while the switch is off, for a request opened by hand.
+    $request->session()->forget(RoomInvitation::KEY);
+    expect(RoomInvitation::openedByHand($request))->toBeTrue();
+    app(RememberRoomInvitation::class)->handle($request, static fn () => response('next'));
+    expect($request->session()->get(RoomInvitation::KEY))->toBeNull();
+});
+
+it('offers no player\'s sentence on the completion page and says no game on the notice while the switch is off', function (): void {
+    FakeGoogle::install();
+    $invitation = [RoomInvitation::KEY => ['code' => '123456', 'tag' => null, 'until' => now()->addHour()->unix()]];
+
+    // Google's completion page with an invitation in the session: as before the area existed.
+    $this->withSession($invitation);
+    GoogleSignIn::keepPending(session()->driver(), new GoogleProfile('109876543210987654321', 'aygun@gmail.com', 'Aygün', true), false);
+    $this->get(route('google.register'))->assertOk()->assertInertia(fn (Assert $page) => $page->where('player', false));
+    $this->post(route('google.register.store'), ['name' => 'Aygün', 'terms' => '1', 'agreement' => '1'])->assertRedirect();
+
+    $account = User::query()->where('email', 'aygun@gmail.com')->sole();
+    expect($account->roleList())->toBe([])
+        ->and($account->player_agreed_at)->toBeNull();
+
+    // The notice: no line about a game.
+    $this->actingAs(User::factory()->unverified()->create())->withSession($invitation)
+        ->get(route('verification.notice'))
+        ->assertInertia(fn (Assert $page) => $page->component('auth/verify-email')->where('game', false));
 });
 
 it('closes the live voice\'s routes with the area, its own switch on', function (): void {

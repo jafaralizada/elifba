@@ -6,6 +6,7 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Models\User;
 use App\Support\GoogleSignIn;
+use App\Support\RoomInvitation;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -66,8 +67,11 @@ class FortifyServiceProvider extends ServiceProvider
             'status' => $request->session()->get('status'),
         ]));
 
+        // `game`: a room's link opened by hand waits behind the confirmation
+        // (§12 "The invitation link (I2)", ADR 033 decision 14).
         Fortify::verifyEmailView(fn (Request $request) => Inertia::render('auth/verify-email', [
             'status' => $request->session()->get('status'),
+            'game' => RoomInvitation::pending($request) !== null,
         ]));
 
         Fortify::registerView(fn () => Inertia::render('auth/register', [

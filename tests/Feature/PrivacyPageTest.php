@@ -113,7 +113,7 @@ it('has the section for rooms in both languages when the switch is on', function
     preg_match('/const ROOMS = \[(.*?)\];/s', (string) file_get_contents(resource_path('js/pages/privacy.tsx')), $list);
     preg_match_all("/'([a-z_]+)'/", $list[1] ?? '', $parts);
 
-    expect($parts[1])->toBe(['what', 'camera', 'stored', 'not_stored', 'why', 'who', 'voice', 'contact', 'how_long', 'delete', 'where']);
+    expect($parts[1])->toBe(['what', 'camera', 'share', 'stored', 'not_stored', 'why', 'who', 'voice', 'contact', 'how_long', 'delete', 'where']);
 
     $request->get(route('privacy'))
         ->assertOk()
@@ -237,6 +237,37 @@ it('says what the camera does with the picture', function (?string $locale, stri
 })->with([
     'az' => [null, 'istəyə bağlıdır', 'brauzer əvvəlcə icazə soruşur', 'heç yerə göndərilmir və saxlanılmır'],
     'en' => ['en', 'is optional', 'the browser asks first', 'it is sent nowhere and is not kept'],
+]);
+
+it('says what WhatsApp gets when a game\'s link is sent, in both languages', function (?string $locale, array $share, array $what): void {
+    Rooms::on();
+    $request = $locale === null ? $this : $this->withSession(['locale' => $locale]);
+
+    $request->get(route('privacy'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('privacy')
+            ->where('translations', function ($translations) use ($share, $what): bool {
+                // The button, the code and no name, WhatsApp's own rules, no request, the preview, an hour, the close (ADR 033 decision 4).
+                foreach ($share as $words) {
+                    if (! str_contains($translations['privacy.rooms.share'], $words)) {
+                        return false;
+                    }
+                }
+
+                // The link and the separate sentence of a newcomer (ADR 033 decision 18).
+                foreach ($what as $words) {
+                    if (! str_contains($translations['privacy.rooms.what'], $words)) {
+                        return false;
+                    }
+                }
+
+                return str_contains($translations['privacy.rooms.share'], $translations['rooms.share.whatsapp'])
+                    && str_contains($translations['privacy.rooms.share'], $translations['rooms.share.share']);
+            }));
+})->with([
+    'az' => [null, ['istəyə bağlıdır', 'oyunun kodu var, heç kimin adı yoxdur', 'öz qaydaları ilə', 'Elifba özü WhatsApp-a heç nə göndərmir', 'önizləməsini', 'ən çox bir saat', 'Otaq bağlananda link işləməz'], ['və ya linki ilə qoşulur', 'linki toxunaraq açan hesab dərhal qoşulur', 'məxfilik qeydindən ayrıca təsdiqləyir']],
+    'en' => ['en', ['is optional', "the game's code and nobody's name", 'under its own rules', 'Elifba itself sends nothing to WhatsApp', 'preview', 'for an hour at most', 'stops working when the room closes'], ['or its link', 'opens the link with a tap joins at once', 'separately from the privacy note']],
 ]);
 
 it('says nothing of rooms when it is off', function (): void {

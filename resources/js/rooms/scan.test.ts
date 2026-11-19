@@ -29,6 +29,13 @@ describe('scannedCode', () => {
         ).toBe('482913');
     });
 
+    it("takes the code from this app's join address with its tag", () => {
+        // From I2 the QR and the shared link carry the room's tag (ADR 033 decision 5).
+        expect(
+            scannedCode('https://elifba.io/oyun/482913?t=8b379c', origins),
+        ).toBe('482913');
+    });
+
     it('takes the old /otaq address too', () => {
         expect(scannedCode('https://elifba.io/otaq/482913', origins)).toBe(
             '482913',

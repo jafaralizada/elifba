@@ -2,12 +2,17 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Domain\Rooms\Support\RoomJoinLink;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\User;
+use App\Support\RoomInvitation;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\URL;
+use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Fortify\Features;
+use Tests\Support\Rooms;
 use Tests\TestCase;
 
 class EmailVerificationTest extends TestCase
@@ -124,5 +129,58 @@ class EmailVerificationTest extends TestCase
 
         Event::assertNotDispatched(Verified::class);
         $this->assertTrue($user->fresh()->hasVerifiedEmail());
+    }
+
+    /**
+     * A game's link opened by hand waits behind the confirmation (docs/architecture.md
+     * §12 "The invitation link (I2)", ADR 033 decision 14): the notice says so.
+     */
+    public function test_says_a_game_waits_while_an_invitation_is_under_way(): void
+    {
+        $user = User::factory()->player()->unverified()->create();
+        $this->actingAs($user)->get(route('verification.notice'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('auth/verify-email')->where('game', false));
+
+        Rooms::on();
+        $room = Rooms::open();
+        $link = route('rooms.join', ['code' => (string) $room->code, 't' => RoomJoinLink::tag($room)]);
+
+        $this->get($link, ['Sec-Fetch-Site' => 'none', 'Sec-Fetch-Mode' => 'navigate', 'Sec-Fetch-Dest' => 'document'])
+            ->assertRedirect(route('verification.notice'));
+        $this->get(route('verification.notice'))
+            ->assertInertia(fn (Assert $page) => $page->where('game', true));
+
+        // Its minutes passed: nothing waits any more.
+        $this->travel((int) config('elifba.rooms.invitation_minutes') + 1)->minutes();
+        $this->get(route('verification.notice'))
+            ->assertInertia(fn (Assert $page) => $page->where('game', false));
+    }
+
+    /**
+     * The notice looks again when it is shown again (ADR 033 decision 14):
+     * an address confirmed in another browser goes on by itself, into the game.
+     */
+    public function test_sends_a_confirmed_account_on_when_the_notice_looks_again(): void
+    {
+        Rooms::on();
+        $room = Rooms::open();
+        $link = route('rooms.join', ['code' => (string) $room->code, 't' => RoomJoinLink::tag($room)]);
+        $user = User::factory()->player()->unverified()->create();
+
+        $this->actingAs($user)
+            ->get($link, ['Sec-Fetch-Site' => 'none', 'Sec-Fetch-Mode' => 'navigate', 'Sec-Fetch-Dest' => 'document'])
+            ->assertRedirect(route('verification.notice'));
+        $this->assertNotNull(session(RoomInvitation::KEY));
+
+        // Confirmed elsewhere — a mail app's own browser — and this tab shown again: its reload.
+        $user->markEmailAsVerified();
+        $version = (string) app(HandleInertiaRequests::class)->version(request());
+        $this->get(route('verification.notice'), ['X-Inertia' => 'true', 'X-Requested-With' => 'XMLHttpRequest', 'X-Inertia-Version' => $version])
+            ->assertRedirect($link);
+        $this->get($link)->assertRedirect(route('rooms.show', $room));
+
+        $this->assertTrue($room->rowOf($user)?->isPresent() ?? false);
+        $this->assertNull(session(RoomInvitation::KEY));
     }
 }

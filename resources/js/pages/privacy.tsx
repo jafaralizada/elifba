@@ -49,11 +49,13 @@ const HOME = ['stored', 'why', 'who', 'not_shared', 'delete', 'how_long'];
 /**
  * The parts of the section for adults' games, in order (ADR 024 decision
  * 10; the camera, ADR 026 decision 15; the winner's name said at the
- * final, ADR 030 decision 8); the operator follows them.
+ * final, ADR 030 decision 8; what WhatsApp gets when a game's link is
+ * sent, ADR 033 decision 4); the operator follows them.
  */
 const ROOMS = [
     'what',
     'camera',
+    'share',
     'stored',
     'not_stored',
     'why',

@@ -95,6 +95,8 @@ describe('bannerAllowedOn', () => {
             'pult/guest-board',
             'pult/index',
             // The player area shows it on «Otaqlar» only (docs/frontend.md rule 15); G3 decides on «Keçmiş oyunlar».
+            // The invitation's door has none either (ADR 033 decision 11).
+            'rooms/invited',
             'rooms/join',
             'rooms/past',
             'rooms/screen',

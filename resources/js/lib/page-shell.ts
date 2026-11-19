@@ -27,16 +27,24 @@ const WITHOUT_SHELL = new Set([
 /**
  * The room pages inside the area's shell (ADR 032 decision 2): «Oyunlar»,
  * «Keçmiş oyunlar» and the entrance. A room page that is a part of a game
- * is in `WITHOUT_SHELL` instead; every room page is in one of the two.
+ * is in `WITHOUT_SHELL` instead, the invitation's door in
+ * `ROOM_PAGES_IN_AUTH`; every room page is in one of the three.
  */
 export const ROOM_PAGES_IN_SHELL = ['rooms/index', 'rooms/past', 'rooms/join'];
+
+/**
+ * The room pages in the auth card (`AuthLayout`): the invitation's door,
+ * where a visitor who opened a room's link makes an account (ADR 033
+ * decision 11). Every room page is in one of the three lists.
+ */
+export const ROOM_PAGES_IN_AUTH = ['rooms/invited'];
 
 export function pageShell(name: string): PageShell {
     if (WITHOUT_SHELL.has(name) || name.startsWith('pult/')) {
         return 'none';
     }
 
-    if (name.startsWith('auth/')) {
+    if (name.startsWith('auth/') || ROOM_PAGES_IN_AUTH.includes(name)) {
         return 'auth';
     }
 
@@ -49,5 +57,9 @@ export function pageShell(name: string): PageShell {
 
 /** Whether the page's shell was decided by name rather than by default: every room page must be. */
 export function shellDecided(name: string): boolean {
-    return WITHOUT_SHELL.has(name) || ROOM_PAGES_IN_SHELL.includes(name);
+    return (
+        WITHOUT_SHELL.has(name) ||
+        ROOM_PAGES_IN_SHELL.includes(name) ||
+        ROOM_PAGES_IN_AUTH.includes(name)
+    );
 }

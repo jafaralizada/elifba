@@ -297,3 +297,41 @@ it('leaves the player role\'s sentence word for word', function (): void {
             ->and($sentence)->not->toContain($translations['rooms.voice.agreement']);
     }
 });
+
+it('words the invitation link in exactly the strings ADR 033 lists, in both languages', function (): void {
+    // ADR 033 decision 18: each new or changed key, az and en, as its table writes it.
+    $adr = (string) file_get_contents(base_path('docs/decisions/033-invitation-link.md'));
+    preg_match_all('/^\s*\| [+~] `([a-z_.]+)`\s*\|(.*)\|(.*)\|\s*$/mu', $adr, $rows, PREG_SET_ORDER);
+    $listed = ['az' => [], 'en' => []];
+
+    foreach ($rows as [, $key, $az, $en]) {
+        [$listed['az'][$key], $listed['en'][$key]] = [trim($az), trim($en)];
+    }
+
+    expect(array_keys($listed['az']))->toContain('rooms.share.text', 'rooms.invited.title', 'privacy.rooms.share', 'privacy.rooms.what');
+
+    foreach (['az', 'en'] as $locale) {
+        /** @var array<string, string> $translations */
+        $translations = json_decode((string) file_get_contents(lang_path("{$locale}.json")), true);
+        $own = array_filter($translations, static fn (string $key): bool => str_starts_with($key, 'rooms.share.') || str_starts_with($key, 'rooms.invited.'), ARRAY_FILTER_USE_KEY);
+
+        // The share row's and the door's keys are the table's, nothing more.
+        expect(array_keys($own))->toEqualCanonicalizing(array_values(array_filter(array_keys($listed[$locale]), static fn (string $key): bool => ! str_starts_with($key, 'privacy.'))), $locale);
+
+        foreach ($listed[$locale] as $key => $text) {
+            expect($translations[$key] ?? null)->toBe($text, "{$locale}: {$key}")
+                ->and(promisesInRoomText($text))->toBe([], "{$locale}: {$key}");
+        }
+
+        // The message names nobody: the link alone fills it.
+        expect($translations['rooms.share.text'])->toContain(':url')
+            ->and(preg_match_all('/:[a-z_]+/', $translations['rooms.share.text']))->toBe(1);
+    }
+
+    // «oyun» for what a person does; «otaq» only on `/privacy` (ADR 026 decision 2).
+    foreach ($listed['az'] as $key => $text) {
+        if (! str_starts_with($key, 'privacy.')) {
+            expect(preg_match('/\botaq|\botağ/u', Az::lower($text)))->toBe(0, $key);
+        }
+    }
+});

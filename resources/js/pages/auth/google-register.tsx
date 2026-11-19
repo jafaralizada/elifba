@@ -16,14 +16,22 @@ type Props = {
     email: string;
     /** Google's name for the account, editable; may be empty. */
     name: string;
+    /**
+     * A game's link opened by hand waits at the end (ADR 033 decision 13):
+     * the player's sentence is a second tick, and the account takes the role.
+     */
+    player: boolean;
 };
 
 /**
  * The last step of signing up with Google (architecture §7 "Google sign-in"):
  * the name and the same privacy-note agreement as the registration form.
- * The role is chosen next, on `/role` (§1 "Accounts and roles").
+ * The role is chosen next, on `/role` (§1 "Accounts and roles") — or, while
+ * a game's link waits (`player`), here: the player's sentence is a tick of
+ * its own under the note's, never merged or ticked in advance, and the
+ * button says «Hesab yarat və qoşul» (§12 "The invitation link (I2)").
  */
-export default function GoogleRegister({ email, name }: Props) {
+export default function GoogleRegister({ email, name, player }: Props) {
     const { t } = useTranslation();
 
     return (
@@ -105,6 +113,32 @@ export default function GoogleRegister({ email, name }: Props) {
                                 <InputError message={errors.terms} />
                             </div>
 
+                            {player && (
+                                <div className="grid gap-2">
+                                    <div className="flex items-start gap-3">
+                                        <Checkbox
+                                            id="agreement"
+                                            name="agreement"
+                                            value="1"
+                                            required
+                                            className="mt-0.5"
+                                            aria-invalid={
+                                                errors.agreement
+                                                    ? true
+                                                    : undefined
+                                            }
+                                        />
+                                        <Label
+                                            htmlFor="agreement"
+                                            className="leading-snug font-normal"
+                                        >
+                                            {t('roles.agreement.player')}
+                                        </Label>
+                                    </div>
+                                    <InputError message={errors.agreement} />
+                                </div>
+                            )}
+
                             <Button
                                 type="submit"
                                 className="mt-2 w-full"
@@ -112,7 +146,9 @@ export default function GoogleRegister({ email, name }: Props) {
                                 data-test="google-register-button"
                             >
                                 {processing && <Spinner />}
-                                {t('auth.register.submit')}
+                                {player
+                                    ? t('rooms.invited.submit')
+                                    : t('auth.register.submit')}
                             </Button>
                         </div>
 

@@ -14,6 +14,7 @@ use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomGame;
 use App\Domain\Rooms\Models\RoomPlayer;
 use App\Models\User;
+use App\Support\RoomInvitation;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -435,6 +436,25 @@ it('lists only the account\'s own rooms on «Oyunlar» and «Keçmiş oyunlar»'
         $this->get('/oyun/'.$code)->assertStatus(preg_match('/^\d{6}$/', (string) $code) === 1 ? 302 : 404);
     }
     $this->get(route('rooms.join.old', ['code' => $world['roomA']->code]))->assertRedirect(route('rooms.join', ['code' => $world['roomA']->code]));
+});
+
+it('answers the invitation\'s door alike to every account, and takes no row in its address', function (): void {
+    // ADR 033 decision 11: `/oyun/qeydiyyat` has no `{room}` or `{member}`, and `guest` sends any account to `/start`.
+    $world = isolationWorld();
+    Rooms::on();
+
+    foreach (['rooms.invited', 'rooms.invited.store'] as $name) {
+        expect(array_intersect(Route::getRoutes()->getByName($name)?->parameterNames() ?? ['missing'], ISOLATED_PARAMETERS))->toBe([], $name);
+    }
+
+    $invitation = [RoomInvitation::KEY => ['code' => (string) $world['roomA']->code, 'tag' => null, 'until' => now()->addHour()->unix()]];
+
+    foreach (['a' => $world['a'], 'b' => $world['b'], 'a parent' => User::factory()->parent()->create(), 'a player' => User::factory()->player()->create(), 'no role' => User::factory()->withoutRole()->create()] as $who => $account) {
+        $this->actingAs($account)->withSession($invitation)->get(route('rooms.invited'))->assertRedirect(route('start'));
+        $this->actingAs($account)->withSession($invitation)->post(route('rooms.invited.store'), ['name' => 'X', 'email' => "door-{$account->id}@example.com", 'password' => 'password', 'terms' => '1', 'agreement' => '1'])
+            ->assertRedirect(route('start'));
+        expect(User::query()->where('email', "door-{$account->id}@example.com")->exists())->toBeFalse($who);
+    }
 });
 
 it('lets the policies refuse another teacher on their own', function (): void {

@@ -5,7 +5,11 @@ use App\Domain\Rooms\Actions\RemoveRoomPlayer;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomPlayer;
 use App\Domain\Rooms\Support\RoomCode;
+use App\Domain\Rooms\Support\RoomJoinLink;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\User;
+use App\Support\RoomInvitation;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -370,10 +374,10 @@ it('joins at /oyun', function (): void {
 
     expect($this->room->rowOf($this->player)?->isPresent())->toBeTrue();
 
-    // The QR and the line under it name the new address, on `APP_URL`.
+    // The QR and the line under it name the new address, on `APP_URL`; the link carries the room's tag (I2).
     $root = rtrim((string) config('app.url'), '/');
     $this->actingAs($this->host)->get(route('rooms.show', $this->room))
-        ->assertInertia(fn (Assert $page) => $page->where('join', ['url' => $root.'/oyun/'.$code, 'entry_url' => $root.'/oyun']));
+        ->assertInertia(fn (Assert $page) => $page->where('join', ['url' => $root.'/oyun/'.$code.'?t='.RoomJoinLink::tag($this->room), 'entry_url' => $root.'/oyun']));
     $this->get(route('rooms.index'))->assertInertia(fn (Assert $page) => $page->where('entrance', $root.'/oyun'));
 });
 
@@ -394,4 +398,249 @@ it('sends the old /otaq addresses to the new ones', function (): void {
     // A visitor is sent to the login first, as at the new address.
     auth()->logout();
     $this->get('/otaq/'.$code)->assertRedirect(route('login'));
+});
+
+/*
+ * The invitation link (docs/architecture.md §12 "The invitation link (I2)",
+ * ADR 033 decisions 5–8): a link opened by hand joins at once, anything
+ * else meets the join page; the link's tag keeps it to its own room; the
+ * session's invitation carries the open to the end of a way in, once.
+ */
+
+/** A top-level navigation's fetch metadata, as a browser sends it. */
+const JOIN_BY_HAND = ['Sec-Fetch-Site' => 'none', 'Sec-Fetch-Mode' => 'navigate', 'Sec-Fetch-Dest' => 'document'];
+
+/** A tap on a link in another site's page (WhatsApp Web, a mail read in a browser). */
+const JOIN_TAPPED = ['Sec-Fetch-Site' => 'cross-site', 'Sec-Fetch-Mode' => 'navigate', 'Sec-Fetch-Dest' => 'document', 'Sec-Fetch-User' => '?1'];
+
+/**
+ * An Inertia visit's headers, with the page's own version, as the app's
+ * script sends them when it follows a redirect.
+ *
+ * @return array<string, string>
+ */
+function joinInertiaVisit(): array
+{
+    return ['X-Inertia' => 'true', 'X-Requested-With' => 'XMLHttpRequest', 'X-Inertia-Version' => (string) app(HandleInertiaRequests::class)->version(request())];
+}
+
+/** The room's link, with its tag. */
+function invitationLink(Room $room): string
+{
+    return route('rooms.join', ['code' => (string) $room->code, 't' => RoomJoinLink::tag($room)]);
+}
+
+it('joins at once when a player opens the link by hand', function (array $headers): void {
+    $this->actingAs($this->player)
+        ->get(invitationLink($this->room), $headers)
+        ->assertRedirect(route('rooms.show', $this->room));
+
+    expect($this->room->rowOf($this->player)?->isPresent())->toBeTrue()
+        ->and($this->room->refresh()->revision)->toBe(1)
+        // Used at once: nothing is left to join later.
+        ->and(session(RoomInvitation::KEY))->toBeNull();
+})->with([
+    'from another app, the camera or the address bar' => [JOIN_BY_HAND],
+    'a tap on a link in a web page' => [JOIN_TAPPED],
+]);
+
+it('shows the join page to what is not opened by hand', function (string $method, array $headers): void {
+    $this->actingAs($this->player);
+    $before = joinSnapshot();
+
+    if (array_key_exists('X-Inertia', $headers)) {
+        $headers = [...$headers, ...joinInertiaVisit()];
+    }
+
+    $response = $this->call($method, invitationLink($this->room), [], [], [], $this->transformHeadersToServerVars($headers));
+
+    expect($response->status())->toBe(200, 'never a redirect into the room')
+        ->and(joinSnapshot())->toBe($before)
+        ->and(session(RoomInvitation::KEY))->toBeNull();
+
+    if ($method === 'GET' && ! array_key_exists('Accept', $headers) && ! array_key_exists('X-Inertia', $headers)) {
+        $response->assertInertia(fn (Assert $page) => $page->component('rooms/join')->where('code', (string) $this->room->code));
+    }
+})->with([
+    'a prefetch' => ['GET', [...JOIN_BY_HAND, 'Sec-Purpose' => 'prefetch']],
+    'a prerender' => ['GET', [...JOIN_BY_HAND, 'Sec-Purpose' => 'prefetch;prerender']],
+    'an older prefetch, or Inertia\'s' => ['GET', [...JOIN_BY_HAND, 'Purpose' => 'prefetch']],
+    'Safari\'s preload' => ['GET', [...JOIN_BY_HAND, 'X-Purpose' => 'preview']],
+    'Firefox\'s prefetch' => ['GET', [...JOIN_BY_HAND, 'X-Moz' => 'prefetch']],
+    'HEAD' => ['HEAD', JOIN_BY_HAND],
+    'an Inertia visit' => ['GET', [...JOIN_BY_HAND, 'X-Inertia' => 'true', 'X-Requested-With' => 'XMLHttpRequest']],
+    'a JSON client' => ['GET', [...JOIN_BY_HAND, 'Accept' => 'application/json']],
+    'an <img>' => ['GET', ['Sec-Fetch-Site' => 'cross-site', 'Sec-Fetch-Mode' => 'no-cors', 'Sec-Fetch-Dest' => 'image']],
+    'an iframe' => ['GET', ['Sec-Fetch-Site' => 'cross-site', 'Sec-Fetch-Mode' => 'navigate', 'Sec-Fetch-Dest' => 'iframe', 'Sec-Fetch-User' => '?1']],
+    'a fetch' => ['GET', ['Sec-Fetch-Site' => 'cross-site', 'Sec-Fetch-Mode' => 'cors', 'Sec-Fetch-Dest' => 'empty']],
+    'a cross-site navigation without a tap' => ['GET', ['Sec-Fetch-Site' => 'cross-site', 'Sec-Fetch-Mode' => 'navigate', 'Sec-Fetch-Dest' => 'document']],
+    'a same-site navigation without a tap' => ['GET', ['Sec-Fetch-Site' => 'same-origin', 'Sec-Fetch-Mode' => 'navigate', 'Sec-Fetch-Dest' => 'document']],
+    'a browser without fetch metadata' => ['GET', []],
+]);
+
+it('reads only the headers a browser sets for the open by hand', function (array $headers, bool $byHand): void {
+    $request = Request::create('/oyun/123456', 'GET', server: $this->transformHeadersToServerVars($headers));
+
+    expect(RoomInvitation::openedByHand($request))->toBe($byHand);
+})->with([
+    'none' => [JOIN_BY_HAND, true],
+    'a tap' => [JOIN_TAPPED, true],
+    'a same-origin tap' => [[...JOIN_TAPPED, 'Sec-Fetch-Site' => 'same-origin'], true],
+    'a speculative header, whatever its value' => [[...JOIN_BY_HAND, 'Sec-Purpose' => ''], false],
+    'not a document' => [[...JOIN_BY_HAND, 'Sec-Fetch-Dest' => 'embed'], false],
+    'not a navigation' => [[...JOIN_BY_HAND, 'Sec-Fetch-Mode' => 'no-cors'], false],
+    'a user header that is not ?1' => [[...JOIN_TAPPED, 'Sec-Fetch-User' => '?0'], false],
+    'nothing' => [[], false],
+]);
+
+it('joins at the end of a path an open by hand began, once', function (): void {
+    $link = invitationLink($this->room);
+    $newcomer = User::factory()->withoutRole()->create();
+
+    // Opened by hand by an account without a role: kept, and off to take the role.
+    $this->actingAs($newcomer)->get($link, JOIN_BY_HAND)->assertRedirect(route('role', ['role' => 'player']));
+    expect(session(RoomInvitation::KEY))->toMatchArray(['code' => (string) $this->room->code, 'tag' => RoomJoinLink::tag($this->room)]);
+
+    // The role taken, the intended address is the link; Inertia's follow of that redirect joins.
+    $this->post(route('role.store'), ['role' => 'player', 'agreement' => '1'])->assertRedirect($link);
+    $this->get($link, joinInertiaVisit())
+        ->assertRedirect(route('rooms.show', $this->room));
+
+    expect($this->room->rowOf($newcomer)?->isPresent())->toBeTrue()
+        ->and(session(RoomInvitation::KEY))->toBeNull();
+
+    // Used once: after leaving, the same link without a tap meets the join page.
+    $this->post(route('rooms.leave', $this->room))->assertRedirect();
+    $this->get($link)->assertOk()->assertInertia(fn (Assert $page) => $page->component('rooms/join'));
+    expect($this->room->rowOf($newcomer)?->isPresent())->toBeFalse();
+});
+
+it('keeps the invitation for another code and never pulls it with a speculative request', function (): void {
+    $other = Rooms::open();
+    $this->actingAs($this->player)->withSession([RoomInvitation::KEY => ['code' => (string) $other->code, 'tag' => null, 'until' => now()->addHour()->unix()]]);
+
+    // Another room's code: not this invitation, the join page.
+    $this->get(invitationLink($this->room))->assertOk()->assertInertia(fn (Assert $page) => $page->component('rooms/join'));
+    expect(session(RoomInvitation::KEY))->not->toBeNull();
+
+    // A prefetch of the invited code: no join, the invitation stays.
+    $this->get(route('rooms.join', (string) $other->code), [...JOIN_BY_HAND, 'Sec-Purpose' => 'prefetch'])->assertOk();
+    expect(session(RoomInvitation::KEY))->not->toBeNull()
+        ->and($other->rowOf($this->player))->toBeNull();
+
+    // A tag that is not the invitation's is not it either.
+    $this->get(route('rooms.join', ['code' => (string) $other->code, 't' => RoomJoinLink::tag($this->room)]));
+    expect(session(RoomInvitation::KEY))->not->toBeNull()
+        ->and($other->rowOf($this->player))->toBeNull();
+});
+
+it('forgets the invitation after its minutes', function (): void {
+    $link = invitationLink($this->room);
+    $unconfirmed = User::factory()->player()->unverified()->create();
+
+    // Opened by hand before the address is confirmed: kept, and off to the notice.
+    $this->actingAs($unconfirmed)->get($link, JOIN_BY_HAND)->assertRedirect(route('verification.notice'));
+    expect(session(RoomInvitation::KEY))->not->toBeNull();
+
+    $unconfirmed->markEmailAsVerified();
+    $this->travel(config('elifba.rooms.invitation_minutes') + 1)->minutes();
+
+    // Confirmed an evening later: the join page and «Qoşul», nothing joined.
+    $this->get($link, joinInertiaVisit())->assertOk();
+    expect($this->room->rowOf($unconfirmed))->toBeNull()
+        ->and(session(RoomInvitation::KEY))->toBeNull();
+});
+
+it('refuses a link whose tag is not the open room\'s, as an unknown code', function (): void {
+    $code = (string) $this->room->code;
+    $this->actingAs($this->player);
+
+    foreach (['000000', 'abcdef', strtoupper(RoomJoinLink::tag($this->room)), RoomJoinLink::tag($this->room).'0'] as $tag) {
+        Rooms::assertRefused($this->get(route('rooms.join', ['code' => $code, 't' => $tag]), JOIN_BY_HAND));
+    }
+
+    // A tag that is not text is no tag of the room either.
+    Rooms::assertRefused($this->get('/oyun/'.$code.'?t[]=x', JOIN_BY_HAND));
+
+    // An old link: the room closed, another drew the same code — its link names the old room.
+    $old = invitationLink($this->room);
+    app(CloseRoom::class)->handle($this->room);
+    $stranger = Rooms::open();
+    $stranger->forceFill(['code' => $code])->save();
+    Rooms::assertRefused($this->get($old, JOIN_BY_HAND));
+
+    expect(RoomPlayer::query()->where('user_id', $this->player->id)->exists())->toBeFalse();
+
+    // The stranger's room's own link opens it.
+    $this->get(invitationLink($stranger), JOIN_BY_HAND)->assertRedirect(route('rooms.show', $stranger));
+});
+
+it('joins without a tag', function (): void {
+    // A typed address, an `/otaq/{code}` redirect, a QR of before.
+    $this->actingAs($this->player)
+        ->get(route('rooms.join', (string) $this->room->code), JOIN_BY_HAND)
+        ->assertRedirect(route('rooms.show', $this->room));
+
+    expect($this->room->rowOf($this->player)?->isPresent())->toBeTrue();
+});
+
+it('never joins the host by a link', function (): void {
+    $room = Rooms::open($this->host, plays: false);
+    $revision = $room->revision;
+
+    // A host who stepped out goes to the room as they are: «Mən də oynayıram» alone changes it.
+    $this->actingAs($this->host)->get(invitationLink($room), JOIN_BY_HAND)->assertRedirect(route('rooms.show', $room));
+    $this->get(invitationLink($room))->assertRedirect(route('rooms.show', $room));
+
+    expect($room->rowOf($this->host)?->isPresent() ?? false)->toBeFalse()
+        ->and($room->refresh()->revision)->toBe($revision);
+});
+
+it('keeps the locked and full answers on the join page, and the unknown refusal, when opened', function (): void {
+    $code = (string) $this->room->code;
+    $this->actingAs($this->host)->patch(route('rooms.update', $this->room), ['locked' => true])->assertRedirect();
+
+    // Locked: the join page with the reason, as after «Qoşul», and nothing else of the room.
+    $this->actingAs($this->player)->get(invitationLink($this->room), JOIN_BY_HAND)
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('rooms/join')
+            ->where('code', $code)
+            ->where('errors', ['code' => __('rooms.errors.locked')])
+            ->missing('players'));
+
+    // Full.
+    $this->actingAs($this->host)->patch(route('rooms.update', $this->room), ['locked' => false]);
+    Config::set('elifba.rooms.max_players', 1);
+    $this->actingAs($this->player)->get(invitationLink($this->room), JOIN_BY_HAND)
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('rooms/join')->where('errors', ['code' => __('rooms.errors.full')]));
+
+    expect($this->room->rowOf($this->player))->toBeNull();
+
+    // Removed, then closed: the one refusal.
+    Config::set('elifba.rooms.max_players', 20);
+    $row = Rooms::join($this->room, $this->player);
+    app(RemoveRoomPlayer::class)->handle($this->room, $row);
+    Rooms::assertRefused($this->actingAs($this->player)->get(invitationLink($this->room), JOIN_BY_HAND));
+
+    $link = invitationLink($this->room);
+    app(CloseRoom::class)->handle($this->room);
+    Rooms::assertRefused($this->actingAs(User::factory()->player()->create())->get($link, JOIN_BY_HAND));
+});
+
+it('counts an open against room-join', function (): void {
+    $this->actingAs($this->player);
+    $tooMany = ['code' => __('rooms.errors.too_many', [], 'az')];
+
+    for ($i = 0; $i < 10; $i++) {
+        $this->get(route('rooms.join', '000000'), JOIN_BY_HAND);
+    }
+
+    // The eleventh, a real link opened by hand: refused by the limit, and nothing joined.
+    $this->get(invitationLink($this->room), JOIN_BY_HAND)
+        ->assertRedirect(route('rooms.entrance'))
+        ->assertSessionHasErrors($tooMany);
+
+    expect($this->room->rowOf($this->player))->toBeNull();
 });

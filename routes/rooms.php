@@ -5,6 +5,7 @@ use App\Http\Controllers\Rooms\RoomAnswerController;
 use App\Http\Controllers\Rooms\RoomCloseController;
 use App\Http\Controllers\Rooms\RoomController;
 use App\Http\Controllers\Rooms\RoomGameController;
+use App\Http\Controllers\Rooms\RoomInvitedController;
 use App\Http\Controllers\Rooms\RoomJoinController;
 use App\Http\Controllers\Rooms\RoomLeaveController;
 use App\Http\Controllers\Rooms\RoomMemberController;
@@ -36,6 +37,12 @@ use Illuminate\Support\Facades\Route;
  * `RoomPolicy` (`->can()`). Both are ULIDs; a name never goes into a URL. A
  * new route with `{room}` or `{member}` must be added to
  * tests/Feature/Classroom/TeacherIsolationTest.php, which fails otherwise.
+ *
+ * The one exception is the invitation's door (§12 "The invitation link
+ * (I2)", ADR 033 decision 11), at the end of this file: a visitor who
+ * opened a room's link by hand makes an account there, with the player
+ * role, so it is a guest route — `rooms.enabled` and `guest`, no `auth` —
+ * and it reads no room: the page is one and the same for any code.
  */
 Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::middleware(Role::Player)])->group(function () {
     // «Oyunlar», the area's home: the games, the account's open rooms, the code field.
@@ -50,8 +57,10 @@ Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::mid
     // The entrance with a code, `/oyun` (G2): 10 tries of a code a minute per account, the three ways together.
     Route::middleware('throttle:room-join')->group(function () {
         Route::get('oyun', [RoomJoinController::class, 'entrance'])->name('rooms.entrance');
+        // A link opened by hand is kept before `auth` (ADR 033 decision 8): `rooms.invitation`.
         Route::get('oyun/{code}', [RoomJoinController::class, 'show'])
             ->where('code', '[0-9]{6}')
+            ->middleware('rooms.invitation')
             ->name('rooms.join');
         Route::post('oyun/{code}', [RoomJoinController::class, 'store'])
             ->where('code', '[0-9]{6}')
@@ -179,4 +188,12 @@ Route::middleware(['rooms.enabled', 'auth', 'role.chosen', 'verified', Role::mid
         ->whereUlid('room')
         ->can('forget', 'room')
         ->name('rooms.name.destroy');
+});
+
+// The invitation's door: a visitor's account with the player role, then the link (I2, ADR 033).
+Route::middleware(['rooms.enabled', 'guest'])->group(function () {
+    Route::get('oyun/qeydiyyat', [RoomInvitedController::class, 'create'])->name('rooms.invited');
+    Route::post('oyun/qeydiyyat', [RoomInvitedController::class, 'store'])
+        ->middleware('throttle:room-invited')
+        ->name('rooms.invited.store');
 });

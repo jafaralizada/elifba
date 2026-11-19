@@ -172,6 +172,7 @@ it('answers a bearer like a visitor on every room route and changes nothing', fu
     Rooms::voiceOn();
     $before = bearerSnapshot();
     $checked = 0;
+    $doors = 0;
 
     foreach (Rooms::routes() as $key => $route) {
         foreach (array_diff($route->methods(), ['HEAD']) as $method) {
@@ -179,13 +180,23 @@ it('answers a bearer like a visitor on every room route and changes nothing', fu
             $visitor = $this->json($method, $uri, ['locked' => true]);
             $bearer = $this->json($method, $uri, ['locked' => true], GuestBoards::bearer($world['token']));
 
-            expect($bearer->status())->toBe($visitor->status(), "{$method} {$key}")
-                ->and($bearer->status())->toBe(401, "{$method} {$key}");
+            expect($bearer->status())->toBe($visitor->status(), "{$method} {$key}");
+
+            // The invitation's door is a guest route (I2, ADR 033): it answers the bearer as a visitor,
+            // and without an invitation under way that is the login, or a refused form.
+            if (str_starts_with($key, 'rooms.invited')) {
+                expect($bearer->status())->toBe($method === 'GET' ? 302 : 422, "{$method} {$key}");
+                $doors++;
+            } else {
+                expect($bearer->status())->toBe(401, "{$method} {$key}");
+            }
+
             $checked++;
         }
     }
 
     expect($checked)->toBeGreaterThanOrEqual(16)
+        ->and($doors)->toBe(2)
         ->and(bearerSnapshot())->toBe($before);
 });
 

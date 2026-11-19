@@ -1,5 +1,8 @@
 <?php
 
+use App\Domain\Rooms\Models\Room;
+use App\Domain\Rooms\Support\RoomJoinLink;
+use App\Enums\Role;
 use App\Models\User;
 use App\Support\GoogleSignIn;
 use Illuminate\Auth\SessionGuard;
@@ -13,6 +16,7 @@ use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Fortify\Features;
 use Tests\Support\FakeGoogle;
+use Tests\Support\Rooms;
 use Tests\TestCase;
 
 /*
@@ -552,4 +556,103 @@ it('throttles the round trips', function (): void {
     }
 
     $this->get(route('google.redirect'))->assertTooManyRequests();
+});
+
+/*
+ * A room's invitation through Google (docs/architecture.md §12 "The
+ * invitation link (I2)", ADR 033 decision 13): while a link opened by hand
+ * waits, the completion page asks for the player's sentence too, and the
+ * account goes on into the game.
+ */
+
+/**
+ * A room, and a visitor who opened its link by hand and came to the door.
+ *
+ * @return array{room: Room, link: string}
+ */
+function googleInvitation(TestCase $test): array
+{
+    Rooms::on();
+    $room = Rooms::open();
+    $link = route('rooms.join', ['code' => (string) $room->code, 't' => RoomJoinLink::tag($room)]);
+
+    $test->get($link, ['Sec-Fetch-Site' => 'none', 'Sec-Fetch-Mode' => 'navigate', 'Sec-Fetch-Dest' => 'document'])
+        ->assertRedirect(route('rooms.invited'));
+
+    return ['room' => $room, 'link' => $link];
+}
+
+it('offers the player\'s sentence on the completion page while an invitation is under way', function (): void {
+    googleInvitation($this);
+
+    throughGoogle($this)->assertRedirect(route('google.register'));
+
+    $this->get(route('google.register'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('auth/google-register')
+            ->where('player', true)
+            ->missing('code')
+            ->missing('room'));
+});
+
+it('grants the player role with it through GrantRole and goes into the game', function (): void {
+    Notification::fake();
+    ['room' => $room, 'link' => $link] = googleInvitation($this);
+    throughGoogle($this)->assertRedirect(route('google.register'));
+
+    $this->post(route('google.register.store'), ['name' => 'Aygün Məmmədova', 'terms' => '1', 'agreement' => '1'])
+        ->assertRedirect($link);
+
+    $player = User::query()->where('google_id', GOOGLE_SUB)->sole();
+    expect($player->roleList())->toBe([Role::Player])
+        ->and($player->area)->toBe(Role::Player)
+        ->and($player->player_agreed_at)->not->toBeNull()
+        ->and($player->terms_accepted_at)->not->toBeNull()
+        ->and($player->teacher_agreed_at)->toBeNull()
+        ->and($player->email_verified_at)->not->toBeNull();
+
+    // Google vouched for the address: the link joins at once, no mailbox and no `/role`.
+    $this->get($link)->assertRedirect(route('rooms.show', $room));
+    expect($room->rowOf($player)?->isPresent())->toBeTrue();
+    Notification::assertNothingSent();
+});
+
+it('refuses the completion without the sentence when it was offered', function (array $input): void {
+    googleInvitation($this);
+    throughGoogle($this)->assertRedirect(route('google.register'));
+
+    $this->post(route('google.register.store'), ['name' => 'Aygün Məmmədova', 'terms' => '1', ...$input])
+        ->assertSessionHasErrors(['agreement' => __('roles.errors.agreement')]);
+
+    $this->assertGuest();
+    expect(User::query()->where('google_id', GOOGLE_SUB)->exists())->toBeFalse();
+})->with([
+    'missing' => [[]],
+    'unticked' => [['agreement' => '0']],
+]);
+
+it('offers no sentence without an invitation', function (): void {
+    Rooms::on();
+    throughGoogle($this)->assertRedirect(route('google.register'));
+
+    $this->get(route('google.register'))->assertInertia(fn (Assert $page) => $page->where('player', false));
+
+    // The sentence, if sent anyway, gives no role: `/role` comes next.
+    $this->post(route('google.register.store'), ['name' => 'Aygün Məmmədova', 'terms' => '1', 'agreement' => '1'])
+        ->assertRedirect(route('start', absolute: false));
+
+    expect(User::query()->sole()->roleList())->toBe([])
+        ->and(User::query()->sole()->player_agreed_at)->toBeNull();
+});
+
+it('takes an existing account from the door into the game', function (): void {
+    $player = User::factory()->player()->create(['google_id' => GOOGLE_SUB]);
+    ['room' => $room, 'link' => $link] = googleInvitation($this);
+
+    throughGoogle($this)->assertRedirect($link);
+    $this->assertAuthenticatedAs($player);
+
+    $this->get($link)->assertRedirect(route('rooms.show', $room));
+    expect($room->rowOf($player)?->isPresent())->toBeTrue();
 });

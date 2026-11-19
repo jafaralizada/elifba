@@ -14,6 +14,7 @@ use App\Domain\Rooms\Models\RoomGame;
 use App\Domain\Rooms\Models\RoomPlayer;
 use App\Domain\Rooms\Models\RoomRound;
 use App\Domain\Rooms\Support\RoomClock;
+use App\Domain\Rooms\Support\RoomJoinLink;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
@@ -318,7 +319,7 @@ it('sends no account id, address or solution to any room page', function (): voi
     config(['app.url' => 'http://192.168.1.20:8000']);
     $this->actingAs($this->tural)->get(route('rooms.show', $other))
         ->assertInertia(fn (Assert $page) => $page->where('join', [
-            'url' => 'http://192.168.1.20:8000/oyun/'.$other->code,
+            'url' => 'http://192.168.1.20:8000/oyun/'.$other->code.'?t='.RoomJoinLink::tag($other),
             'entry_url' => 'http://192.168.1.20:8000/oyun',
         ]));
 });
@@ -392,7 +393,7 @@ it('gives the screen only to the host', function (): void {
     expect(array_keys($props))->toContain('room', 'state', 'place_labels', 'join')
         ->and($props['room'])->toBe(['id' => $room->id, 'status' => 'open'])
         ->and($props['state'])->toBe($this->getJson(route('rooms.state', [$room, 'for' => 'screen']), ['Referer' => route('rooms.screen', $room)])->json())
-        ->and($props['join']['url'])->toBe(rtrim((string) config('app.url'), '/').'/oyun/'.$room->code);
+        ->and($props['join']['url'])->toBe(rtrim((string) config('app.url'), '/').'/oyun/'.$room->code.'?t='.RoomJoinLink::tag($room));
     $this->get(route('rooms.screen', $room))->assertInertia(fn (Assert $page) => $page->component('rooms/screen'));
 
     // In a game it follows the same state, and writes nothing but its own read (`rooms.screen_seen_ms`).
@@ -656,4 +657,53 @@ it('sends the screen what it needs to choose and start', function (): void {
 
     expect([$game?->mechanic, $game?->difficulty])->toBe([RoomMechanic::RecallCells, 1])
         ->and(pagesProps($this->get(route('rooms.screen', $room)))['state']['game']['mechanic'])->toBe('recall_cells');
+});
+
+it('gives the start screen, the screen and the round the link with the room\'s tag', function (): void {
+    // ADR 033 decision 5: the QR's and the shared link's address carries the room's tag, derived and stored nowhere.
+    $room = Rooms::open($this->resad);
+    Rooms::join($room, $this->aygun);
+    $root = rtrim((string) config('app.url'), '/');
+    $tag = RoomJoinLink::tag($room);
+    $link = ['url' => "{$root}/oyun/{$room->code}?t={$tag}", 'entry_url' => "{$root}/oyun"];
+
+    expect($tag)->toMatch('/^[0-9a-f]{6}$/')
+        ->and(RoomJoinLink::tag($room->refresh()))->toBe($tag)
+        ->and(RoomJoinLink::tag(Rooms::open($this->tural)))->not->toBe($tag)
+        ->and(RoomJoinLink::tagMatches($room, null))->toBeTrue()
+        ->and(RoomJoinLink::tagMatches($room, $tag))->toBeTrue()
+        ->and(RoomJoinLink::tagMatches($room, strtoupper($tag)))->toBeFalse();
+
+    // The host's start screen and a player's, with «Dostunu çağır» behind it.
+    expect(pagesProps($this->actingAs($this->resad)->get(route('rooms.show', $room)))['join'])->toBe($link)
+        ->and(pagesProps($this->actingAs($this->aygun)->get(route('rooms.show', $room)))['join'])->toBe($link)
+        // The big screen.
+        ->and(pagesProps($this->actingAs($this->resad)->get(route('rooms.screen', $room)))['join'])->toBe($link);
+
+    // In a round, behind the code chip.
+    $game = Rooms::playing($room);
+    $this->travelTo(Rooms::at($game, RoomPhase::Answer, 0));
+    expect(pagesProps($this->actingAs($this->aygun)->get(route('rooms.show', $room)))['join'])->toBe($link);
+
+    // The tag is in no table: the room's row holds no column with it.
+    expect(json_encode(DB::table('rooms')->where('id', $room->id)->first()))->not->toContain($tag);
+});
+
+it('shows nothing of a room at the door', function (): void {
+    // ADR 033 decision 11: the door reads no room — not the code, the game, the host or who has joined.
+    $room = Rooms::open($this->resad);
+    Rooms::join($room, $this->aygun);
+    auth()->logout();
+
+    $this->get(route('rooms.join', ['code' => (string) $room->code, 't' => RoomJoinLink::tag($room)]), ['Sec-Fetch-Site' => 'none', 'Sec-Fetch-Mode' => 'navigate', 'Sec-Fetch-Dest' => 'document'])
+        ->assertRedirect(route('rooms.invited'));
+    $props = pagesProps($this->get(route('rooms.invited')));
+    $json = (string) json_encode($props);
+
+    expect(array_keys($props))->toEqualCanonicalizing(['errors', 'name', 'auth', 'sidebarOpen', 'locale', 'locales', 'passwordRules', 'googleSignIn'])
+        ->not->toContain('room', 'join', 'code', 'players', 'host', 'state');
+
+    foreach ([(string) $room->code, $room->id, 'Rəşad', 'Aygün', RoomJoinLink::tag($room)] as $secret) {
+        expect($json)->not->toContain($secret);
+    }
 });

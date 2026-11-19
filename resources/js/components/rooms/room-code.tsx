@@ -1,6 +1,7 @@
-import { QrCode } from 'lucide-react';
+import { Check, Copy, MessageCircle, QrCode, Share2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -13,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
+import { shareAbilities, shareWay, whatsAppHref } from '@/rooms/share';
 
 /** Where a phone joins the open room, from the server (`RoomJoinLink`). */
 export type JoinLink = { url: string; entry_url: string };
@@ -77,11 +79,112 @@ export function RoomQr({
     );
 }
 
+const noSubscription = () => () => {};
+const noWay = () => null;
+
+/** The second button's way on this browser (`shareWay()`), read when drawn and never stored. */
+function currentShareWay() {
+    return shareWay(shareAbilities());
+}
+
+/**
+ * The share row (docs/frontend.md rule 15 "The invitation link", ADR 033
+ * decisions 1–3): «WhatsApp», a link to WhatsApp's own `wa.me` address
+ * with `rooms.share.text` and `join.url` in it — a link the person taps,
+ * never a request, script or image of WhatsApp's, and never a name — and
+ * beside it «Paylaş», the system's sheet with the same message, on a
+ * touched device that has one, else «Linki kopyala», the link alone, else
+ * nothing. Two 44px `outline` buttons side by side; never on the big screen.
+ */
+export function ShareRow({
+    join,
+    className,
+}: {
+    join: JoinLink;
+    className?: string;
+}) {
+    const { t } = useTranslation();
+    const way = useSyncExternalStore(noSubscription, currentShareWay, noWay);
+    const [copied, setCopied] = useState(false);
+    const text = t('rooms.share.text', { url: join.url });
+
+    useEffect(() => {
+        if (!copied) {
+            return;
+        }
+
+        const timer = window.setTimeout(() => setCopied(false), 2000);
+
+        return () => window.clearTimeout(timer);
+    }, [copied]);
+
+    const sheet = () => {
+        // A cancelled sheet says nothing.
+        navigator.share({ text }).catch(() => {});
+    };
+
+    const copy = () => {
+        navigator.clipboard
+            .writeText(join.url)
+            .then(() => setCopied(true))
+            .catch(() => {});
+    };
+
+    return (
+        <div
+            className={cn(
+                'grid w-full gap-2',
+                way === null ? 'grid-cols-1' : 'grid-cols-2',
+                className,
+            )}
+        >
+            <Button asChild variant="outline" className="h-11 min-w-0">
+                <a
+                    href={whatsAppHref(text)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={t('rooms.share.whatsapp_label')}
+                >
+                    <MessageCircle aria-hidden />
+                    {t('rooms.share.whatsapp')}
+                </a>
+            </Button>
+            {way === 'sheet' && (
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 min-w-0"
+                    onClick={sheet}
+                >
+                    <Share2 aria-hidden />
+                    {t('rooms.share.share')}
+                </Button>
+            )}
+            {way === 'copy' && (
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 min-w-0"
+                    onClick={copy}
+                >
+                    {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+                    <span aria-live="polite" className="truncate">
+                        {copied
+                            ? t('rooms.share.copied')
+                            : t('rooms.share.copy')}
+                    </span>
+                </Button>
+            )}
+        </div>
+    );
+}
+
 /**
  * The start screen's invitation (docs/frontend.md rule 15 "Games first",
  * ADR 026 decision 16): the QR of `join.url` (dark on white in both
  * themes), «Oyun kodu», the code in two groups of three and how to join
- * with either. `qr` is its side: 160px, 120px under the room's standing.
+ * with either, and from I2 the share row under it (ADR 033 decision 1).
+ * `qr` is its side: 160px, 120px under the room's standing.
  */
 export function InviteCard({
     code,
@@ -109,11 +212,14 @@ export function InviteCard({
                 {spacedCode(code)}
             </span>
             {join !== null && (
-                <span className="max-w-xs text-xs leading-snug text-balance text-muted-foreground">
-                    {t('rooms.screen.join', {
-                        address: typedAddress(join.entry_url),
-                    })}
-                </span>
+                <>
+                    <span className="max-w-xs text-xs leading-snug text-balance text-muted-foreground">
+                        {t('rooms.screen.join', {
+                            address: typedAddress(join.entry_url),
+                        })}
+                    </span>
+                    <ShareRow join={join} className="mt-2 max-w-xs" />
+                </>
             )}
         </section>
     );
@@ -122,7 +228,8 @@ export function InviteCard({
 /**
  * The code and its 224px QR in a dialog, so a late player can scan it from
  * any phone in the room: behind the round's code chip (`CodeChip`) and a
- * player's «Dostunu çağır».
+ * player's «Dostunu çağır». From I2 the share row sits under the QR (ADR
+ * 033 decision 1): a player may send the link as they may show the QR.
  */
 export function CodeDialog({
     code,
@@ -157,6 +264,7 @@ export function CodeDialog({
                         {spacedCode(code)}
                     </span>
                     {join !== null && <RoomQr url={join.url} size={224} />}
+                    {join !== null && <ShareRow join={join} />}
                 </div>
                 <DialogClose asChild>
                     <Button type="button" variant="secondary" className="h-11">

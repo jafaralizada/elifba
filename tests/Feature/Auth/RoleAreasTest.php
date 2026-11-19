@@ -335,6 +335,25 @@ it('places classes, rankings, teacher words and class games in the teacher area,
     }
 });
 
+it('keeps the invitation\'s door the only room route outside the player group', function (): void {
+    // ADR 033 decision 11: `/oyun/qeydiyyat`, where a visitor makes a player account — `rooms.enabled` and `guest`, no `auth`.
+    $outside = [];
+
+    foreach (Route::getRoutes()->getRoutes() as $route) {
+        if (preg_match('#^(rooms|oyun|otaq)(/|$)#', $route->uri()) === 1 && areaGroupsOf($route) !== ['player']) {
+            $outside[areaRouteKey($route)] = $route->gatherMiddleware();
+        }
+    }
+
+    expect(array_keys($outside))->toEqualCanonicalizing(['rooms.invited', 'rooms.invited.store']);
+
+    foreach ($outside as $key => $middleware) {
+        expect($middleware)->toContain('rooms.enabled', 'guest')
+            ->and(array_filter($middleware, static fn (mixed $name): bool => is_string($name) && ($name === 'auth' || str_starts_with($name, 'auth:') || str_starts_with($name, 'role'))))->toBe([], $key)
+            ->and(Route::getRoutes()->getByName($key)?->parameterNames())->toBe([], $key);
+    }
+});
+
 it('refuses a teacher without the parent role on every child route', function (): void {
     ['teacher' => $teacher, 'child' => $child, 'uri' => $uri] = teacherWithParentRows();
     $before = areaSnapshot();

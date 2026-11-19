@@ -343,7 +343,25 @@ it('keeps the room pages apart from the children\'s on the page side', function 
         }
     }
 
-    expect($wrong)->toBe([]);
+    expect($wrong)->toBe([])
+        // The invitation's door and the share row's rules are walked too (ADR 033).
+        ->and(File::exists("{$js}/pages/rooms/invited.tsx"))->toBeTrue()
+        ->and(File::exists("{$js}/rooms/share.ts"))->toBeTrue();
+});
+
+it('keeps the invitation away from classes, children and games, and from the room\'s own rows', function (): void {
+    // ADR 033 decision 8: the invitation holds a code and a tag and reads no room —
+    // a visitor learns nothing from it — and nothing of a class, a child or a game.
+    foreach (['Support/RoomInvitation.php', 'Http/Middleware/RememberRoomInvitation.php', 'Actions/Fortify/CreateInvitedPlayer.php'] as $file) {
+        $names = appNamesIn(app_path($file));
+
+        expect(array_filter($names, static fn (string $name): bool => str_starts_with($name, 'App\\Domain\\')))->toBe([], $file);
+    }
+
+    // The door's controller renders the page from no room either.
+    $door = (string) file_get_contents(app_path('Http/Controllers/Rooms/RoomInvitedController.php'));
+    expect(appNamesIn(app_path('Http/Controllers/Rooms/RoomInvitedController.php')))->not->toContain('App\\Domain\\Rooms\\Models\\Room')
+        ->and($door)->not->toContain('RoomCode::');
 });
 
 it('takes the taunts\' images from the room\'s own list, never from the children\'s catalog', function (): void {
