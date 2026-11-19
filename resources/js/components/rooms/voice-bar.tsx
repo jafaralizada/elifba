@@ -255,7 +255,10 @@ function Bar({ bar, voice }: { bar: VoiceBarForm; voice: RoomVoice }) {
             return <Trouble trouble={bar.trouble} voice={voice} />;
         case 'in':
             return (
-                <Band inner="min-h-14 py-1.5 pr-3 md:pr-5">
+                <Band
+                    className={cn(bar.mic === 'on' && 'bg-(--voice-tint)')}
+                    inner="min-h-14 py-1 pr-3 md:pr-5"
+                >
                     <button
                         type="button"
                         aria-haspopup="dialog"
@@ -388,7 +391,12 @@ export function SpeakingBars({ className }: { className?: string }) {
     );
 }
 
-/** The microphone as a 44px pill with a word: «Sönülü», «Açıq» (filled), «Susdurulub» (dashed). */
+/**
+ * The microphone, the bar's strongest control (docs/frontend.md rule 15
+ * "Live voice"): a 48px button that says what a tap does — «Mikrofonu aç»,
+ * filled in the voice's colour; «Mikrofonu söndür» with a pulsing dot while
+ * open, outlined on the bar the open microphone tints; «Susdurulub», dashed.
+ */
 function MicPill({
     mic,
     onTap,
@@ -402,37 +410,36 @@ function MicPill({
     return (
         <button
             type="button"
-            aria-pressed={mic === 'muted' ? undefined : open}
-            title={
-                mic === 'muted'
-                    ? t('rooms.voice.muted_you')
-                    : open
-                      ? t('rooms.voice.mic.close')
-                      : t('rooms.voice.mic.open')
-            }
+            data-voice-mic={mic}
+            title={mic === 'muted' ? t('rooms.voice.muted_you') : undefined}
             disabled={mic === 'opening'}
             onClick={onTap}
             className={cn(
-                'inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full border-[1.5px] pr-3.5 pl-3 text-sm font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-wait',
+                'inline-flex h-12 shrink-0 items-center gap-2 rounded-full border-[1.5px] px-4 text-[0.9375rem] font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-wait',
                 open
-                    ? FILLED
+                    ? 'border-(--voice) bg-background text-(--voice-text)'
                     : mic === 'muted'
-                      ? 'border-dashed text-muted-foreground'
-                      : 'bg-card',
+                      ? 'border-dashed bg-card text-muted-foreground'
+                      : cn(FILLED, 'shadow-sm'),
             )}
         >
             {mic === 'opening' ? (
-                <Spinner className="size-4.5" />
+                <Spinner className="size-5" />
             ) : open ? (
-                <Mic aria-hidden className="size-4.5" />
+                <span aria-hidden className="relative flex size-2.5">
+                    <span className="absolute inline-flex size-full rounded-full bg-(--voice) opacity-60 motion-safe:animate-ping" />
+                    <span className="relative inline-flex size-2.5 rounded-full bg-(--voice)" />
+                </span>
+            ) : mic === 'muted' ? (
+                <MicOff aria-hidden className="size-5" />
             ) : (
-                <MicOff aria-hidden className="size-4.5" />
+                <Mic aria-hidden className="size-5" />
             )}
             {open
-                ? t('rooms.voice.mic.on')
+                ? t('rooms.voice.mic.close')
                 : mic === 'muted'
                   ? t('rooms.voice.mic.muted')
-                  : t('rooms.voice.mic.off')}
+                  : t('rooms.voice.mic.open')}
         </button>
     );
 }

@@ -289,7 +289,7 @@ What this meets:
 ### The pages (C4; docs/frontend.md rule 15 "Live voice")
 
 34. **Variant A, «Zolaq».** The voice is a bar docked above the tab bar on every moment of the room page — the start screen, a round, a reveal, the final — and absent while the voice is off:
-    - **the microphone** is the bar's button, in words: «Sönülü» with `MicOff`, or «Açıq» with `Mic`, filled, so its owner never overlooks an open microphone; «Susdurulub» with a dashed outline for a muted player;
+    - **the microphone** is the bar's strongest button and says what a tap does (the owner, 2026-11-19: «Sönülü» read as a label, not as a button): «Mikrofonu aç» with `Mic`, filled in the voice's colour; while open «Mikrofonu söndür» with a pulsing dot, outlined in the voice's colour on a bar tinted with it, so its owner never overlooks an open microphone; «Susdurulub» with a dashed outline for a muted player. `rooms.voice.mic.off` and `.on` («Sönülü», «Açıq») stay in the words but are no longer drawn;
     - **the speaker** is the bar's text: «:name danışır», «Heç kim danışmır», with «Səsdə: :count nəfər» under it;
     - **joining**: the bar is an invitation — «Aparıcı canlı səsi açıb», «Səsə qoşul» — and the first time the sheet with the sentence; a waiting newcomer's bar says they wait;
     - **the host** turns the voice on with a switch in «Otağın idarəsi», and mutes, admits and turns it off in the sheet «Canlı səs» that the bar opens — one tap away in a round too. A waiting newcomer adds a line above the bar with «Səsə burax»;
