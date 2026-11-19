@@ -9,20 +9,20 @@ use App\Domain\Rooms\Support\RoomSignal;
 use App\Domain\Rooms\Support\RoomVoice;
 use App\Domain\Rooms\Support\RoomVoiceCut;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 /**
  * The host's switch «Canlı səs» (docs/architecture.md §12 "Live voice",
  * ADR 031 decision 9): `PUT /rooms/{room}/voice` `{on}`, at any moment, a
  * round included. Under the room row's lock it refuses a closed room.
  *
- * On: refused with `rooms.voice.errors.busy` while
- * `elifba.rooms.voice.max_rooms` other open rooms have their voice on; sets
- * `voice_at` and lets in the host's row and every present player's that
- * is not let in yet — the list the host is looking at. A mute stays as the
- * host left it. Off: clears `voice_at` and raises the epoch, which closes
+ * A room's voice is on from its opening while the instance's voice is on
+ * (`OpenRoom`), so this is mostly the host turning it off and on again
+ * (ADR 031 decision 37, as amended 2026-11-19). On: sets `voice_at` and
+ * lets in the host's row and every present player's that is not let in
+ * yet — the list the host is looking at. Never refused: the limit on
+ * voice rooms is the ticket's (`JoinRoomVoice`, decision 38). A mute stays
+ * as the host left it. Off: clears `voice_at` and raises the epoch, which closes
  * the voice room for everyone. A change marks the room active, raises its
  * revision and signals it; then the voice server is told (`RoomVoiceCut`:
  * the voice room made, or the old one deleted). Asking for what already is
@@ -32,7 +32,6 @@ final readonly class SetRoomVoice
 {
     /**
      * @throws AuthorizationException when the room is closed
-     * @throws ValidationException on `on` when too many rooms have their voice on
      */
     public function handle(Room $room, RoomVoiceSwitchData $data): void
     {
@@ -66,17 +65,8 @@ final readonly class SetRoomVoice
         });
     }
 
-    /**
-     * @throws ValidationException
-     */
     private static function turnOn(Room $locked): void
     {
-        $others = Room::query()->open()->whereNotNull('voice_at')->whereKeyNot($locked->id)->count();
-
-        if ($others >= Config::integer('elifba.rooms.voice.max_rooms')) {
-            throw ValidationException::withMessages(['on' => __('rooms.voice.errors.busy')]);
-        }
-
         $locked->voice_at = now();
 
         foreach ($locked->players()->whereNull('voice_admitted_at')->whereNull('removed_at')->get() as $row) {

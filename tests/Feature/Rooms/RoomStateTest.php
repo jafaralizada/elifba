@@ -263,7 +263,7 @@ it('builds the voice fixtures from rows: a player of each standing with the voic
     RoomPlayer::factory()->for($room)->for($tural)->create(['id' => $turalRow, 'joined_at' => $at(2), 'voice_admitted_at' => now(), 'voice_muted_at' => now()]);
     // Let in once, but without an account now: no standing.
     RoomPlayer::factory()->for($room)->create(['id' => $namelessRow, 'user_id' => null, 'joined_at' => $at(3), 'voice_admitted_at' => now()]);
-    // Came after the voice was turned on: waits.
+    // Came in while a game ran, the voice on: waits.
     RoomPlayer::factory()->for($room)->for($leyla)->create(['id' => $leylaRow, 'joined_at' => $at(4)]);
     RoomPlayer::factory()->for($room)->removed()->create(['joined_at' => $at(5), 'voice_admitted_at' => now()]);
 

@@ -1,27 +1,39 @@
 /**
  * The live voice's connection (docs/architecture.md §12 "Live voice", "The
- * page (C4)"; ADR 031 decisions 1, 2, 5, 10, 11, 26 and 31) — the one file
- * that imports `livekit-client`, and only when a player taps «Səsə qoşul»
- * (`loadVoiceLibrary()`), so the library is a chunk of its own from the
- * app's host and no other page loads it.
+ * page (C4)"; ADR 031 decisions 1, 2, 5, 10, 11, 26 and 31, and as amended
+ * 2026-11-19 decisions 35, 38 and 40) — the one file that imports
+ * `livekit-client`, and only when the page first joins the voice — by
+ * itself for an admitted player whose account agreed, or on the tap of
+ * «Səsə qoşul» (`loadVoiceLibrary()`) — so the library is a chunk of its
+ * own from the app's host and no other page loads it.
  *
  * A join asks the app for a ticket (`POST /rooms/{room}/voice/tickets`)
  * and connects to the instance's own voice server with an empty list of
  * ICE servers, always: neither a public STUN server nor the voice server's
- * own list is ever used. The microphone is off at every join and is opened
- * and closed only by its owner's tap (`setMic()`); a hidden page closes its
- * own microphone at once and says so when shown; when the voice room is
- * closed under the page (a new epoch: a removal, the sweep), the page asks
- * for a new ticket and comes back by itself with its microphone as it was
- * a moment before, and stops after the last try. The page never sends a
- * data message, and what the connection says — who is there, whose
- * microphone is open, who speaks — is reported as `VoiceConnection` for
- * `voiceView()` to draw and is stored nowhere.
+ * own list is ever used. A join captures nothing: the microphone is off at
+ * every join, and only its owner's tap opens it (`setMic()`). The page owns
+ * one capture of it, made at the owner's first «Mikrofonu aç» — the
+ * browser's one question on the page, where it asks at all — and kept for
+ * the whole voice: closing it disables the track, which sends silence and
+ * tells the voice server it is muted, and opening it again enables the
+ * same track, with no new `getUserMedia` and so no question. It is
+ * released — stopped, and the device's indicator goes out — when the page
+ * leaves the voice («Səsdən çıx», the voice off, a removal, a close, a
+ * failure, the page left), at the host's mute and when the browser ends
+ * it. A hidden page closes its own microphone at once, keeping the
+ * capture, and says so when shown; when the voice room is closed under the
+ * page (a new epoch: a removal, the sweep), the page asks for a new ticket
+ * and comes back by itself, publishing the kept microphone again, open
+ * only if it was open a moment before, and stops after the last try. A
+ * full instance (`busy`) waits for a tap. The page never sends a data
+ * message, and what the connection says — who is there, whose microphone
+ * is open, who speaks — is reported as `VoiceConnection` for `voiceView()`
+ * to draw and is stored nowhere.
  */
 import type * as LiveKit from 'livekit-client';
 import { z } from 'zod';
 import type { ShownPage } from './live';
-import type { VoiceConnection, VoiceLive } from './voice-view';
+import type { VoiceConnection, VoiceLive, VoiceTrouble } from './voice-view';
 
 /** The parts of `livekit-client` this file uses. */
 export type VoiceLibrary = Pick<
@@ -32,9 +44,11 @@ export type VoiceLibrary = Pick<
     | 'ConnectionState'
     | 'AudioPresets'
     | 'Track'
+    | 'TrackEvent'
+    | 'createLocalAudioTrack'
 >;
 
-/** The library, as its own chunk: imported on the tap of «Səsə qoşul», never before. */
+/** The library, as its own chunk: imported when the page first joins the voice, never before. */
 export function loadVoiceLibrary(): Promise<VoiceLibrary> {
     return import('livekit-client');
 }
@@ -54,6 +68,8 @@ export type VoiceTicketOutcome =
     | { kind: 'agreement' }
     /** 401, 403, 404, 419: not admitted, not present, the voice off, the room closed, the session over. */
     | { kind: 'refused' }
+    /** 503 `{status: "busy"}`: the instance has no room for another voice in use (ADR 031 decision 38). */
+    | { kind: 'busy' }
     /** 503, a limit, a network failure: the voice server is not there now. */
     | { kind: 'unavailable' };
 
@@ -63,22 +79,32 @@ export type MicError = 'denied' | 'no_mic';
 /** Waits before each try for a new ticket when the voice room was closed under the page. */
 export const REJOIN_MS = [0, 1000, 3000] as const;
 
-/** Audio as ADR 031 decision 31 sets it: Opus speech, DTX and RED, the browser's own processing. */
+/** The browser's own processing of the captured microphone (ADR 031 decision 31). */
+export const AUDIO_CAPTURE = {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+} as const;
+
+/**
+ * Audio as ADR 031 decision 31 sets it: Opus speech, DTX and RED, the
+ * browser's own processing. A closed microphone is a disabled track the
+ * page keeps (`stopMicTrackOnMute: false`), and a voice room closed under
+ * the page leaves it to the page (`stopLocalTrackOnUnpublish: false`):
+ * decision 35, as amended 2026-11-19 — C4 stopped it at every close.
+ */
 export function roomOptions(lib: VoiceLibrary): LiveKit.RoomOptions {
     return {
         adaptiveStream: false,
         dynacast: false,
         disconnectOnPageLeave: true,
-        audioCaptureDefaults: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-        },
+        stopLocalTrackOnUnpublish: false,
+        audioCaptureDefaults: { ...AUDIO_CAPTURE },
         publishDefaults: {
             audioPreset: lib.AudioPresets.speech,
             dtx: true,
             red: true,
-            stopMicTrackOnMute: true,
+            stopMicTrackOnMute: false,
         },
     };
 }
@@ -113,6 +139,12 @@ export type VoiceOptions = {
 };
 
 type Room = InstanceType<VoiceLibrary['Room']>;
+type MicTrack = LiveKit.LocalAudioTrack;
+
+/** A capture the browser has not ended. */
+function liveTrack(track: MicTrack): boolean {
+    return track.mediaStreamTrack.readyState !== 'ended';
+}
 
 /**
  * One page's voice: `join()`, `setMic()`, `leave()`, `dispose()`. It holds
@@ -125,6 +157,10 @@ export class VoiceLink {
     /** The owner's microphone as the owner left it: only a tap, the hidden page or the host's mute changes it. */
     private micOn = false;
     private opening = false;
+    /** The page's one capture of the microphone, made at the owner's first open and kept, disabled while closed, until the voice is left. */
+    private mic: MicTrack | null = null;
+    /** The connection the capture is published in, if any. */
+    private micRoom: Room | null = null;
     /** Whether the player is in the voice by their own choice: a leave or a refusal ends it. */
     private wanted = false;
     private rejoining = false;
@@ -155,7 +191,11 @@ export class VoiceLink {
         return this.connection;
     }
 
-    /** The player's tap on «Səsə qoşul» or «Razıyam, qoşul» (`agree`), «Yenidən cəhd et», «Yenidən qoşul», «Burada qoşul». */
+    /**
+     * The page joining by itself (ADR 031 decision 40), or the player's tap
+     * on «Səsə qoşul» or «Razıyam, qoşul» (`agree`), «Yenidən cəhd et»,
+     * «Yenidən qoşul», «Burada qoşul». It listens and captures nothing.
+     */
     async join(agree = false): Promise<void> {
         if (
             this.disposed ||
@@ -196,13 +236,19 @@ export class VoiceLink {
         switch (outcome.kind) {
             case 'agreement':
                 this.wanted = false;
+                this.releaseMic();
                 this.report({ kind: 'idle' });
                 this.options.onAgreement?.();
 
                 return;
             case 'refused':
                 this.wanted = false;
+                this.releaseMic();
                 this.report({ kind: 'idle' });
+
+                return;
+            case 'busy':
+                this.fail('busy');
 
                 return;
             case 'unavailable':
@@ -220,11 +266,16 @@ export class VoiceLink {
         }
     }
 
-    /** The owner's tap on the microphone. The browser's own question comes with the first `true`, never earlier. */
+    /**
+     * The owner's tap on the microphone. The first `true` of the page
+     * captures it — the browser's own question, never earlier — and every
+     * later one enables the kept capture; `false` disables it.
+     */
     async setMic(on: boolean): Promise<void> {
         const room = this.room;
+        const lib = this.lib;
 
-        if (room === null || this.connection.kind !== 'in') {
+        if (room === null || lib === null || this.connection.kind !== 'in') {
             return;
         }
 
@@ -232,9 +283,7 @@ export class VoiceLink {
             this.micOn = false;
             this.opening = false;
             this.emit();
-            await room.localParticipant
-                .setMicrophoneEnabled(false)
-                .catch(() => undefined);
+            await this.mic?.mute().catch(() => undefined);
 
             return;
         }
@@ -247,8 +296,30 @@ export class VoiceLink {
         this.emit();
 
         try {
-            await room.localParticipant.setMicrophoneEnabled(true);
-            this.micOn = this.room === room && this.opening;
+            const track = await this.capture(lib);
+            const still = () =>
+                track !== null &&
+                this.mic === track &&
+                liveTrack(track) &&
+                this.room === room &&
+                this.opening;
+
+            if (track !== null && still()) {
+                await this.publishMic(room, track);
+            }
+
+            // Enabled only while it is still this owner's open capture: the browser may have ended it
+            // (a call, the device gone) while it was published, and the library would capture an ended
+            // track again by itself — a microphone nobody tapped.
+            if (track !== null && still()) {
+                await track.unmute();
+                this.micOn = still();
+            }
+
+            if (track !== null && !this.micOn && this.mic === track) {
+                // Closed, ended or the voice room changed while the browser asked: kept closed, or released.
+                await track.mute().catch(() => undefined);
+            }
         } catch (error) {
             this.micOn = false;
             this.options.onMicError?.(micError(error));
@@ -267,8 +338,8 @@ export class VoiceLink {
     /** «Səsdən çıx», or the voice going off: one tap, and nothing of the game changes. */
     async leave(): Promise<void> {
         this.wanted = false;
-        this.micOn = false;
-        this.opening = false;
+        // Stopped, not unpublished: the voice room is left at once, and an unpublish would renegotiate a connection that is closing.
+        this.releaseMic(false);
         const room = this.room;
         this.room = null;
         this.report({ kind: 'idle' });
@@ -295,6 +366,86 @@ export class VoiceLink {
         this.disposed = true;
         this.stopWatching();
         void this.leave();
+    }
+
+    /** The kept capture, or a new one — the browser's question, where it asks — when there is none or the browser ended it; null once the page left the voice meanwhile. */
+    private async capture(lib: VoiceLibrary): Promise<MicTrack | null> {
+        if (this.mic !== null && liveTrack(this.mic)) {
+            return this.mic;
+        }
+
+        this.dropMic();
+        const track = await lib.createLocalAudioTrack({ ...AUDIO_CAPTURE });
+
+        if (!this.wanted || this.disposed || this.mic !== null) {
+            track.stop();
+
+            return this.mic;
+        }
+
+        this.mic = track;
+        track.on(lib.TrackEvent.Ended, () => this.micEnded(track));
+
+        return track;
+    }
+
+    /** Publishes the kept capture in this voice room, once. */
+    private async publishMic(room: Room, track: MicTrack): Promise<void> {
+        if (this.micRoom !== room) {
+            await room.localParticipant.publishTrack(track);
+            this.micRoom = room;
+        }
+    }
+
+    /**
+     * Stops the capture, so the device's indicator goes out: the page left
+     * the voice, the host muted the player, or the browser ended it. The
+     * next «Mikrofonu aç» captures again.
+     */
+    private releaseMic(unpublish = true): void {
+        this.micOn = false;
+        this.opening = false;
+        this.dropMic(unpublish);
+    }
+
+    /** Stops the capture, if any, and unpublishes it from a voice room the page stays in. */
+    private dropMic(unpublish = true): void {
+        const track = this.mic;
+        const room = this.micRoom;
+        this.mic = null;
+        this.micRoom = null;
+
+        if (track === null) {
+            return;
+        }
+
+        if (unpublish && room !== null) {
+            void room.localParticipant
+                .unpublishTrack(track, true)
+                .catch(() => undefined);
+        }
+
+        track.stop();
+    }
+
+    /** The browser ended the capture (a call, the device gone): closed first, so nothing captures again without a tap, then released. */
+    private micEnded(track: MicTrack): void {
+        if (track !== this.mic) {
+            return;
+        }
+
+        this.micOn = false;
+        this.opening = false;
+        void track
+            .mute()
+            .catch(() => undefined)
+            .finally(() => {
+                if (this.mic === track) {
+                    this.releaseMic();
+                    this.emit();
+                }
+            });
+        this.emit();
     }
 
     private async askTicket(agree: boolean): Promise<VoiceTicketOutcome> {
@@ -339,6 +490,7 @@ export class VoiceLink {
         }
 
         this.report(this.inState(room));
+        this.options.onAudio?.(room.canPlaybackAudio);
         void room.startAudio().catch(() => undefined);
 
         return true;
@@ -378,14 +530,13 @@ export class VoiceLink {
                 element.remove();
             }
         });
-        // The host's mute takes the permission to publish: the microphone is closed and stays closed (decision 10).
+        // The host's mute takes the permission to publish: the microphone is released and stays closed (decisions 10, 35).
         room.on(E.ParticipantPermissionsChanged, (_before, participant) => {
             if (
                 participant === room.localParticipant &&
                 participant.permissions?.canPublish === false
             ) {
-                this.micOn = false;
-                this.opening = false;
+                this.releaseMic();
             }
 
             update();
@@ -416,6 +567,8 @@ export class VoiceLink {
         }
 
         this.room = null;
+        // The capture outlives the voice room (`stopLocalTrackOnUnpublish: false`), published nowhere now.
+        this.micRoom = null;
         const R = lib.DisconnectReason;
 
         if (this.leaving || !this.wanted || this.disposed) {
@@ -439,12 +592,13 @@ export class VoiceLink {
         }
 
         if (reason === R.CLIENT_INITIATED) {
-            // The library left with the page (`pagehide`, a frozen tab): back in when the page is shown.
-            this.micOn = false;
+            // The library left with the page (`pagehide`, a frozen tab), and stopped the capture with it: back in, listening, when the page is shown.
+            this.releaseMic();
             this.report({
                 kind: 'in',
                 live: emptyLive(),
                 mic: 'off',
+                captured: false,
                 reconnecting: true,
             });
 
@@ -459,7 +613,7 @@ export class VoiceLink {
         this.fail('dropped');
     }
 
-    /** A new ticket for the voice room as it is now, the microphone as it was a moment before. */
+    /** A new ticket for the voice room as it is now, the kept microphone published again as it was a moment before. */
     private async rejoin(lib: VoiceLibrary, mic: boolean): Promise<void> {
         if (this.rejoining) {
             return;
@@ -471,6 +625,7 @@ export class VoiceLink {
             kind: 'in',
             live: emptyLive(),
             mic: 'off',
+            captured: this.mic !== null && liveTrack(this.mic),
             reconnecting: true,
         });
 
@@ -494,7 +649,15 @@ export class VoiceLink {
                 ) {
                     // Turned off, removed, gone: the state says which.
                     this.wanted = false;
+                    this.releaseMic();
                     this.report({ kind: 'idle' });
+
+                    return;
+                }
+
+                if (outcome.kind === 'busy') {
+                    // Full: a tap tries again, never the page.
+                    this.fail('busy');
 
                     return;
                 }
@@ -503,9 +666,7 @@ export class VoiceLink {
                     outcome.kind === 'ticket' &&
                     (await this.connect(lib, outcome.ticket))
                 ) {
-                    if (mic) {
-                        await this.setMic(true);
-                    }
+                    await this.restoreMic(mic);
 
                     return;
                 }
@@ -515,6 +676,38 @@ export class VoiceLink {
         } finally {
             this.rejoining = false;
         }
+    }
+
+    /** The kept capture into the new voice room: open only if it was open a moment before, else published closed. */
+    private async restoreMic(open: boolean): Promise<void> {
+        const room = this.room;
+        const track = this.mic;
+
+        if (room === null || track === null) {
+            return;
+        }
+
+        if (!liveTrack(track)) {
+            this.releaseMic();
+            this.emit();
+
+            return;
+        }
+
+        if (open) {
+            await this.setMic(true);
+
+            return;
+        }
+
+        try {
+            await track.mute();
+            await this.publishMic(room, track);
+        } catch {
+            // A voice room that will not take it: the next «Mikrofonu aç» publishes it.
+        }
+
+        this.emit();
     }
 
     private visibilityChanged(): void {
@@ -539,19 +732,17 @@ export class VoiceLink {
         }
     }
 
-    /** No open microphone on a page nobody sees: closed at once, and said when the page is shown. */
+    /** No open microphone on a page nobody sees: closed at once — disabled, the capture kept — and said when the page is shown. */
     private closeHiddenMic(): void {
         this.micOn = false;
         this.opening = false;
-        void this.room?.localParticipant
-            .setMicrophoneEnabled(false)
-            .catch(() => undefined);
+        void this.mic?.mute().catch(() => undefined);
         this.options.onHiddenMic?.();
     }
 
-    private fail(trouble: 'unreachable' | 'dropped' | 'elsewhere'): void {
+    private fail(trouble: VoiceTrouble): void {
         this.wanted = false;
-        this.micOn = false;
+        this.releaseMic();
         this.report({ kind: 'failed', trouble });
     }
 
@@ -581,6 +772,7 @@ export class VoiceLink {
             kind: 'in',
             live,
             mic: this.opening ? 'opening' : this.micOn ? 'on' : 'off',
+            captured: this.mic !== null && liveTrack(this.mic),
             reconnecting:
                 this.lib !== null &&
                 room.state !== this.lib.ConnectionState.Connected,

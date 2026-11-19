@@ -465,7 +465,7 @@ it('keeps the voice library inside the room\'s voice module', function (): void 
         }
     }
 
-    // `livekit-client` is imported by one file, and there only on the tap of «Səsə qoşul» (or as a type).
+    // `livekit-client` is imported by one file, and there only when the page first joins the voice — by itself for an agreed account, or on the tap of «Səsə qoşul» (ADR 031 as amended 2026-11-19) — or as a type.
     expect($importers)->toBe(['rooms/voice.ts']);
     $voice = (string) file_get_contents("{$js}/rooms/voice.ts");
     expect(preg_match("/^\\s*import\\s+(?!type\\b)[^;]*?from\\s+'livekit-client'/m", $voice))->toBe(0)

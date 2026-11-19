@@ -43,8 +43,10 @@ use Inertia\Response;
  * open room the account hosts or is present in, with the game of its
  * choice and whether a game is running (`RoomList::open()`); and
  * `entrance`, the code field's address (`RoomJoinLink::entrance()`).
- * Choosing a game there posts it (`OpenRoom`): the room opens behind it,
- * or the host's open room takes it, and either way the host lands in it —
+ * Choosing a game there posts it (`OpenRoom`, told whether the instance's
+ * live voice is on — a new room's voice is on from its opening while it
+ * is, ADR 031 as amended 2026-11-19): the room opens behind it, or the
+ * host's open room takes it, and either way the host lands in it —
  * while a game runs there, with `rooms.errors.game_running` and nothing
  * changed. «Keçmiş oyunlar» (`rooms/past`) gets the rooms the account was
  * in (`RoomList::past()`) and `retention_days`, for its line on how long
@@ -99,7 +101,7 @@ final class RoomController extends Controller
     public function store(Request $request, #[CurrentUser] User $account, OpenRoom $openRoom): RedirectResponse
     {
         try {
-            $room = $openRoom->handle($account, OpenRoomData::validate($request->all()));
+            $room = $openRoom->handle($account, OpenRoomData::validate($request->all()), voice: RoomsArea::voice());
         } catch (RoomGameRunning $running) {
             Inertia::flash('toast', ['type' => 'error', 'message' => __('rooms.errors.game_running')]);
 

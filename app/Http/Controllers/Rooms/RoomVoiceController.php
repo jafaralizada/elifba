@@ -13,7 +13,8 @@ use Illuminate\Http\Response;
  * The host's switch «Canlı səs» (docs/architecture.md §12 "Live voice",
  * ADR 031 decision 9): `PUT /rooms/{room}/voice` `{on}` (`RoomPolicy::voice`:
  * the host of an open room while the instance's voice is on). It answers
- * 204, or 422 `busy`; every device learns from the state.
+ * 204 — never `busy` since ADR 031 as amended 2026-11-19, whose limit is
+ * the ticket's; every device learns from the state.
  */
 final class RoomVoiceController extends Controller
 {

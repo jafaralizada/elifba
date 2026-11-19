@@ -279,8 +279,8 @@ it('names the voice on the welcome page only while its switch is on', function (
             ->assertInertia(fn (Assert $page) => $page->component('welcome')->where('rooms.voice', true));
     }
 
-    // The line keeps what it said and adds the voice: off until the host turns it on, never recorded.
-    foreach (['az' => ['Aparıcı açsa', 'mikrofonu hər kəs özü açır', 'səs yazılmır'], 'en' => ['If the host turns it on', 'everyone turns their own microphone on', 'the voice is not recorded']] as $locale => $words) {
+    // The line keeps what it said and adds the voice: on until the host turns it off, never recorded (ADR 031 as amended 2026-11-19).
+    foreach (['az' => ['aparıcı isə onu söndürə bilər', 'mikrofonu hər kəs özü açır', 'səs yazılmır'], 'en' => ['the host can turn it off', 'everyone turns their own microphone on', 'the voice is not recorded']] as $locale => $words) {
         $translations = json_decode((string) file_get_contents(lang_path("{$locale}.json")), true);
 
         expect($translations['welcome.rooms.names_voice'])->toStartWith($translations['welcome.rooms.names'])

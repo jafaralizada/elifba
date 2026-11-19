@@ -38,12 +38,15 @@ it('opens a room with a code and the host as its first player', function (): voi
         ->and($room->closed_at)->toBeNull()
         ->and($room->revision)->toBe(0)
         ->and($room->last_activity_at->toDateTimeString())->toBe('2026-11-24 19:00:00')
-        ->and($room->isOpen())->toBeTrue();
+        ->and($room->isOpen())->toBeTrue()
+        // The instance's live voice is off here: so is the room's (RoomVoiceTest has it on, ADR 031 decision 37).
+        ->and($room->voice_at)->toBeNull();
 
     $player = RoomPlayer::query()->sole();
     expect($player->room_id)->toBe($room->id)
         ->and($player->user_id)->toBe($this->host->id)
-        ->and($player->isPresent())->toBeTrue();
+        ->and($player->isPresent())->toBeTrue()
+        ->and($player->voice_admitted_at)->toBeNull();
 
     // The lobby shows the code and the host by name, marked as the viewer.
     $this->get(route('rooms.show', $room))

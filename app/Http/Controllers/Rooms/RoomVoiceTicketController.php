@@ -12,12 +12,15 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * «Səsə qoşul» (docs/architecture.md §12 "Live voice", ADR 031 decisions
- * 14 and 19): `POST /rooms/{room}/voice/tickets` `{agree?: true}`
+ * A ticket to the live voice (docs/architecture.md §12 "Live voice", ADR 031
+ * decisions 14, 19 and 40): `POST /rooms/{room}/voice/tickets` `{agree?: true}`
  * (`RoomPolicy::listen`, `throttle:room-voice`). It answers `{url, token}`
  * as JSON with `no-store` — never a redirect, a prop or a URL — 422 on
- * `agree` without the account's agreement, or 503 `{status: "unavailable"}`
- * when the voice server does not answer (`RoomVoiceUnreachable`).
+ * `agree` without the account's agreement, 503 `{status: "unavailable"}`
+ * when the voice server does not answer (`RoomVoiceUnreachable`), or 503
+ * `{status: "busy"}` when the instance has no room for another voice in
+ * use (`RoomVoiceBusy`, ADR 031 decision 38 as amended 2026-11-19). The
+ * page asks for it by itself as well as on a tap (decision 40).
  */
 final class RoomVoiceTicketController extends Controller
 {

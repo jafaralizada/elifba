@@ -143,6 +143,34 @@ it('says nothing of voice in the state, the privacy page or the welcome page whi
     $this->get(route('rooms.show', $room))->assertInertia(fn (Assert $page) => $page->where('state.voice', null));
 });
 
+it('opens every room with its voice off while the voice switch is off, and joins nobody', function (): void {
+    // A voice server named, the switch off: `RoomsArea::voice()` is false (ADR 031 decision 37, as amended 2026-11-19).
+    Rooms::on();
+    Http::fake();
+    Config::set(['elifba.rooms.voice.key' => FakeVoiceServer::KEY, 'elifba.rooms.voice.secret' => FakeVoiceServer::SECRET, 'elifba.rooms.voice.url' => FakeVoiceServer::URL, 'elifba.rooms.voice.api_url' => FakeVoiceServer::API_URL]);
+    expect(RoomsArea::voice())->toBeFalse();
+
+    $host = User::factory()->player()->create(['voice_agreed_at' => now()]);
+    $this->actingAs($host)->post(route('rooms.store'), ['mechanic' => 'recall_order'])->assertRedirect();
+    $room = Room::query()->where('user_id', $host->id)->sole();
+    // Before a game: nobody let in, since the room's voice is off.
+    $row = Rooms::join($room);
+
+    expect($room->voice_at)->toBeNull()
+        ->and(RoomPlayer::query()->where('room_id', $room->id)->whereNotNull('voice_admitted_at')->count())->toBe(0)
+        ->and($row->refresh()->voice_admitted_at)->toBeNull()
+        ->and($this->actingAs($host)->getJson(route('rooms.state', $room))->assertOk()->json('voice'))->toBeNull();
+    $this->actingAs($host)->postJson(route('rooms.voice.tickets.store', $room), ['agree' => true])->assertNotFound();
+    Http::assertNothingSent();
+
+    // The switch on but no voice server named counts as off too: a room opened then has its voice off.
+    Config::set(['elifba.rooms.voice.enabled' => true, 'elifba.rooms.voice.api_url' => null]);
+    $other = User::factory()->player()->create();
+    $this->actingAs($other)->post(route('rooms.store'), ['mechanic' => 'recall_order'])->assertRedirect();
+    expect(Room::query()->where('user_id', $other->id)->sole()->voice_at)->toBeNull();
+    Http::assertNothingSent();
+});
+
 it('counts the voice as off when its server is not configured', function (): void {
     $named = [
         'elifba.rooms.enabled' => true,

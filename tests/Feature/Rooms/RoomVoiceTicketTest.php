@@ -84,9 +84,9 @@ it('gives a ticket to the host and to an admitted present player, and to nobody 
     askTicket($this->host, $this->room)->assertOk()->assertJsonStructure(['url', 'token']);
     askTicket($this->aygun, $this->room)->assertOk();
 
-    // A newcomer who waits; a player who left; a removed player; an account outside the room.
+    // A newcomer who waits (came in while a game ran); a player who left; a removed player; an account outside the room.
     $newcomer = User::factory()->player()->create();
-    $newcomerRow = Rooms::join($this->room, $newcomer);
+    $newcomerRow = Rooms::newcomer($this->room, $newcomer);
     $leaver = User::factory()->player()->create();
     $leaverRow = Rooms::join($this->room, $leaver);
     app(SetRoomPlayerVoice::class)->handle($this->room, $leaverRow, new RoomPlayerVoiceData(RoomVoiceStanding::Open));
@@ -140,8 +140,9 @@ it('gives a ticket only for the voice room as it is now', function (): void {
     $this->voice->during('CreateRoom', fn () => app(RemoveRoomPlayer::class)->handle($this->room, $other));
     $token = (string) askTicket($this->aygun, $this->room)->assertOk()->json('token');
 
-    // The voice room made for the old epoch goes again, and the ticket is for the new one.
-    expect(array_map(static fn (array $sent): array => [$sent['call'], $sent['body']['name'] ?? $sent['body']['room']], $this->voice->sent))->toBe([
+    // The voice rooms in use counted first (ADR 031 decision 38); the voice room made for the old epoch goes again, and the ticket is for the new one.
+    expect(array_map(static fn (array $sent): array => [$sent['call'], $sent['body']['name'] ?? $sent['body']['room'] ?? null], $this->voice->sent))->toBe([
+        ['ListRooms', null],
         ['CreateRoom', $this->room->id.'.0'],
         ['DeleteRoom', $this->room->id.'.0'],
         ['DeleteRoom', $this->room->id.'.0'],
@@ -279,8 +280,10 @@ it('answers 503 and stamps nothing when the voice server is down', function (): 
         ->assertExactJson(['status' => 'unavailable'])
         ->assertHeader('Cache-Control', 'no-store, private');
 
+    // The «on» of the set-up made the voice room; the ticket's first call, the count of voice rooms in use, did not arrive.
     expect($this->aygun->refresh()->voice_agreed_at)->toBeNull()
-        ->and($this->voice->calls('CreateRoom'))->toHaveCount(2)
+        ->and($this->voice->calls('CreateRoom'))->toHaveCount(1)
+        ->and(array_column($this->voice->calls('ListRooms'), 'answered'))->toBe([false])
         ->and(end($this->voice->sent)['answered'] ?? null)->toBeFalse()
         // A ticket raises no revision and is not a read.
         ->and($this->room->refresh()->revision)->toBe($revision)
@@ -365,8 +368,8 @@ it('keeps a ticket inside its own room for an account in two rooms', function ()
     $otherHost = User::factory()->player()->create();
     $roomB = Rooms::open($otherHost);
     app(SetRoomVoice::class)->handle($roomB, new RoomVoiceSwitchData(true));
-    // Let in to the first room, waiting in the second.
-    $aygunInB = Rooms::join($roomB, $this->aygun);
+    // Let in to the first room, waiting in the second (came in while a game ran there).
+    $aygunInB = Rooms::newcomer($roomB, $this->aygun);
     $calls = count($this->voice->sent);
 
     askTicket($this->aygun, $roomB->refresh())->assertForbidden();
@@ -400,7 +403,7 @@ it('gives twelve tickets a minute to an account, refusals counted, and nobody el
     askTicket($this->host, $this->room)->assertOk();
 
     $newcomer = User::factory()->player()->create(['voice_agreed_at' => now()]);
-    Rooms::join($this->room, $newcomer);
+    Rooms::newcomer($this->room, $newcomer);
 
     foreach (range(1, 12) as $try) {
         askTicket($newcomer, $this->room)->assertForbidden();
@@ -438,4 +441,83 @@ it('keeps an account\'s count of tickets no longer than its minute and one more'
         ->filter(static fn (Illuminate\Console\Scheduling\Event $event): bool => str_contains((string) $event->command, 'cache:prune-expired'));
     expect($events)->toHaveCount(1)
         ->and($events->first()->expression)->toBe('* * * * *');
+});
+
+/*
+ * The limit, as amended 2026-11-19 (ADR 031 decision 38): with every
+ * room's voice on from its opening, the ticket counts the voice rooms in
+ * use at the voice server — one `ListRooms`, each with its participants —
+ * and refuses only a voice room nobody is in yet while `max_rooms` other
+ * rooms' voice rooms have someone.
+ */
+
+it('refuses a ticket with busy while five other voice rooms have someone in them, and stamps nothing', function (): void {
+    $logged = [];
+    Event::listen(MessageLogged::class, static function (MessageLogged $event) use (&$logged): void {
+        $logged[] = $event->message;
+    });
+    $talking = Room::factory()->count(5)->create(['voice_at' => now()]);
+
+    foreach ($talking as $other) {
+        $this->voice->joins($other->voiceRoom(), '01kaqrx2ab3c4d5e6f7g8h9jkm');
+    }
+
+    $revision = $this->room->refresh()->revision;
+    $this->voice->sent = [];
+
+    askTicket($this->aygun, $this->room)
+        ->assertStatus(503)
+        ->assertExactJson(['status' => 'busy'])
+        ->assertHeader('Cache-Control', 'no-store, private');
+    askTicket($this->host, $this->room)->assertStatus(503)->assertExactJson(['status' => 'busy']);
+
+    // Counted, and nothing more: no voice room made, no agreement stamped, no revision, nothing reported.
+    expect(array_column($this->voice->sent, 'call'))->toBe(['ListRooms', 'ListRooms'])
+        ->and($this->voice->calls('ListRooms')[0]['grant'])->toBe(['roomList' => true])
+        ->and($this->aygun->refresh()->voice_agreed_at)->toBeNull()
+        ->and($this->room->refresh()->revision)->toBe($revision)
+        ->and($logged)->toBe([]);
+
+    // One of them empties: there is room again, and the agreement is stamped with the ticket.
+    $this->voice->rooms[$talking->first()?->voiceRoom() ?? ''] = [];
+    askTicket($this->aygun, $this->room)->assertOk();
+    expect($this->aygun->refresh()->voice_agreed_at)->not->toBeNull();
+});
+
+it('never refuses a ticket for a voice room in use', function (): void {
+    foreach (Room::factory()->count(7)->create(['voice_at' => now()]) as $other) {
+        $this->voice->joins($other->voiceRoom(), '01kaqrx2ab3c4d5e6f7g8h9jkm');
+    }
+
+    // The host is in this room's voice: Aygün joins them, however many others talk.
+    $this->voice->joins($this->room->voiceRoom(), $this->hostRow->id);
+    askTicket($this->aygun, $this->room)->assertOk();
+
+    // Under a new epoch, a voice room of this room's old one still in use counts as its own.
+    app(SetRoomVoice::class)->handle($this->room, new RoomVoiceSwitchData(false));
+    app(SetRoomVoice::class)->handle($this->room, new RoomVoiceSwitchData(true));
+    $this->voice->joins($this->room->refresh()->voiceRoom(0), $this->hostRow->id);
+    askTicket($this->aygun, $this->room)->assertOk();
+    expect(ticketClaims((string) askTicket($this->host, $this->room)->assertOk()->json('token'))['video']['room'])->toBe($this->room->id.'.1');
+});
+
+it('counts only voice rooms with a participant', function (): void {
+    // Ten voice rooms made and nobody in them, four with someone: room for one more.
+    foreach (Room::factory()->count(10)->create(['voice_at' => now()]) as $quiet) {
+        $this->voice->rooms[$quiet->voiceRoom()] = [];
+    }
+
+    foreach (Room::factory()->count(4)->create(['voice_at' => now()]) as $other) {
+        $this->voice->joins($other->voiceRoom(), '01kaqrx2ab3c4d5e6f7g8h9jkm');
+    }
+
+    askTicket($this->aygun, $this->room)->assertOk();
+
+    // A fifth one in use, and this voice room still empty: full.
+    $this->voice->joins(Room::factory()->create(['voice_at' => now()])->voiceRoom(), '01kaqrx2ab3c4d5e6f7g8h9jkm');
+    askTicket($this->aygun, $this->room)->assertStatus(503)->assertExactJson(['status' => 'busy']);
+
+    // The limit is the instance's to set.
+    Config::set('elifba.rooms.voice.max_rooms', 6);
+    askTicket($this->aygun, $this->room)->assertOk();
 });

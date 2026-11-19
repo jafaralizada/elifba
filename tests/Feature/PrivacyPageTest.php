@@ -313,7 +313,7 @@ it('says what the live voice is, that it is not recorded and what the operator c
         ->and(substr_count($page, 'rooms.voice'))->toBe(2);
 })->with([
     'az' => [null, [
-        'Canlı səs hər otaqda sönülü olur; onu yalnız aparıcı aça',
+        'Canlı səs hər otaqda açıq başlayır',
         'Mikrofon həmişə sönülü başlayır və onu yalnız oyunçu özü açır',
         'Səs yazılmır, mətnə çevrilmir və saxlanılmır',
         'Böyük ekran səsi nə səsləndirir, nə də dinləyir',
@@ -322,7 +322,7 @@ it('says what the live voice is, that it is not recorded and what the operator c
         'ad və səs yox',
     ], 'Canlı səs də saxlanılmır', 'öz səs serverindən keçir', 'canlı səsdən dərhal kəsilir'],
     'en' => ['en', [
-        'The live voice is off in every room; only the host can turn it on',
+        'The live voice starts on in every room',
         'The microphone always starts off and only the player turns it on',
         'The voice is not recorded, not turned into text and not kept',
         'The big screen neither plays the voice nor listens',

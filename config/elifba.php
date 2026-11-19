@@ -123,8 +123,9 @@ return [
         // address a browser opens and the one the app calls. A ticket lets
         // its holder join for `ticket_seconds`; a call to the voice server
         // connects and answers within `timeout_ms`, or the write it follows
-        // goes on without it; at most `max_rooms` open rooms have their
-        // voice on at once.
+        // goes on without it; at most `max_rooms` voice rooms are in use at
+        // once — counted at the ticket, among voice rooms someone is in
+        // (ADR 031 decision 38, as amended 2026-11-19).
         'voice' => [
             'enabled' => filter_var(env('ELIFBA_ROOMS_VOICE', false), FILTER_VALIDATE_BOOL),
             'key' => env('ELIFBA_ROOMS_VOICE_KEY') ?: null,

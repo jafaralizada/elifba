@@ -24,6 +24,14 @@ use Illuminate\Validation\ValidationException;
  * A change raises the revision, marks the room active and signals it; a
  * player who had answered the open round and comes back alone to it
  * closes it (`RoomRoundClose`).
+ *
+ * While the room's voice is on, a row that comes in with no admission
+ * while no game is running — the start screen, between games, the final —
+ * is let into the voice at once: the host is looking at the list as it
+ * grows. One that comes in while a game runs waits for «Səsə burax»; a
+ * player who returns keeps what their row had (docs/architecture.md §12
+ * "Live voice", ADR 031 decision 39, as amended 2026-11-19). An admission
+ * calls no voice server.
  */
 final readonly class JoinRoom
 {
@@ -65,9 +73,15 @@ final readonly class JoinRoom
                 $row->joined_at = now();
             }
 
+            $nowMs = RoomClock::nowMs();
             $row->left_at = null;
+
+            if ($row->voice_admitted_at === null && $locked->voiceIsOn() && $locked->runningGame($nowMs) === null) {
+                $row->voice_admitted_at = now();
+            }
+
             $row->save();
-            RoomRoundClose::whenPresenceChanges($locked, RoomClock::nowMs());
+            RoomRoundClose::whenPresenceChanges($locked, $nowMs);
 
             $locked->last_activity_at = now();
             RoomSignal::raise($locked);

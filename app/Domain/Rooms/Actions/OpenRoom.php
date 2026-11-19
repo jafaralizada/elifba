@@ -22,12 +22,17 @@ use Illuminate\Support\Facades\DB;
  *
  * - The account hosts no open room: a `rooms` row with a code from
  *   `RoomCode` and the choice — this game at the host's defaults
- *   (`RoomDefaults`) — and the host as its first player.
+ *   (`RoomDefaults`) — and the host as its first player. While the
+ *   instance's live voice is on (`$voice`, which the controller reads
+ *   from `RoomsArea::voice()`, as `RoomState::for()` is told it), the
+ *   room's voice is on from this moment and the host's row is let into
+ *   it (ADR 031 decision 37, as amended 2026-11-19). No call goes to the
+ *   voice server: the first ticket makes the voice room.
  * - It hosts an open room with no game running: no second room. That
  *   room's choice takes this game and keeps its difficulty and rounds
  *   (the game's defaults when it has no level at that difficulty), under
  *   the room row's lock; the room is active, its revision rises and it is
- *   signalled.
+ *   signalled. Its voice stays as it is.
  * - It hosts an open room with a game running: nothing is written
  *   (`RoomGameRunning`).
  */
@@ -36,11 +41,13 @@ final readonly class OpenRoom
     public function __construct(private RoomCode $codes) {}
 
     /**
+     * @param  bool  $voice  whether the instance's live voice is on
+     *
      * @throws RoomGameRunning when a game is running in the host's open room
      */
-    public function handle(User $host, OpenRoomData $data): Room
+    public function handle(User $host, OpenRoomData $data, bool $voice = false): Room
     {
-        return DB::transaction(function () use ($host, $data): Room {
+        return DB::transaction(function () use ($host, $data, $voice): Room {
             RoomLock::host($host->id);
 
             $open = Room::query()->open()->where('user_id', $host->id)->first();
@@ -51,7 +58,7 @@ final readonly class OpenRoom
 
             $setup = RoomDefaults::for($host, $data->mechanic);
 
-            $room = $this->codes->issue(static fn (string $code): Room => DB::transaction(static function () use ($host, $code, $setup): Room {
+            $room = $this->codes->issue(static fn (string $code): Room => DB::transaction(static function () use ($host, $code, $setup, $voice): Room {
                 $room = new Room;
                 $room->user_id = $host->id;
                 $room->code = $code;
@@ -59,6 +66,7 @@ final readonly class OpenRoom
                 $room->setup_difficulty = $setup->difficulty;
                 $room->setup_rounds = $setup->rounds;
                 $room->last_activity_at = now();
+                $room->voice_at = $voice ? now() : null;
                 $room->save();
 
                 return $room;
@@ -68,6 +76,7 @@ final readonly class OpenRoom
             $player->room_id = $room->id;
             $player->user_id = $host->id;
             $player->joined_at = now();
+            $player->voice_admitted_at = $voice ? now() : null;
             $player->save();
 
             return $room;

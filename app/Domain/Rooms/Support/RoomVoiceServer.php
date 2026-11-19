@@ -107,22 +107,26 @@ final class RoomVoiceServer
     }
 
     /**
-     * The voice rooms there are, by name.
+     * The voice rooms there are, by name, each with how many are in it
+     * (`num_participants`, a 32-bit number protojson writes as a number):
+     * the sweep reads the names, `JoinRoomVoice` the voice rooms in use
+     * (ADR 031 decision 38, as amended 2026-11-19).
      *
-     * @return list<string>
+     * @return array<string, int>
      */
     public function rooms(): array
     {
         $answer = $this->call('ListRooms', ['names' => []], ['roomList' => true]);
-        $names = [];
+        $rooms = [];
 
         foreach (is_array($answer['rooms'] ?? null) ? $answer['rooms'] : [] as $room) {
             if (is_array($room) && is_string($room['name'] ?? null)) {
-                $names[] = $room['name'];
+                $count = $room['num_participants'] ?? 0;
+                $rooms[$room['name']] = (is_int($count) || (is_string($count) && ctype_digit($count))) ? (int) $count : 0;
             }
         }
 
-        return $names;
+        return $rooms;
     }
 
     /**

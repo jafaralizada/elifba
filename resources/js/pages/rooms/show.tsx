@@ -137,8 +137,10 @@ type Props = {
  * of the moment stands at the bottom of the viewport (`RoomActionBar
  * framed`).
  *
- * While the host has the live voice on, its round button stands in the
- * frame's top bar on every moment and opens the panel «Canlı səs»; the host's
+ * While the room's live voice is on — from its opening, until the host
+ * turns it off (ADR 031 as amended 2026-11-19) — its round button stands in
+ * the frame's top bar on every moment and opens the panel «Canlı səs», and
+ * an agreed account is in the voice, listening, without a tap; the host's
  * «Otağın idarəsi» has its switch (`useRoomVoice()`, docs/frontend.md rule
  * 15 "Live voice", ADR 031). The voice is the room's, not a game's: the
  * button stays through every moment, and nothing of a round reads it.

@@ -8,6 +8,7 @@ import {
     LogOut,
     Mic,
     MicOff,
+    Pointer,
     Shield,
     Smartphone,
     X,
@@ -53,7 +54,10 @@ import type {
  * join, the microphone, who is in, «Səsdən çıx» and the host's tools. A
  * note stands over the page for a moment. It draws `voice.view` and nothing
  * it worked out itself, and nothing of it is there while the voice is off.
- * The sentence before a first join (`VoiceConsent`) is here too.
+ * The sentence before a first join (`VoiceConsent`) is here too. From ADR
+ * 031 as amended 2026-11-19 the page is in the voice by itself, so the
+ * button's first look is «in the voice» for an account that agreed; its
+ * dot asks for a tap where the browser holds the voice back.
  */
 export function VoiceButton({ voice }: { voice: RoomVoice }) {
     const { view, note } = voice;
@@ -148,15 +152,19 @@ function VoiceIcon({ view, onOpen }: { view: VoiceView; onOpen: () => void }) {
                       ? 'border-dashed border-muted-foreground/50 bg-background text-muted-foreground'
                       : cn(
                             TINTED,
-                            bar.speaker.kind !== 'none' && 'border-(--voice)',
+                            (bar.speaker.kind !== 'none' || bar.held) &&
+                                'border-(--voice)',
                         );
-            label =
-                bar.mic === 'on'
-                    ? t('rooms.voice.state.mic')
-                    : bar.mic === 'muted'
-                      ? t('rooms.voice.state.muted')
-                      : t('rooms.voice.state.listening');
+            label = bar.held
+                ? t('rooms.voice.tap_to_hear')
+                : bar.mic === 'on'
+                  ? t('rooms.voice.state.mic')
+                  : bar.mic === 'muted'
+                    ? t('rooms.voice.state.muted')
+                    : t('rooms.voice.state.listening');
             ring = bar.mic === 'on';
+            // The browser holds the voice back until a tap anywhere (ADR 031 decision 42).
+            dot = bar.held;
             break;
     }
 
@@ -205,11 +213,16 @@ function troubleLine(
     trouble: VoiceTrouble | 'reconnecting',
     t: (key: string) => string,
 ): string {
-    return trouble === 'reconnecting'
-        ? t('rooms.voice.reconnecting')
-        : trouble === 'elsewhere'
-          ? t('rooms.voice.elsewhere')
-          : t('rooms.voice.errors.unreachable');
+    switch (trouble) {
+        case 'reconnecting':
+            return t('rooms.voice.reconnecting');
+        case 'elsewhere':
+            return t('rooms.voice.elsewhere');
+        case 'busy':
+            return t('rooms.voice.errors.busy');
+        default:
+            return t('rooms.voice.errors.unreachable');
+    }
 }
 
 const NOTE_ICONS: Record<RoomVoiceNote, typeof Mic> = {
@@ -238,14 +251,18 @@ function VoiceNote({ note }: { note: RoomVoiceNote }) {
 
 /**
  * The microphone in the panel, its strongest button, saying what a tap
- * does: «Mikrofonu aç», filled in the voice's colour; «Mikrofonu söndür»
- * with a pulsing dot while open; «Susdurulub», dashed, with why.
+ * does: «Mikrofonu aç», filled in the voice's colour, with the muted line
+ * to always allow the site under it while the browser would ask (ADR 031
+ * decision 36); «Mikrofonu söndür» with a pulsing dot while open;
+ * «Susdurulub», dashed, with why.
  */
 function MicToggle({
     mic,
+    alwaysAllow,
     onTap,
 }: {
     mic: 'off' | 'opening' | 'on' | 'muted';
+    alwaysAllow: boolean;
     onTap: () => void;
 }) {
     const { t } = useTranslation();
@@ -268,7 +285,7 @@ function MicToggle({
         );
     }
 
-    return (
+    const button = (
         <button
             type="button"
             data-voice-mic={mic}
@@ -293,6 +310,22 @@ function MicToggle({
             )}
             {open ? t('rooms.voice.mic.close') : t('rooms.voice.mic.open')}
         </button>
+    );
+
+    if (!alwaysAllow) {
+        return button;
+    }
+
+    return (
+        <div className="flex flex-col items-center gap-1.5">
+            {button}
+            <p
+                data-voice-always-allow
+                className="text-center text-[0.8125rem] leading-snug text-muted-foreground"
+            >
+                {t('rooms.voice.always_allow')}
+            </p>
+        </div>
     );
 }
 
@@ -346,7 +379,10 @@ export function SpeakingBars({ className }: { className?: string }) {
  * The sentence before an account's first join (ADR 031 decision 14): «Canlı
  * səs», `rooms.voice.agreement` in a tinted box, the three notes, «Razıyam,
  * qoşul» and «İndi yox», and the way to `/privacy`'s part «Canlı səs». A
- * sheet below `sm`, a dialog from there. Later joins are one tap.
+ * sheet below `sm`, a dialog from there. From 2026-11-19 it opens by itself
+ * once outside a round (decision 41), later joins are the page's own, and
+ * closing it without «Razıyam, qoşul» is «İndi yox», remembered for the
+ * room on this device.
  */
 function VoiceConsent({ voice }: { voice: RoomVoice }) {
     const { t } = useTranslation();
@@ -357,7 +393,14 @@ function VoiceConsent({ voice }: { voice: RoomVoice }) {
     ] as const;
 
     return (
-        <Dialog open={voice.consent} onOpenChange={voice.setConsent}>
+        <Dialog
+            open={voice.consent}
+            onOpenChange={(open) => {
+                if (!open) {
+                    voice.dismissConsent();
+                }
+            }}
+        >
             <DialogContent showCloseButton={false} className={SHEET}>
                 <div className="flex flex-col gap-4 px-4 pt-5 pb-[max(env(safe-area-inset-bottom),1rem)]">
                     <DialogTitle className="flex items-center gap-2 text-lg">
@@ -523,15 +566,14 @@ function VoicePanel({ voice }: { voice: RoomVoice }) {
                         </Button>
                     )}
                     {!inVoice && !view.host && (
-                        <DialogClose asChild>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                className="h-11"
-                            >
-                                {t('rooms.voice.not_now')}
-                            </Button>
-                        </DialogClose>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-11"
+                            onClick={voice.notNow}
+                        >
+                            {t('rooms.voice.not_now')}
+                        </Button>
                     )}
                 </div>
             </DialogContent>
@@ -597,6 +639,7 @@ function PanelStanding({
                 );
             }
 
+            // «Yenidən cəhd et» for an unreachable or a full voice: the page never tries again by itself (ADR 031 decision 38).
             const action =
                 bar.trouble === 'elsewhere'
                     ? t('rooms.voice.here')
@@ -628,20 +671,38 @@ function PanelStanding({
         case 'in':
             return (
                 <>
-                    <p className="flex min-h-6 items-center gap-2.5 text-[0.9375rem] font-semibold">
-                        {bar.speaker.kind === 'none' ? (
-                            <Headphones
+                    {bar.held ? (
+                        <p
+                            role="status"
+                            data-voice-held
+                            className="flex min-h-6 items-center gap-2.5 text-[0.9375rem] font-semibold"
+                        >
+                            <Pointer
                                 aria-hidden
                                 className="size-5 shrink-0 text-(--voice-text)"
                             />
-                        ) : (
-                            <SpeakingBars className="text-[1.25rem] text-(--voice-text)" />
-                        )}
-                        <span className="min-w-0 truncate">
-                            <SpeakerLine speaker={bar.speaker} />
-                        </span>
-                    </p>
-                    <MicToggle mic={bar.mic} onTap={voice.tapMic} />
+                            {t('rooms.voice.tap_to_hear')}
+                        </p>
+                    ) : (
+                        <p className="flex min-h-6 items-center gap-2.5 text-[0.9375rem] font-semibold">
+                            {bar.speaker.kind === 'none' ? (
+                                <Headphones
+                                    aria-hidden
+                                    className="size-5 shrink-0 text-(--voice-text)"
+                                />
+                            ) : (
+                                <SpeakingBars className="text-[1.25rem] text-(--voice-text)" />
+                            )}
+                            <span className="min-w-0 truncate">
+                                <SpeakerLine speaker={bar.speaker} />
+                            </span>
+                        </p>
+                    )}
+                    <MicToggle
+                        mic={bar.mic}
+                        alwaysAllow={bar.alwaysAllow}
+                        onTap={voice.tapMic}
+                    />
                 </>
             );
     }
@@ -787,7 +848,7 @@ export function useVoiceSwitch({
                 setError(
                     reply.status === 422
                         ? (Object.values(body?.errors ?? {})[0]?.[0] ??
-                              t('rooms.voice.errors.busy'))
+                              t('rooms.setup.change_failed'))
                         : t('rooms.setup.change_failed'),
                 );
             })
@@ -806,10 +867,11 @@ export function useVoiceSwitch({
 
 /**
  * «Canlı səs», the first row of «Otağın idarəsi» while the instance's voice
- * is on (rule 15 "The host turns it on"): `Headphones`, the switch and its
- * line — what turning it on means, or that turning it off stops it for
- * everyone at once — and «Hazırda canlı səs üçün yer yoxdur» when the
- * instance has no room for another voice.
+ * is on (rule 15 "The host turns it off and on"; on from the room's
+ * opening since ADR 031 as amended 2026-11-19): `Headphones`, the switch
+ * and its line — what turning it on means, or that turning it off stops it
+ * for everyone at once. Turning it on is never refused: the limit on voice
+ * rooms is the ticket's.
  */
 export function VoiceSwitchRow({
     roomId,

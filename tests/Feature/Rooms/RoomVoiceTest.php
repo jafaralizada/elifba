@@ -4,20 +4,25 @@ use App\Domain\Rooms\Actions\LeaveRoom;
 use App\Domain\Rooms\Actions\RemoveRoomPlayer;
 use App\Domain\Rooms\Models\Room;
 use App\Domain\Rooms\Models\RoomPlayer;
+use App\Domain\Rooms\Support\RoomClock;
 use App\Models\User;
 use Illuminate\Testing\TestResponse;
 use Tests\Support\Rooms;
 
 /*
  * The host's tools of a room's live voice (docs/architecture.md §12 "Live
- * voice", ADR 031 decisions 7–12): off in every room until its host turns
- * it on; on lets in the host and everyone present at that moment, and an
- * account that comes later waits until the host lets it in; only the host
- * admits, mutes and lets speak, never on the host's own row, and a mute
- * stays until the host lifts it; at most `max_rooms` rooms talk at once.
- * Every change is a fact in a row, raises the revision and signals the
- * room, and every device reads it from the state. The voice server is
- * faked (`Rooms::voiceOn()`).
+ * voice", ADR 031 decisions 7–12 and, as amended 2026-11-19, 37–39): on
+ * from the opening in every room opened while the instance's voice is on,
+ * with the host let in, until the host turns it off; on lets in the host
+ * and everyone present at that moment; an account that comes in before a
+ * game is let in at once, and one that comes in while a game runs waits
+ * until the host lets it in; only the host admits, mutes and lets speak,
+ * never on the host's own row, and a mute stays until the host lifts it;
+ * «on» is never refused — the limit is the ticket's. Every change is a
+ * fact in a row, raises the revision and signals the room, and every
+ * device reads it from the state. The room of the set-up was opened with
+ * the voice off, as one opened before the amendment or with the switch
+ * off. The voice server is faked (`Rooms::voiceOn()`).
  */
 
 beforeEach(function (): void {
@@ -58,18 +63,39 @@ function standVoice(User $account, Room $room, RoomPlayer $member, string $stand
     return test()->actingAs($account)->putJson(route('rooms.members.voice.update', ['room' => $room, 'member' => $member]), ['standing' => $standing]);
 }
 
-it('starts off in every room', function (): void {
-    $other = Rooms::open();
+it('starts on in every room opened while the voice switch is on, with the host let in, and calls no voice server', function (): void {
+    // A game chosen on «Oyunlar»: the room opens behind it, its voice on and its host let in.
+    $nigar = User::factory()->player()->create(['name' => 'Nigar Rzayeva']);
+    $this->actingAs($nigar)->post(route('rooms.store'), ['mechanic' => 'recall_order'])->assertRedirect();
+    $opened = Room::query()->where('user_id', $nigar->id)->sole();
+    $nigarRow = RoomPlayer::query()->where('room_id', $opened->id)->sole();
 
+    expect($opened->voice_at?->toDateTimeString())->toBe('2026-11-24 10:00:00')
+        ->and([$opened->voice_epoch, $opened->revision])->toBe([0, 0])
+        ->and($nigarRow->voice_admitted_at?->toDateTimeString())->toBe('2026-11-24 10:00:00')
+        ->and($nigarRow->voice_muted_at)->toBeNull()
+        ->and(voiceOf($nigar, $opened))->toBe([
+            'voice' => ['on' => true, 'agreed' => false],
+            'players' => [$nigarRow->id => 'open'],
+        ])
+        // Opening asks the voice server nothing: the first ticket makes the voice room.
+        ->and($this->voice->sent)->toBe([]);
+
+    // Another game chosen in it leaves the voice as it is, on or off.
+    $this->actingAs($nigar)->post(route('rooms.store'), ['mechanic' => 'anagram'])->assertRedirect(route('rooms.show', $opened));
+    expect($opened->refresh()->voice_at?->toDateTimeString())->toBe('2026-11-24 10:00:00');
+    turnVoice($nigar, $opened, false)->assertNoContent();
+    $this->actingAs($nigar)->post(route('rooms.store'), ['mechanic' => 'recall_order'])->assertRedirect(route('rooms.show', $opened));
+    expect($opened->refresh()->voice_at)->toBeNull()
+        ->and($opened->voice_epoch)->toBe(1);
+
+    // A room opened with the instance's voice off keeps it off: nobody is let in.
     expect([$this->room->refresh()->voice_at, $this->room->voice_epoch])->toBe([null, 0])
-        ->and([$other->refresh()->voice_at, $other->voice_epoch])->toBe([null, 0])
         ->and(voiceOf($this->aygun, $this->room))->toBe([
             'voice' => ['on' => false, 'agreed' => false],
             'players' => [$this->hostRow->id => null, $this->aygunRow->id => null, $this->turalRow->id => null],
         ])
-        ->and(voiceOf($this->host, $this->room)['voice'])->toBe(['on' => false, 'agreed' => false])
-        ->and(RoomPlayer::query()->whereNotNull('voice_admitted_at')->orWhereNotNull('voice_muted_at')->count())->toBe(0)
-        ->and($this->voice->sent)->toBe([]);
+        ->and(RoomPlayer::query()->where('room_id', $this->room->id)->whereNotNull('voice_admitted_at')->count())->toBe(0);
 });
 
 it('lets only the host turn the voice on and off', function (): void {
@@ -109,7 +135,7 @@ it('lets only the host turn the voice on and off', function (): void {
     expect($this->room->refresh()->voice_at)->toBeNull();
 });
 
-it('admits everyone present when the voice is turned on and makes a newcomer wait', function (): void {
+it('admits everyone present when the voice is turned on, lets in at once a player who comes in before a game, or between games, and makes one who comes in during a game wait', function (): void {
     turnVoice($this->host, $this->room, true)->assertNoContent();
 
     // The host and Aygün were in the room: let in. Tural had left: not.
@@ -122,7 +148,7 @@ it('admits everyone present when the voice is turned on and makes a newcomer wai
             $this->turalRow->id => null,
         ]);
 
-    // An account that comes after the voice is on waits; so does Tural, back.
+    // Before a game the host sees the list grow: an account that comes in is let in at once, and so is Tural, back with a row never let in.
     $leyla = User::factory()->player()->create(['name' => 'Leyla Həsənova']);
     $leylaRow = Rooms::join($this->room, $leyla);
     Rooms::join($this->room, $this->tural);
@@ -130,12 +156,50 @@ it('admits everyone present when the voice is turned on and makes a newcomer wai
     expect(voiceOf($leyla, $this->room)['players'])->toBe([
         $this->hostRow->id => 'open',
         $this->aygunRow->id => 'open',
-        $this->turalRow->id => 'waiting',
-        $leylaRow->id => 'waiting',
+        $this->turalRow->id => 'open',
+        $leylaRow->id => 'open',
     ]);
 
-    // A host who stepped out of playing keeps the voice: the host's row is always `open`.
+    // While a game runs the host's eyes are on the round: a newcomer waits; a player who left and comes back keeps what the row had.
+    Rooms::playing($this->room);
+    $kamran = User::factory()->player()->create(['name' => 'Kamran Nəsirov']);
+    $kamranRow = Rooms::join($this->room, $kamran);
+    app(LeaveRoom::class)->handle($this->room, $leylaRow->refresh());
+    Rooms::join($this->room, $leyla);
+
+    expect($kamranRow->refresh()->voice_admitted_at)->toBeNull()
+        ->and(voiceOf($kamran, $this->room)['players'])->toBe([
+            $this->hostRow->id => 'open',
+            $this->aygunRow->id => 'open',
+            $this->turalRow->id => 'open',
+            $leylaRow->id => 'open',
+            $kamranRow->id => 'waiting',
+        ]);
+
+    // The final, between games: a newcomer is let in at once; Kamran, still in the room, waits for the host and not for the game's end.
+    $this->actingAs($this->host)->delete(route('rooms.game.destroy', $this->room));
+    expect($this->room->refresh()->runningGame(RoomClock::nowMs()))->toBeNull();
+    $samir = User::factory()->player()->create(['name' => 'Samir Quliyev']);
+    $samirRow = Rooms::join($this->room, $samir);
+
+    expect(voiceOf($samir, $this->room)['players'])->toBe([
+        $this->hostRow->id => 'open',
+        $this->aygunRow->id => 'open',
+        $this->turalRow->id => 'open',
+        $leylaRow->id => 'open',
+        $kamranRow->id => 'waiting',
+        $samirRow->id => 'open',
+    ]);
+
+    // Kamran leaves and comes back between games: a row never let in comes in like any newcomer.
+    app(LeaveRoom::class)->handle($this->room, $kamranRow->refresh());
+    Rooms::join($this->room, $kamran);
+    expect(voiceOf($kamran, $this->room)['players'][$kamranRow->id])->toBe('open');
+
+    // With the voice off nobody is let in, before a game or not; a host who stepped out of playing keeps the voice: the host's row is always `open`.
     turnVoice($this->host, $this->room, false)->assertNoContent();
+    $nigarRow = Rooms::join($this->room, User::factory()->player()->create(['name' => 'Nigar Rzayeva']));
+    expect($nigarRow->refresh()->voice_admitted_at)->toBeNull();
     $this->actingAs($this->host)->putJson(route('rooms.plays.update', $this->room), ['plays' => false])->assertNoContent();
     turnVoice($this->host, $this->room, true)->assertNoContent();
 
@@ -144,13 +208,16 @@ it('admits everyone present when the voice is turned on and makes a newcomer wai
         $this->aygunRow->id => 'open',
         $this->turalRow->id => 'open',
         $leylaRow->id => 'open',
+        $kamranRow->id => 'open',
+        $samirRow->id => 'open',
+        $nigarRow->id => 'open',
     ]);
 });
 
 it('lets only the host admit, mute and let speak, and never the host\'s own row', function (): void {
     turnVoice($this->host, $this->room, true)->assertNoContent();
     $leyla = User::factory()->player()->create();
-    $leylaRow = Rooms::join($this->room, $leyla);
+    $leylaRow = Rooms::newcomer($this->room, $leyla);
     $elsewhere = Rooms::join(Rooms::open());
 
     // A player can do none of it, not even to themselves.
@@ -180,7 +247,7 @@ it('lets only the host admit, mute and let speak, and never the host\'s own row'
     expect(voiceOf($this->aygun, $this->room)['players'][$this->aygunRow->id])->toBe('open');
 
     // A newcomer let in muted listens; admitting and muting is one tap.
-    $kamran = Rooms::join($this->room);
+    $kamran = Rooms::newcomer($this->room);
     standVoice($this->host, $this->room, $kamran, 'muted')->assertNoContent();
     expect(voiceOf($this->host, $this->room)['players'][$kamran->id])->toBe('muted');
 
@@ -210,27 +277,20 @@ it('keeps a mute through the voice going off and on', function (): void {
     expect($this->room->refresh()->revision)->toBe($revision);
 });
 
-it('refuses another voice beyond the limit', function (): void {
-    $talking = Room::factory()->count(5)->create(['voice_at' => now()]);
-    // A closed room and an idle one do not count, whatever their rows say.
-    Room::factory()->closed()->create(['voice_at' => now()]);
-    Room::factory()->create(['voice_at' => now(), 'last_activity_at' => now()->subHours(4)]);
+it('never refuses to turn the voice on', function (): void {
+    // Five other rooms with their voice on and someone in each voice room: the limit is the ticket's (ADR 031 decision 38).
+    foreach (Room::factory()->count(5)->create(['voice_at' => now()]) as $talking) {
+        $this->voice->joins($talking->voiceRoom(), '01kaqrx2ab3c4d5e6f7g8h9jkm');
+    }
 
-    turnVoice($this->host, $this->room, true)
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors(['on' => __('rooms.voice.errors.busy')]);
-    expect($this->room->refresh()->voice_at)->toBeNull()
-        ->and($this->aygunRow->refresh()->voice_admitted_at)->toBeNull()
-        ->and($this->voice->calls('CreateRoom'))->toBe([]);
-
-    // One of them goes quiet: there is room again.
-    $talking->first()?->forceFill(['voice_at' => null])->save();
     turnVoice($this->host, $this->room, true)->assertNoContent();
-    expect($this->room->refresh()->voiceIsOn())->toBeTrue();
+    expect($this->room->refresh()->voiceIsOn())->toBeTrue()
+        ->and($this->aygunRow->refresh()->voice_admitted_at)->not->toBeNull();
 
-    // Turning off is never refused.
-    Room::factory()->create(['voice_at' => now()]);
     turnVoice($this->host, $this->room, false)->assertNoContent();
+    turnVoice($this->host, $this->room, true)->assertNoContent();
+    expect($this->room->refresh()->voiceIsOn())->toBeTrue()
+        ->and($this->voice->calls('ListRooms'))->toBe([]);
 });
 
 it('signals every device when the voice or a standing changes', function (): void {
@@ -255,7 +315,7 @@ it('signals every device when the voice or a standing changes', function (): voi
     [$raised, $sent] = $changes(fn () => standVoice($this->host, $this->room, $this->aygunRow, 'muted')->assertNoContent());
     expect($raised)->toBe(1)->and($sent)->toBe($signal($this->room->revision));
 
-    $newcomer = Rooms::join($this->room);
+    $newcomer = Rooms::newcomer($this->room);
     [$raised, $sent] = $changes(fn () => standVoice($this->host, $this->room, $newcomer, 'open')->assertNoContent());
     expect($raised)->toBe(1)->and($sent)->toBe($signal($this->room->revision));
 

@@ -1,7 +1,16 @@
-import { describe, expect, it } from 'vite-plus/test';
+import { describe, expect, it, vi } from 'vite-plus/test';
 import { RoomState } from './contract';
-import { myVoiceRow, screenVoiceView, voiceView } from './voice-view';
-import type { VoiceConnection, VoiceLive } from './voice-view';
+import { VOICE_OUT_KEEP, VOICE_OUT_KEY, VoiceOut } from './voice-out';
+import type { VoiceOutStorage } from './voice-out';
+import {
+    joinsByItself,
+    mayJoinByItself,
+    myVoiceRow,
+    opensSentenceByItself,
+    screenVoiceView,
+    voiceView,
+} from './voice-view';
+import type { VoiceBrowser, VoiceConnection, VoiceLive } from './voice-view';
 
 /*
  * What a room page draws of the live voice (docs/architecture.md §12 "Live
@@ -12,7 +21,10 @@ import type { VoiceConnection, VoiceLive } from './voice-view';
  * else. The fixtures are C3's: tests/Fixtures/rooms/state.voice.json (a
  * player's start screen, the voice on: the host and Aygün open, Tural
  * muted, Leyla waiting) and state.voice.off.json (the host's, the voice
- * off).
+ * off). As amended 2026-11-19 (ADR 031 decisions 36 and 40–42): when a
+ * page joins the voice or opens the sentence by itself, what the browser
+ * says of the page — a held voice, the microphone's question — and the
+ * rooms this device left (`voice-out.ts`).
  */
 const fixtures = import.meta.glob<unknown>(
     '../../../tests/Fixtures/rooms/state*.json',
@@ -34,11 +46,13 @@ const LEYLA = '01kaqrx6de7f8g9h0jkmnpqrst';
 function inVoice(
     live: Partial<VoiceLive>,
     mic: 'off' | 'on' = 'off',
+    captured = mic === 'on',
 ): VoiceConnection {
     return {
         kind: 'in',
         live: { here: [], open: [], speaking: [], ...live },
         mic,
+        captured,
         reconnecting: false,
     };
 }
@@ -200,6 +214,7 @@ describe('voiceView', () => {
                 kind: 'in',
                 live: { here: [], open: [], speaking: [] },
                 mic: 'off',
+                captured: false,
                 reconnecting: true,
             })?.bar,
         ).toEqual({ form: 'trouble', trouble: 'reconnecting' });
@@ -207,6 +222,7 @@ describe('voiceView', () => {
             'unreachable',
             'dropped',
             'elsewhere',
+            'busy',
         ] as const) {
             expect(voiceView(on, { kind: 'failed', trouble })?.bar).toEqual({
                 form: 'trouble',
@@ -228,6 +244,219 @@ describe('voiceView', () => {
         expect(
             myVoiceRow({ ...away, me: { player_id: null, host: false } }),
         ).toBeNull();
+    });
+});
+
+describe('the voice on by default', () => {
+    const idle: VoiceConnection = { kind: 'idle' };
+    const fresh: RoomState = { ...on, voice: { on: true, agreed: false } };
+
+    it('joins by itself only an admitted player whose account agreed and who did not leave that voice on this device', () => {
+        // Aygün, admitted and agreed, and the host: in without a tap; Tural, muted by the host, listens.
+        expect(joinsByItself(on, idle, false)).toBe(true);
+        expect(joinsByItself(as(on, HOST, true), idle, false)).toBe(true);
+        expect(joinsByItself(as(on, TURAL, false), idle, false)).toBe(true);
+        // Leyla waits for the host; an account that has not agreed gets the sentence, not the voice.
+        expect(joinsByItself(as(on, LEYLA, false), idle, false)).toBe(false);
+        expect(joinsByItself(fresh, idle, false)).toBe(false);
+        // Left or declined on this device: never by itself.
+        expect(joinsByItself(on, idle, true)).toBe(false);
+        // The voice off or none, a player who left the room, an insecure page: nothing.
+        expect(joinsByItself(state('state.voice.off'), idle, false)).toBe(
+            false,
+        );
+        expect(joinsByItself(state('state.lobby'), idle, false)).toBe(false);
+        expect(
+            joinsByItself(
+                as(on, '01kaqrx5cd6e7f8g9h0jkmnpqr', false),
+                idle,
+                false,
+            ),
+        ).toBe(false);
+        expect(joinsByItself(on, idle, false, false)).toBe(false);
+        // Already joining or in: nothing more.
+        expect(joinsByItself(on, { kind: 'joining' }, false)).toBe(false);
+        expect(joinsByItself(on, inVoice({ here: [AYGUN] }), false)).toBe(
+            false,
+        );
+    });
+
+    it('never joins by itself after a failure', () => {
+        for (const trouble of [
+            'unreachable',
+            'dropped',
+            'elsewhere',
+            'busy',
+        ] as const) {
+            expect(joinsByItself(on, { kind: 'failed', trouble }, false)).toBe(
+                false,
+            );
+        }
+
+        // The page may still be in it — and joins only when that becomes so: the failure waits for a tap.
+        expect(mayJoinByItself(on, false)).toBe(true);
+        expect(mayJoinByItself(on, true)).toBe(false);
+    });
+
+    it('opens the sentence by itself only outside a round, and not after «İndi yox»', () => {
+        // The same viewer, admitted and not agreed, in a round and at the final.
+        const at = (name: string): RoomState => ({
+            ...state(name),
+            me: fresh.me,
+            players: fresh.players,
+            voice: fresh.voice,
+        });
+
+        // The start screen, and the final.
+        expect(opensSentenceByItself(fresh, false)).toBe(true);
+        expect(at('state.over').game?.phase).toBe('over');
+        expect(opensSentenceByItself(at('state.over'), false)).toBe(true);
+        // Never over a round: it waits for the game to end.
+        for (const name of [
+            'state.countdown',
+            'state.answer',
+            'state.reveal',
+        ]) {
+            expect(at(name).game?.phase, name).toBe('live');
+            expect(opensSentenceByItself(at(name), false), name).toBe(false);
+        }
+        // «İndi yox» on this device, an account that agreed, a newcomer who waits, the voice off, an insecure page.
+        expect(opensSentenceByItself(fresh, true)).toBe(false);
+        expect(opensSentenceByItself(on, false)).toBe(false);
+        expect(opensSentenceByItself(as(fresh, LEYLA, false), false)).toBe(
+            false,
+        );
+        expect(
+            opensSentenceByItself(
+                { ...fresh, voice: { on: false, agreed: false } },
+                false,
+            ),
+        ).toBe(false);
+        expect(opensSentenceByItself(fresh, false, false)).toBe(false);
+    });
+
+    it('offers the line to always allow while the browser would ask', () => {
+        const bar = (
+            question: VoiceBrowser['question'],
+            mic: 'off' | 'on' = 'off',
+            captured = false,
+            viewer = on,
+        ) =>
+            voiceView(viewer, inVoice({ here: [AYGUN] }, mic, captured), true, {
+                held: false,
+                question,
+            })?.bar;
+
+        expect(bar('prompt')).toMatchObject({ form: 'in', alwaysAllow: true });
+        expect(bar('unknown')).toMatchObject({ alwaysAllow: true });
+        expect(bar('granted')).toMatchObject({ alwaysAllow: false });
+        expect(bar('denied')).toMatchObject({ alwaysAllow: false });
+        // The page holds a capture: opening it asks nothing. Nor while it is open, nor for a muted player.
+        expect(bar('prompt', 'off', true)).toMatchObject({
+            alwaysAllow: false,
+        });
+        expect(bar('prompt', 'on')).toMatchObject({ alwaysAllow: false });
+        expect(bar('prompt', 'off', false, as(on, TURAL, false))).toMatchObject(
+            { mic: 'muted', alwaysAllow: false },
+        );
+    });
+
+    it('says to tap while the browser holds the voice back, and stops at the first tap', () => {
+        const held: VoiceBrowser = { held: true, question: 'granted' };
+        const heard = inVoice({ here: [HOST, AYGUN] });
+
+        expect(voiceView(on, heard, true, held)?.bar).toMatchObject({
+            form: 'in',
+            held: true,
+        });
+        // The tap plays every voice: nothing is held any more.
+        expect(
+            voiceView(on, heard, true, { held: false, question: 'granted' })
+                ?.bar,
+        ).toMatchObject({ held: false });
+        // A page that captures is played to.
+        expect(
+            voiceView(on, inVoice({ here: [AYGUN] }, 'off', true), true, held)
+                ?.bar,
+        ).toMatchObject({ held: false });
+        // Out of the voice there is nothing to hear.
+        expect(voiceView(on, idle, true, held)?.bar.form).toBe('invited');
+    });
+});
+
+describe('VoiceOut', () => {
+    it('keeps the last twenty rooms left, and survives a storage that throws', () => {
+        const kept = new Map<string, string>();
+        const storage: VoiceOutStorage = {
+            getItem: (key) => kept.get(key) ?? null,
+            setItem: (key, value) => {
+                kept.set(key, value);
+            },
+        };
+        const out = new VoiceOut(() => storage);
+        const stored = () =>
+            JSON.parse(kept.get(VOICE_OUT_KEY) ?? 'null') as unknown;
+
+        // «Səsdən çıx» or «İndi yox»: remembered on the device, and read again after a reload.
+        expect(out.has(HOST)).toBe(false);
+        out.leave(HOST);
+        expect(out.has(HOST)).toBe(true);
+        expect(stored()).toEqual([HOST]);
+        expect(new VoiceOut(() => storage).has(HOST)).toBe(true);
+        // «Səsə qoşul» takes the room off.
+        out.back(HOST);
+        expect(out.has(HOST)).toBe(false);
+        expect(stored()).toEqual([]);
+
+        // The last twenty, the oldest first out; a room left again goes to the end.
+        for (let i = 1; i <= VOICE_OUT_KEEP + 1; i++) {
+            out.leave(`room-${i}`);
+        }
+        out.leave('room-2');
+        expect(VOICE_OUT_KEEP).toBe(20);
+        expect(out.has('room-1')).toBe(false);
+        expect(stored()).toHaveLength(20);
+        expect((stored() as string[]).at(-1)).toBe('room-2');
+        expect((stored() as string[])[0]).toBe('room-3');
+
+        // The page is told of each change while it listens.
+        const told = vi.fn();
+        const stop = out.subscribe(told);
+        out.leave('room-x');
+        stop();
+        out.leave('room-y');
+        expect(told).toHaveBeenCalledTimes(1);
+
+        // Whatever else the key holds is an empty list, or only its ids.
+        kept.set(VOICE_OUT_KEY, '{not json');
+        expect(new VoiceOut(() => storage).has('room-y')).toBe(false);
+        kept.set(VOICE_OUT_KEY, JSON.stringify([1, null, '', 'room-z']));
+        expect(new VoiceOut(() => storage).has('room-z')).toBe(true);
+
+        // A storage that throws at every read and write, one that cannot be reached, or none:
+        // the page remembers until a reload, and nothing throws.
+        const refusing: VoiceOutStorage = {
+            getItem: () => {
+                throw new DOMException('denied', 'SecurityError');
+            },
+            setItem: () => {
+                throw new DOMException('full', 'QuotaExceededError');
+            },
+        };
+        for (const reach of [
+            () => refusing,
+            () => {
+                throw new DOMException('denied', 'SecurityError');
+            },
+            () => null,
+        ]) {
+            const memory = new VoiceOut(reach);
+            expect(memory.has(AYGUN)).toBe(false);
+            expect(() => memory.leave(AYGUN)).not.toThrow();
+            expect(memory.has(AYGUN)).toBe(true);
+            expect(() => memory.back(AYGUN)).not.toThrow();
+            expect(memory.has(AYGUN)).toBe(false);
+        }
     });
 });
 

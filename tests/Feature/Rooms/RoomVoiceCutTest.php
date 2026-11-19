@@ -156,8 +156,8 @@ it('closes the voice room under a new epoch on a removal, the voice going off an
 });
 
 it('closes no voice room when the host removes a newcomer who waits', function (): void {
-    // A newcomer who came in after the voice was turned on waits: no ticket was ever issued for that row (C5).
-    $stranger = Rooms::join($this->room, User::factory()->player()->create(['name' => 'Tural Səfərov']));
+    // A newcomer who came in while a game ran waits: no ticket was ever issued for that row (C5).
+    $stranger = Rooms::newcomer($this->room, User::factory()->player()->create(['name' => 'Tural Səfərov']));
     expect($stranger->refresh()->voice_admitted_at)->toBeNull();
     $this->voice->sent = [];
 
@@ -303,7 +303,7 @@ it('closes the voice room under a new epoch when a ticket was replayed', functio
 
     // A newcomer who waits, inside: a ticket that was never theirs to have.
     $next = $this->room->voiceRoom();
-    $waiting = Rooms::join($this->room);
+    $waiting = Rooms::newcomer($this->room);
     $this->voice->joins($next, $this->hostRow->id);
     $this->voice->joins($next, $waiting->id, false);
     $sweep();

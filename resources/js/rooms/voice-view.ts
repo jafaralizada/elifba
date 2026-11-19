@@ -1,13 +1,17 @@
 /**
  * What a room page draws of the live voice (docs/frontend.md rule 15 "Live
  * voice"; architecture §12 "Live voice", "The page (C4)"; ADR 031 decisions
- * 8, 11, 12, 26 and 34): `voiceView(state, connection)` for a phone and
- * `screenVoiceView(state)` for the big screen. Pure: it reads the state —
- * who may what — and, on a phone, what its own voice connection says —
- * who is there, whose microphone is open, who speaks — and names everyone
- * from the state's `players` by the row's id, as it names everyone. It
- * imports nothing of the voice connection, so the screen can use it and
- * still reach no voice code (`RoomsApartTest`).
+ * 8, 11, 12, 26 and 34, and as amended 2026-11-19 decisions 36 and 40–42):
+ * `voiceView(state, connection)` for a phone and `screenVoiceView(state)`
+ * for the big screen, and when a phone joins the voice or opens the
+ * sentence by itself (`joinsByItself()`, `opensSentenceByItself()`). Pure:
+ * it reads the state — who may what — and, on a phone, what its own voice
+ * connection and its browser say — who is there, whose microphone is
+ * open, who speaks, whether the browser holds the voice back or would ask
+ * for the microphone — and names everyone from the state's `players` by
+ * the row's id, as it names everyone. It imports nothing of the voice
+ * connection, so the screen can use it and still reach no voice code
+ * (`RoomsApartTest`).
  */
 import type { RoomPlayer, RoomState, RoomVoiceStanding } from './contract';
 
@@ -28,7 +32,9 @@ export type VoiceTrouble =
     /** The connection dropped and the library's own tries ran out. */
     | 'dropped'
     /** The same account joined from another device, which now has the voice. */
-    | 'elsewhere';
+    | 'elsewhere'
+    /** The instance has no room for another voice in use (ADR 031 decision 38): a tap tries again, the page never does. */
+    | 'busy';
 
 /** The viewer's own voice connection as `rooms/voice.ts` reports it. */
 export type VoiceConnection =
@@ -40,6 +46,8 @@ export type VoiceConnection =
           live: VoiceLive;
           /** The viewer's own microphone: `opening` while the browser asks. */
           mic: 'off' | 'opening' | 'on';
+          /** The page holds a capture of the microphone, open or closed: opening it asks the browser nothing (ADR 031 decision 35). */
+          captured: boolean;
           /** The library is resuming a dropped connection, or the page asks for a new ticket. */
           reconnecting: boolean;
       }
@@ -86,6 +94,10 @@ export type VoiceBarForm =
           speaker: VoiceSpeaker;
           count: number;
           mic: 'off' | 'opening' | 'on' | 'muted';
+          /** The browser holds the heard voices back until a tap anywhere (ADR 031 decision 42): «Eşitmək üçün ekrana toxunun». */
+          held: boolean;
+          /** The line under «Mikrofonu aç» to always allow the site, while the browser would ask (decision 36). */
+          alwaysAllow: boolean;
       }
     | {
           form: 'trouble';
@@ -101,6 +113,16 @@ export type VoiceView = {
     /** The sheet «Canlı səs»: the host's row and each present player's, those who speak first. */
     rows: VoiceRow[];
 };
+
+/** What the browser says of the page (ADR 031 decisions 36 and 42), beside the connection. */
+export type VoiceBrowser = {
+    /** It holds the heard voices back until a tap: an iPhone on a page that joined by itself, Chrome on a page nobody tapped. */
+    held: boolean;
+    /** The Permissions API's `microphone`, or `unknown` where it cannot say. */
+    question: 'prompt' | 'granted' | 'denied' | 'unknown';
+};
+
+const QUIET: VoiceBrowser = { held: false, question: 'granted' };
 
 /** The viewer's own row: the player's, or the host's own row for a host who does not play. */
 export function myVoiceRow(state: RoomState): RoomPlayer | null {
@@ -129,6 +151,7 @@ export function voiceView(
     state: RoomState,
     connection: VoiceConnection = IDLE,
     secure = true,
+    browser: VoiceBrowser = QUIET,
 ): VoiceView | null {
     if (state.voice === null || !state.voice.on) {
         return null;
@@ -156,7 +179,12 @@ export function voiceView(
             ? null
             : { id: waitingRow.id, name: waitingRow.name };
 
-    return { host, bar: barForm(state, me, connection, secure), waiting, rows };
+    return {
+        host,
+        bar: barForm(state, me, connection, secure, browser),
+        waiting,
+        rows,
+    };
 }
 
 function barForm(
@@ -164,6 +192,7 @@ function barForm(
     me: RoomPlayer,
     connection: VoiceConnection,
     secure: boolean,
+    browser: VoiceBrowser,
 ): VoiceBarForm {
     if (!secure) {
         return { form: 'insecure' };
@@ -188,18 +217,87 @@ function barForm(
             };
         case 'failed':
             return { form: 'trouble', trouble: connection.trouble };
-        case 'in':
+        case 'in': {
             if (connection.reconnecting) {
                 return { form: 'trouble', trouble: 'reconnecting' };
             }
+
+            const mic = me.voice === 'muted' ? 'muted' : connection.mic;
 
             return {
                 form: 'in',
                 speaker: speakerOf(state, me.id, connection.live.speaking),
                 count: connection.live.here.length,
-                mic: me.voice === 'muted' ? 'muted' : connection.mic,
+                mic,
+                // After the page's first «Mikrofonu aç» it captures, and the browser plays every voice.
+                held: browser.held && !connection.captured,
+                alwaysAllow:
+                    mic === 'off' &&
+                    !connection.captured &&
+                    (browser.question === 'prompt' ||
+                        browser.question === 'unknown'),
             };
+        }
     }
+}
+
+/** Admitted (`open` or `muted`) into a room whose voice is on. */
+function admitted(state: RoomState): boolean {
+    if (state.voice === null || !state.voice.on) {
+        return false;
+    }
+
+    const me = myVoiceRow(state);
+
+    return me !== null && (me.voice === 'open' || me.voice === 'muted');
+}
+
+/**
+ * Whether the page may be in the voice without a tap (ADR 031 decision 40,
+ * as amended 2026-11-19): an admitted viewer whose account agreed, on a
+ * secure page, who has not left or declined this room's voice on this
+ * device (`left`, `rooms/voice-out.ts`). The page joins by itself when
+ * this becomes true — it opens, the viewer is admitted, the voice comes
+ * on — and not again while it stays true, so a refusal or a failure waits
+ * for a tap and the page never tries in a loop.
+ */
+export function mayJoinByItself(
+    state: RoomState,
+    left: boolean,
+    secure = true,
+): boolean {
+    return secure && !left && state.voice?.agreed === true && admitted(state);
+}
+
+/** Whether the page joins now by itself: it may, and it is out of the voice without a failure (`idle`). */
+export function joinsByItself(
+    state: RoomState,
+    connection: VoiceConnection,
+    left: boolean,
+    secure = true,
+): boolean {
+    return connection.kind === 'idle' && mayJoinByItself(state, left, secure);
+}
+
+/**
+ * Whether the sheet with the sentence opens by itself (ADR 031 decision
+ * 41): for an admitted viewer whose account has not agreed, on a secure
+ * page, who has not declined this room's voice on this device — on the
+ * start screen, between games or at the final, never over a round: a
+ * running game holds it back until it ends.
+ */
+export function opensSentenceByItself(
+    state: RoomState,
+    left: boolean,
+    secure = true,
+): boolean {
+    return (
+        secure &&
+        !left &&
+        state.voice?.agreed === false &&
+        state.game?.phase !== 'live' &&
+        admitted(state)
+    );
 }
 
 /** Who speaks, named from the state's rows; the viewer is left out of a list that has others. */

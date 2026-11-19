@@ -86,7 +86,7 @@ final readonly class SweepRoomVoices
     public function handle(bool $voice): int
     {
         try {
-            $names = $this->server->rooms();
+            $names = array_keys($this->server->rooms());
         } catch (RoomVoiceUnreachable $failure) {
             report(new RoomVoiceNotCut('*', $failure->call, $failure->cause));
 

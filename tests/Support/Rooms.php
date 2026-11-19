@@ -4,6 +4,7 @@ namespace Tests\Support;
 
 use App\Domain\Content\Enums\RoomMechanic;
 use App\Domain\Rooms\Actions\ChooseRoomGame;
+use App\Domain\Rooms\Actions\EndRoomGame;
 use App\Domain\Rooms\Actions\JoinRoom;
 use App\Domain\Rooms\Actions\OpenRoom;
 use App\Domain\Rooms\Actions\SetHostPlays;
@@ -71,10 +72,13 @@ final class Rooms
      * A room opened by `$host` (a new player when null) choosing `$mechanic`
      * through `OpenRoom`: a code, the choice, and the host as its first
      * player — stepped out through `SetHostPlays` when `$plays` is false.
+     * `$voice` is what the controller tells `OpenRoom` (`RoomsArea::voice()`):
+     * false by default, a room opened with the instance's voice off — or
+     * before ADR 031 as amended 2026-11-19 — whose host turns it on.
      */
-    public static function open(?User $host = null, bool $plays = true, RoomMechanic $mechanic = RoomMechanic::RecallOrder): Room
+    public static function open(?User $host = null, bool $plays = true, RoomMechanic $mechanic = RoomMechanic::RecallOrder, bool $voice = false): Room
     {
-        $room = app(OpenRoom::class)->handle($host ?? User::factory()->player()->create(), new OpenRoomData($mechanic));
+        $room = app(OpenRoom::class)->handle($host ?? User::factory()->player()->create(), new OpenRoomData($mechanic), $voice);
 
         if (! $plays) {
             app(SetHostPlays::class)->handle($room, new HostPlaysData(false));
@@ -102,6 +106,31 @@ final class Rooms
     public static function join(Room $room, ?User $account = null): RoomPlayer
     {
         return app(JoinRoom::class)->handle($room, $account ?? User::factory()->player()->create());
+    }
+
+    /**
+     * `$account` (a new player when null) joins the room while a game runs —
+     * the one running, or one started for it and ended right after — so that,
+     * with the room's voice on, its row waits for «Səsə burax»: a player who
+     * comes in before a game is let in at once (ADR 031 decision 39, as
+     * amended 2026-11-19). The room is back between games unless its game
+     * was already running.
+     */
+    public static function newcomer(Room $room, ?User $account = null): RoomPlayer
+    {
+        $running = $room->refresh()->runningGame(RoomClock::nowMs()) !== null;
+
+        if (! $running) {
+            self::playing($room);
+        }
+
+        $row = self::join($room, $account);
+
+        if (! $running) {
+            app(EndRoomGame::class)->handle($room);
+        }
+
+        return $row->refresh();
     }
 
     /**
